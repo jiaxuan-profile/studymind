@@ -2,6 +2,23 @@
 
 StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, and vector similarity search for related content.
 
+## Learning Approach
+
+StudyMind supports both formative and summative assessment strategies:
+
+### Formative Assessment
+- **Continuous Learning**: Regular practice questions and review sessions spread across your study period
+- **Progress Tracking**: Monitor your understanding with spaced repetition
+- **Immediate Feedback**: Get instant AI-powered explanations and concept clarifications
+- **Self-Assessment**: Generate practice questions to test your knowledge
+- **Adaptive Learning**: Focus more on challenging concepts based on your performance
+
+### Summative Assessment
+- **Exam Preparation**: Comprehensive review of all covered material
+- **Knowledge Synthesis**: Connect concepts across different topics
+- **Mock Tests**: Generate exam-style questions to assess overall understanding
+- **Performance Analytics**: Track your readiness for final assessments
+
 ## Database Setup
 
 First, enable the vector extension and create the necessary tables and functions:
