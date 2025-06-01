@@ -1,26 +1,24 @@
-// vercel.json
+// Suggested vercel.json (THIS IS JAVASCRIPT WITH COMMENTS, NOT PURE JSON)
 {
   "version": 2,
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "nodejs20.x", // Or nodejs18.x - use a modern version
-      // Ensure no other settings here are forcing CommonJS
-      "memory": 1024, // Optional: default is 1024MB for Node.js
-      "maxDuration": 10 // Optional: default is 10s for Hobby plan
-    }
-  },
-  "builds": [
-    {
-      "src": "package.json", // This makes Vercel use your project's build scripts
-      "use": "@vercel/static-build", // For Vite
-      "config": {
-        "distDir": "dist" // Vite's output directory
-      }
-    },
-    {
-      "src": "api/**/*.ts", // Tell Vercel to handle .ts files in api/
-      "use": "@vercel/node"  // Use the Vercel Node.js builder
-      // This builder should respect "type": "module" if runtime is modern
-    }
-  ]
-}
+  "functions": { // This object starts here
+    "api/**/*.ts": { // Key
+      "runtime": "nodejs20.x", // Key-value pair
+      "memory": 1024,
+      "maxDuration": 10
+    } // This object for "api/**/*.ts" ends here
+  }, // Comma is correct as "builds" follows
+  "builds": [ // Array starts here
+    { // First object in array
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { // Nested object
+        "distDir": "dist"
+      } // "config" object ends
+    }, // Comma is correct as another object follows
+    { // Second object in array
+      "src": "api/**/*.ts",
+      "use": "@vercel/node"
+    } // Second object ends, NO TRAILING COMMA if this is the last element in the array
+  ] // Array ends, NO TRAILING COMMA if this is the last property in the root object
+} // Root object ends
