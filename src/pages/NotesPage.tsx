@@ -52,20 +52,27 @@ const NotesPage: React.FC = () => {
   };
 
   const handleCreateNewNote = async () => {
-    const id = Math.random().toString(36).substring(2, 11);
-    const now = new Date();
+    try {
+      const id = Math.random().toString(36).substring(2, 11);
+      const now = new Date();
 
-    const newNote = {
-      id,
-      title: 'Untitled Note',
-      content: '',
-      tags: [],
-      createdAt: now,
-      updatedAt: now,
-    };
+      const newNote = {
+        id,
+        title: 'Untitled Note',
+        content: '',
+        tags: [],
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    await addNote(newNote);
-    navigate(`/notes/${id}`);
+      await addNote(newNote);
+      
+      // Navigate to the new note with state indicating it's a new note
+      navigate(`/notes/${id}`, { state: { isNewNote: true } });
+    } catch (error) {
+      console.error("Error creating new note:", error);
+      alert(`Failed to create note: ${(error as Error).message}`);
+    }
   };
   
   const handleDelete = async (id: string, e: React.MouseEvent) => {

@@ -1,6 +1,5 @@
-// src/pages/NoteDetailPage.tsx
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import ReactMarkdown from 'react-markdown';
 import { 
@@ -20,10 +19,11 @@ import { saveNoteToDatabase } from '../services/databaseServiceClient';
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { notes, updateNote, deleteNote } = useStore();
   
   const [note, setNote] = useState(notes.find((n) => n.id === id));
-  const [editMode, setEditMode] = useState(false);
+  const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
   const [isSaving, setIsSaving] = useState(false);
   const [editedNote, setEditedNote] = useState(() => {
     const current = notes.find(n => n.id === id);
@@ -37,6 +37,13 @@ const NoteDetailPage: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
+
+  useEffect(() => {
+    // Clear the location state after initial setup
+    if (location.state?.isNewNote) {
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate, location.pathname]);
   
   useEffect(() => {
     const foundNote = notes.find((n) => n.id === id);
@@ -333,7 +340,7 @@ I can help with:
               >
                 {showAiPanel ? (
                   <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
-                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
+                    <path fillRule="evenodd\" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
