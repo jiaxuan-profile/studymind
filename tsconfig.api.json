@@ -1,9 +1,8 @@
-// tsconfig.api.json 
 {
   "compilerOptions": {
     "target": "ESNext",
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
     "outDir": "dist-api",
     "rootDir": "api",
     "esModuleInterop": true,
