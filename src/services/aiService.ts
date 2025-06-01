@@ -31,7 +31,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
     // Extract key concepts using the first few paragraphs
     const preview = content.split('\n').slice(0, 3).join('\n');
-    const conceptResponse = await fetch('https://studymind-ai.netlify.app/.netlify/functions/analyze-concepts', {
+    const conceptResponse = await fetch('/api/analyze-concepts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: preview, title })
@@ -58,7 +58,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
 export async function generateNoteSummary(content: string): Promise<string> {
   try {
-    const response = await fetch('https://studymind-ai.netlify.app/.netlify/functions/summarize', {
+    const response = await fetch('/api/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: content })
