@@ -3,6 +3,8 @@ import { Upload, FileText, AlertCircle } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { useStore } from '../store';
+import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
+import { saveNoteToDatabase } from '../services/databaseServiceClient';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -39,17 +41,41 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           throw new Error('Unsupported file type');
       }
 
-      // Create a new note
-      const noteId = Math.random().toString(36).substring(2, 11);
+      // Create note data
+      const id = Math.random().toString(36).substring(2, 11);
+      const title = file.name.replace(`.${fileType}`, '');
       const now = new Date();
-      
+      const tags = [fileType.toUpperCase(), 'Imported'];
+
+      // Generate embedding
+      console.log("Generating embedding for uploaded document...");
+      const embedding = await generateEmbeddingOnClient(content, title);
+      console.log("Embedding generated successfully");
+
+      // Save to database
+      const noteData = {
+        id,
+        title,
+        content,
+        tags,
+        embedding,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString()
+      };
+
+      console.log("Saving uploaded document to database...");
+      await saveNoteToDatabase(noteData);
+      console.log("Document saved to database successfully");
+
+      // Add to store
       await addNote({
-        id: noteId,
-        title: file.name.replace(`.${fileType}`, ''),
-        content: content,
-        tags: [fileType.toUpperCase()],
+        id,
+        title,
+        content,
+        tags,
+        embedding,
         createdAt: now,
-        updatedAt: now,
+        updatedAt: now
       });
 
       if (onClose) onClose();
