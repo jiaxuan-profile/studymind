@@ -87,7 +87,7 @@ const NotesPage: React.FC = () => {
       await saveNoteToDatabase(noteToSaveToDb);
       console.log("New note saved to database.");
 
-      addNote({
+      const createdNote = {
         id,
         title: newNote.title,
         content: newNote.content,
@@ -95,8 +95,9 @@ const NotesPage: React.FC = () => {
         createdAt: now,
         updatedAt: now,
         embedding
-      });
+      };
 
+      await addNote(createdNote);
       setNewNote({ title: '', content: '', tags: '' });
       setShowNewNoteForm(false);
       
