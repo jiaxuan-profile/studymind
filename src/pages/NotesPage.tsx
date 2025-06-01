@@ -22,14 +22,8 @@ const NotesPage: React.FC = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [showNewNoteForm, setShowNewNoteForm] = useState(false);
   const [showPdfUploader, setShowPdfUploader] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [newNote, setNewNote] = useState({
-    title: '',
-    content: '',
-    tags: '',
-  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get all unique tags from notes
@@ -56,60 +50,22 @@ const NotesPage: React.FC = () => {
       setSelectedTags([...selectedTags, tag]);
     }
   };
-  
-  const handleNewNoteSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
 
-    try {
-      const id = Math.random().toString(36).substring(2, 11);
-      const now = new Date();
+  const handleCreateNewNote = async () => {
+    const id = Math.random().toString(36).substring(2, 11);
+    const now = new Date();
 
-      console.log("Generating embedding for new note...");
-      const embedding = await generateEmbeddingOnClient(newNote.content, newNote.title);
-      console.log("Embedding generated for new note.");
+    const newNote = {
+      id,
+      title: 'Untitled Note',
+      content: '',
+      tags: [],
+      createdAt: now,
+      updatedAt: now,
+    };
 
-      if (!embedding) {
-        throw new Error('Failed to generate embedding for new note.');
-      }
-
-      const noteToSaveToDb = {
-        id,
-        title: newNote.title,
-        content: newNote.content,
-        tags: newNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-        embedding
-      };
-
-      console.log("Saving new note to database...");
-      await saveNoteToDatabase(noteToSaveToDb);
-      console.log("New note saved to database.");
-
-      const createdNote = {
-        id,
-        title: newNote.title,
-        content: newNote.content,
-        tags: noteToSaveToDb.tags,
-        createdAt: now,
-        updatedAt: now,
-        embedding
-      };
-
-      await addNote(createdNote);
-      setNewNote({ title: '', content: '', tags: '' });
-      setShowNewNoteForm(false);
-      
-      // Navigate to the new note's detail page
-      navigate(`/notes/${id}`);
-
-    } catch (error) {
-      console.error("Error creating new note:", error);
-      alert(`Failed to create new note: ${(error as Error).message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
+    await addNote(newNote);
+    navigate(`/notes/${id}`);
   };
   
   const handleDelete = async (id: string, e: React.MouseEvent) => {
@@ -199,20 +155,14 @@ const NotesPage: React.FC = () => {
         <h1 className="text-3xl font-bold text-gray-900">Your Notes</h1>
         <div className="flex gap-2">
           <button
-            onClick={() => {
-              setShowNewNoteForm(true);
-              setShowPdfUploader(false);
-            }}
+            onClick={handleCreateNewNote}
             className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
           >
             <Plus className="h-5 w-5 mr-2" />
-            New Note
+            Create Note
           </button>
           <button
-            onClick={() => {
-              setShowPdfUploader(true);
-              setShowNewNoteForm(false);
-            }}
+            onClick={() => setShowPdfUploader(true)}
             className="flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
           >
             <FileText className="h-5 w-5 mr-2" />
@@ -360,73 +310,7 @@ const NotesPage: React.FC = () => {
               </svg>
             </button>
           </div>
-          <DocumentUploader />
-        </div>
-      )}
-      
-      {/* New Note Form */}
-      {showNewNoteForm && (
-        <div className="mb-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200 slide-in">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Create New Note</h2>
-          <form onSubmit={handleNewNoteSubmit}>
-            <div className="mb-4">
-              <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                Title
-              </label>
-              <input
-                type="text"
-                id="title"
-                required
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                value={newNote.title}
-                onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
-              />
-            </div>
-            <div className="mb-4">
-              <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
-                Content (Markdown supported)
-              </label>
-              <textarea
-                id="content"
-                rows={6}
-                required
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                value={newNote.content}
-                onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="mb-4">
-              <label htmlFor="tags" className="block text-sm font-medium text-gray-700 mb-1">
-                Tags (comma separated)
-              </label>
-              <input
-                type="text"
-                id="tags"
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                placeholder="AI, Study, Math"
-                value={newNote.tags}
-                onChange={(e) => setNewNote({ ...newNote, tags: e.target.value })}
-              />
-            </div>
-            <div className="flex justify-end space-x-3">
-              <button
-                type="button"
-                className="px-4 py-2 border border-gray-300  rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                onClick={() => setShowNewNoteForm(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-              >
-                {isSubmitting ? 'Creating...' : 'Create Note'}
-              </button>
-            </div>
-          </form>
+          <DocumentUploader onClose={() => setShowPdfUploader(false)} />
         </div>
       )}
       
@@ -471,7 +355,7 @@ const NotesPage: React.FC = () => {
           {!searchTerm && selectedTags.length === 0 && (
             <div className="mt-6 flex justify-center gap-4">
               <button
-                onClick={() => setShowNewNoteForm(true)}
+                onClick={handleCreateNewNote}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
               >
                 <Plus className="h-5 w-5 mr-2" />
