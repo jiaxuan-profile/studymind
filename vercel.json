@@ -1,15 +1,26 @@
+// vercel.json
 {
   "version": 2,
   "functions": {
-    "api/generate-embedding.ts": {
-      "memory": 1024,
-      "maxDuration": 30
+    "api/**/*.ts": {
+      "runtime": "nodejs20.x", // Or nodejs18.x - use a modern version
+      // Ensure no other settings here are forcing CommonJS
+      "memory": 1024, // Optional: default is 1024MB for Node.js
+      "maxDuration": 10 // Optional: default is 10s for Hobby plan
     }
   },
-  "routes": [
+  "builds": [
     {
-      "src": "/api/generate-embedding",
-      "dest": "/api/generate-embedding.ts"
+      "src": "package.json", // This makes Vercel use your project's build scripts
+      "use": "@vercel/static-build", // For Vite
+      "config": {
+        "distDir": "dist" // Vite's output directory
+      }
+    },
+    {
+      "src": "api/**/*.ts", // Tell Vercel to handle .ts files in api/
+      "use": "@vercel/node"  // Use the Vercel Node.js builder
+      // This builder should respect "type": "module" if runtime is modern
     }
   ]
 }
