@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -7,8 +7,15 @@ import NoteDetailPage from './pages/NoteDetailPage';
 import ConceptsPage from './pages/ConceptsPage';
 import ReviewPage from './pages/ReviewPage';
 import NotFoundPage from './pages/NotFoundPage';
+import { useStore } from './store';
 
 function App() {
+  const { loadNotes } = useStore();
+
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
+
   return (
     <Routes>
       <Route path="/" element={<Layout />}>
