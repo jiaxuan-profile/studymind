@@ -1,24 +1,23 @@
-// Suggested vercel.json (THIS IS JAVASCRIPT WITH COMMENTS, NOT PURE JSON)
 {
   "version": 2,
-  "functions": { // This object starts here
-    "api/**/*.ts": { // Key
-      "runtime": "nodejs20.x", // Key-value pair
+  "functions": { 
+    "api/**/*.ts": {
+      "runtime": "nodejs20.x",
       "memory": 1024,
       "maxDuration": 10
-    } // This object for "api/**/*.ts" ends here
-  }, // Comma is correct as "builds" follows
-  "builds": [ // Array starts here
-    { // First object in array
+    }
+  },
+  "builds": [
+    { 
       "src": "package.json",
       "use": "@vercel/static-build",
-      "config": { // Nested object
+      "config": { 
         "distDir": "dist"
-      } // "config" object ends
-    }, // Comma is correct as another object follows
-    { // Second object in array
+      } 
+    }, 
+    { 
       "src": "api/**/*.ts",
       "use": "@vercel/node"
-    } // Second object ends, NO TRAILING COMMA if this is the last element in the array
-  ] // Array ends, NO TRAILING COMMA if this is the last property in the root object
-} // Root object ends
+    } 
+  ] 
+}
