@@ -20,9 +20,6 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       hasEmbedding: !!noteData.embedding
     });
 
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-
     const { data, error } = await supabase
       .from('notes')
       .upsert({
@@ -32,8 +29,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         tags: noteData.tags,
         embedding: noteData.embedding,
         updated_at: noteData.updatedAt,
-        created_at: noteData.createdAt || noteData.updatedAt,
-        user_id: userData.user.id
+        created_at: noteData.createdAt || noteData.updatedAt
       })
       .select();
 
@@ -79,13 +75,9 @@ export async function getAllNotes() {
   try {
     console.log("Database Service: Fetching all notes");
     
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) throw userError;
-
     const { data, error } = await supabase
       .from('notes')
       .select('*')
-      .eq('user_id', userData.user.id)
       .order('updated_at', { ascending: false });
 
     if (error) {
