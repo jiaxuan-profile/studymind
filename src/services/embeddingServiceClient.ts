@@ -1,6 +1,6 @@
 // src/services/embeddingServiceClient.ts 
 const API_BASE_URL = import.meta.env.PROD 
-  ? '/.netlify/functions'
+  ? 'https://studymind-ai.netlify.app/.netlify/functions'
   : '';
 const EMBEDDING_ENDPOINT = `${API_BASE_URL}/generate-embedding`;
 
