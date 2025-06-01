@@ -9,9 +9,25 @@ Given a text, identify:
 Format the response as JSON with tags, concepts, and summary fields.`;
 
 export const handler: Handler = async (event) => {
+  // Add CORS headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
+  };
+
+  // Handle preflight requests
+  if (event.httpMethod === 'OPTIONS') {
+    return {
+      statusCode: 204,
+      headers
+    };
+  }
+
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
+      headers,
       body: JSON.stringify({ error: 'Method not allowed' })
     };
   }
@@ -22,11 +38,16 @@ export const handler: Handler = async (event) => {
     if (!text || !title) {
       return {
         statusCode: 400,
+        headers,
         body: JSON.stringify({ error: 'Missing text or title' })
       };
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY is not configured');
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({ model: 'gemini-pro' });
 
     const prompt = `${SYSTEM_PROMPT}\n\nTitle: ${title}\n\nContent: ${text}`;
@@ -40,6 +61,7 @@ export const handler: Handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify(analysis)
     };
 
@@ -47,7 +69,11 @@ export const handler: Handler = async (event) => {
     console.error('Error analyzing concepts:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'Failed to analyze concepts' })
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to analyze concepts',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      })
     };
   }
 };
