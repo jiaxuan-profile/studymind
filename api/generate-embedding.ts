@@ -1,19 +1,22 @@
 import { GoogleGenerativeAI, TaskType, Content } from "@google/generative-ai";
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { Handler } from '@netlify/functions';
 
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
+export const handler: Handler = async (event, context) => {
   console.log("------------------------------------------------------");
   console.log(`SERVERLESS: /api/generate-embedding invoked at ${new Date().toISOString()}`);
-  console.log("SERVERLESS: Request method:", req.method);
-  console.log("SERVERLESS: Request headers:", JSON.stringify(req.headers, null, 2));
+  console.log("SERVERLESS: Request method:", event.httpMethod);
+  console.log("SERVERLESS: Request headers:", JSON.stringify(event.headers, null, 2));
 
-  if (req.method !== 'POST') {
+  if (event.httpMethod !== 'POST') {
     console.warn("SERVERLESS: Method not allowed. Responding with 405.");
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: 'Method Not Allowed' });
+    return {
+      statusCode: 405,
+      headers: {
+        'Allow': 'POST',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ error: 'Method Not Allowed' })
+    };
   }
 
   try {
@@ -22,14 +25,17 @@ export default async function handler(
 
     if (!apiKey) {
       console.error("SERVERLESS: CRITICAL - GEMINI_API_KEY is NOT SET in environment variables.");
-      return res.status(500).json({
-        error: "Server configuration error: GEMINI_API_KEY is not configured."
-      });
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "Server configuration error: GEMINI_API_KEY is not configured."
+        })
+      };
     }
     console.log("SERVERLESS: GEMINI_API_KEY is present (length > 0):", apiKey.length > 0);
 
     console.log("SERVERLESS: Attempting to parse request body.");
-    const requestBody = req.body;
+    const requestBody = JSON.parse(event.body || '{}');
     console.log("SERVERLESS: Raw request body:", JSON.stringify(requestBody, null, 2));
 
     const { text, title } = requestBody;
@@ -38,26 +44,35 @@ export default async function handler(
     if (!text || typeof text !== 'string' || text.trim().length === 0) {
       console.warn("SERVERLESS: Invalid or missing 'text' in request body.");
       console.warn(`SERVERLESS: Received text: ${JSON.stringify(text)}`);
-      return res.status(400).json({ 
-        error: "Missing or invalid 'text' field. Must be a non-empty string." 
-      });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: "Missing or invalid 'text' field. Must be a non-empty string." 
+        })
+      };
     }
 
     if (!title || typeof title !== 'string' || title.trim().length === 0) {
       console.warn("SERVERLESS: Invalid or missing 'title' in request body.");
       console.warn(`SERVERLESS: Received title: ${JSON.stringify(title)}`);
-      return res.status(400).json({ 
-        error: "Missing or invalid 'title' field. Must be a non-empty string." 
-      });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: "Missing or invalid 'title' field. Must be a non-empty string." 
+        })
+      };
     }
 
     // Check for reasonable text length limits
     const MAX_TEXT_LENGTH = 10000; // Adjust based on your needs
     if (text.length > MAX_TEXT_LENGTH) {
       console.warn(`SERVERLESS: Text too long (${text.length} chars). Max allowed: ${MAX_TEXT_LENGTH}`);
-      return res.status(400).json({ 
-        error: `Text too long. Maximum allowed length is ${MAX_TEXT_LENGTH} characters.` 
-      });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ 
+          error: `Text too long. Maximum allowed length is ${MAX_TEXT_LENGTH} characters.` 
+        })
+      };
     }
 
     console.log(`SERVERLESS: Successfully parsed 'text' (length: ${text.length}) and 'title' (length: ${title.length}) from body.`);
@@ -86,23 +101,29 @@ export default async function handler(
     if (!result || !result.embedding || !result.embedding.values || result.embedding.values.length === 0) {
       console.error('SERVERLESS: Embedding, embedding.values, or values array is undefined or empty in the API result.');
       console.error('SERVERLESS: Full API result object:', JSON.stringify(result, null, 2));
-      return res.status(500).json({ 
-        error: 'Failed to generate valid embedding values from API' 
-      });
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Failed to generate valid embedding values from API' 
+        })
+      };
     }
 
     console.log(`SERVERLESS: Successfully generated embedding with ${result.embedding.values.length} dimensions. Responding with 200 OK.`);
 
-    // Set appropriate headers for the response
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Cache-Control', 'no-cache'); // Embeddings might change, so avoid caching
-
-    return res.status(200).json({ 
-      embedding: result.embedding.values,
-      dimensions: result.embedding.values.length,
-      title: title.trim(),
-      textLength: text.length
-    });
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      body: JSON.stringify({ 
+        embedding: result.embedding.values,
+        dimensions: result.embedding.values.length,
+        title: title.trim(),
+        textLength: text.length
+      })
+    };
 
   } catch (error: any) {
     console.error("-------------------- SERVERLESS ERROR START --------------------");
@@ -148,10 +169,13 @@ export default async function handler(
       }
     }
 
-    return res.status(statusCode).json({ 
-      error: errorMessage,
-      timestamp: new Date().toISOString()
-    });
+    return {
+      statusCode,
+      body: JSON.stringify({ 
+        error: errorMessage,
+        timestamp: new Date().toISOString()
+      })
+    };
     
   } finally {
     console.log(`SERVERLESS: /api/generate-embedding finished processing at ${new Date().toISOString()}`);
