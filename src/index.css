@@ -86,8 +86,31 @@
   @apply my-4;
 }
 
-.note-content code {
-  @apply px-2 py-1 bg-gray-100 rounded-md text-sm font-mono text-gray-800;
+/* Inline code styling */
+.note-content > :not(pre) > code {
+  @apply px-1.5 py-1 bg-gray-100 rounded-md text-sm font-mono text-primary-dark;
+  background-color: theme('colors.gray.100') !important;
+  color: theme('colors.primary.dark') !important;
+  font-weight: normal !important;
+  border-radius: theme('borderRadius.md') !important;
+}
+
+/* Code block container */
+.note-content pre {
+  @apply bg-gray-50 border border-gray-200 rounded-lg p-4 my-6 overflow-x-auto shadow-sm;
+  background-color: theme('colors.gray.50') !important;
+  color: theme('colors.gray.800') !important;
+}
+
+/* Code block content */
+.note-content pre code {
+  @apply font-mono text-sm block;
+  background-color: transparent !important;
+  color: inherit !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  font-weight: normal !important;
+  text-shadow: none !important;
 }
 
 /* Animations */
