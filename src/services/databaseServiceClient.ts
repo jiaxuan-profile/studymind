@@ -5,6 +5,7 @@ interface NotePayload {
   id: string;
   title: string;
   content: string;
+  summary?: string;
   tags: string[];
   embedding?: number[]; 
   updatedAt: string;
@@ -17,6 +18,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       id: noteData.id,
       title: noteData.title,
       tags: noteData.tags,
+      hasSummary: !!noteData.summary,
       hasEmbedding: !!noteData.embedding
     });
 
@@ -26,6 +28,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         id: noteData.id,
         title: noteData.title,
         content: noteData.content,
+        summary: noteData.summary,
         tags: noteData.tags,
         embedding: noteData.embedding,
         updated_at: noteData.updatedAt,
@@ -129,6 +132,33 @@ export async function deleteNoteFromDatabase(id: string) {
 
   } catch (error) {
     console.error('Database Service: Error deleting note:', error);
+    throw error;
+  }
+}
+
+export async function updateNoteSummary(id: string, summary: string) {
+  try {
+    console.log("Database Service: Updating note summary:", { id, summaryLength: summary.length });
+    
+    const { data, error } = await supabase
+      .from('notes')
+      .update({ 
+        summary,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select();
+
+    if (error) {
+      console.error("Database Service: Supabase error:", error);
+      throw new Error(`Failed to update note summary: ${error.message}`);
+    }
+
+    console.log("Database Service: Note summary updated successfully");
+    return data;
+
+  } catch (error) {
+    console.error('Database Service: Error updating note summary:', error);
     throw error;
   }
 }

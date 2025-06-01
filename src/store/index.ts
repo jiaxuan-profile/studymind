@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { Note, Concept, User, ReviewItem } from '../types';
 import { demoConcepts } from '../data/demoConcepts';
 import { demoReviews } from '../data/demoReviews';
-import { getAllNotes } from '../services/databaseServiceClient';
+import { getAllNotes, updateNoteSummary } from '../services/databaseServiceClient';
+import { generateNoteSummary } from '../services/aiService';
 
 interface PaginationState {
   currentPage: number;
@@ -30,6 +31,7 @@ interface State {
   loadNotes: (page?: number, pageSize?: number) => Promise<void>;
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
+  summarizeNote: (id: string) => Promise<void>;
   
   // Concepts actions
   addConcept: (concept: Concept) => void;
@@ -82,7 +84,8 @@ export const useStore = create<State>((set, get) => ({
           ...note,
           createdAt: new Date(note.created_at),
           updatedAt: new Date(note.updated_at),
-          tags: note.tags || []
+          tags: note.tags || [],
+          summary: note.summary
         })),
         isLoading: false,
         pagination: {
@@ -124,6 +127,36 @@ export const useStore = create<State>((set, get) => ({
   })),
   
   setCurrentNote: (note) => set({ currentNote: note }),
+
+  summarizeNote: async (id) => {
+    const note = get().notes.find(n => n.id === id);
+    if (!note) return;
+
+    try {
+      set(state => ({
+        notes: state.notes.map(n => 
+          n.id === id ? { ...n, summary: 'Generating summary...' } : n
+        )
+      }));
+
+      const summary = await generateNoteSummary(note.content);
+      await updateNoteSummary(id, summary);
+
+      set(state => ({
+        notes: state.notes.map(n => 
+          n.id === id ? { ...n, summary } : n
+        )
+      }));
+    } catch (error) {
+      console.error('Error summarizing note:', error);
+      set(state => ({
+        notes: state.notes.map(n => 
+          n.id === id ? { ...n, summary: undefined } : n
+        )
+      }));
+      throw error;
+    }
+  },
   
   // Concepts actions
   addConcept: (concept) => set((state) => ({ concepts: [...state.concepts, concept] })),
