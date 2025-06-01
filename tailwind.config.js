@@ -62,12 +62,25 @@ export default {
               fontWeight: '600',
             },
             code: {
-              color: '#1F2937',
-              backgroundColor: '#F3F4F6',
+              color: '#E5E7EB', // Light text for dark background
+              backgroundColor: '#1F2937', // Dark background
               padding: '0.25rem 0.5rem',
               borderRadius: '0.375rem',
               fontWeight: '500',
             },
+            'pre code': {
+              backgroundColor: 'transparent',
+              color: '#E5E7EB',
+              padding: '0',
+              borderRadius: '0',
+            },
+            pre: {
+              backgroundColor: '#1F2937',
+              color: '#E5E7EB',
+              padding: '1rem',
+              borderRadius: '0.5rem',
+              border: '1px solid #374151',
+            }
           },
         },
       },
