@@ -7,22 +7,22 @@ export default {
     extend: {
       colors: {
         primary: {
-          light: '#6366F1',
-          DEFAULT: '#4F46E5',
-          dark: '#4338CA',
+          light: '#818CF8',
+          DEFAULT: '#6366F1',
+          dark: '#4F46E5',
         },
         secondary: {
-          light: '#14B8A6',
-          DEFAULT: '#0D9488',
-          dark: '#0F766E',
+          light: '#34D399',
+          DEFAULT: '#10B981',
+          dark: '#059669',
         },
         accent: {
-          light: '#FBBF24',
+          light: '#FCD34D',
           DEFAULT: '#F59E0B',
           dark: '#D97706',
         },
         success: {
-          DEFAULT: '#10B981',
+          DEFAULT: '#059669',
         },
         warning: {
           DEFAULT: '#FBBF24',
@@ -32,7 +32,7 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       typography: {
         DEFAULT: {
@@ -40,9 +40,9 @@ export default {
             maxWidth: 'none',
             color: '#374151',
             a: {
-              color: '#4F46E5',
+              color: '#6366F1',
               '&:hover': {
-                color: '#4338CA',
+                color: '#4F46E5',
               },
             },
             h1: {
@@ -61,14 +61,27 @@ export default {
               color: '#1F2937',
               fontWeight: '600',
             },
+            code: {
+              color: '#1F2937',
+              backgroundColor: '#F3F4F6',
+              padding: '0.25rem 0.5rem',
+              borderRadius: '0.375rem',
+              fontWeight: '500',
+            },
           },
         },
       },
-      spacing: {
-        '18': '4.5rem',
+      backgroundImage: {
+        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        'gradient-conic': 'conic-gradient(var(--tw-gradient-stops))',
+      },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
       },
       animation: {
-        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        shimmer: 'shimmer 2s infinite',
       },
     },
   },

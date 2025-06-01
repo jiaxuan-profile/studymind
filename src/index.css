@@ -3,43 +3,119 @@
 @tailwind utilities;
 
 :root {
-  --color-primary: #4F46E5;
-  --color-primary-light: #6366F1;
-  --color-primary-dark: #4338CA;
-  --color-secondary: #0D9488;
+  --color-primary: #6366F1;
+  --color-primary-light: #818CF8;
+  --color-primary-dark: #4F46E5;
+  --color-secondary: #10B981;
   --color-accent: #F59E0B;
-  --color-success: #10B981;
+  --color-success: #059669;
   --color-warning: #FBBF24;
   --color-error: #EF4444;
+  
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.2);
+  --glass-shadow: rgba(31, 41, 55, 0.1);
 }
 
-body {
-  font-family: 'Inter', sans-serif;
-  @apply text-gray-800 bg-gray-50;
+@layer base {
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    @apply text-gray-800 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-bold tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    @apply backdrop-blur-lg bg-white/80 border border-white/20 shadow-lg;
+  }
+  
+  .glass-button {
+    @apply px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 border border-white/30 
+           shadow-sm transition-all duration-200 backdrop-blur-sm;
+  }
+
+  .card {
+    @apply bg-white/90 backdrop-blur-sm border border-gray-100 rounded-xl shadow-lg 
+           hover:shadow-xl transition-all duration-300 overflow-hidden;
+  }
+
+  .card-hover {
+    @apply hover:scale-[1.02] hover:border-primary/20;
+  }
+
+  .input-field {
+    @apply block w-full rounded-lg border-gray-200 bg-white/70 backdrop-blur-sm
+           focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all duration-200;
+  }
+
+  .button-primary {
+    @apply px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark 
+           focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200
+           shadow-md hover:shadow-lg active:scale-95;
+  }
+
+  .button-secondary {
+    @apply px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg
+           hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-200
+           transition-all duration-200 shadow-sm hover:shadow-md active:scale-95;
+  }
 }
 
 .note-content {
   @apply prose prose-gray max-w-none;
-  line-height: 1.6;
+  line-height: 1.8;
+}
+
+.note-content h1 {
+  @apply text-3xl font-bold text-gray-900 mb-6;
+}
+
+.note-content h2 {
+  @apply text-2xl font-semibold text-gray-800 mt-8 mb-4;
+}
+
+.note-content p {
+  @apply text-gray-700 mb-4;
+}
+
+.note-content ul, .note-content ol {
+  @apply my-4;
+}
+
+.note-content code {
+  @apply px-2 py-1 bg-gray-100 rounded-md text-sm font-mono text-gray-800;
 }
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes slideIn {
-  from { transform: translateY(10px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
+  from { transform: translateX(-20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
 .fade-in {
-  animation: fadeIn 0.3s ease-in-out;
+  animation: fadeIn 0.4s ease-out;
 }
 
 .slide-in {
-  animation: slideIn 0.3s ease-in-out;
+  animation: slideIn 0.3s ease-out;
+}
+
+.scale-in {
+  animation: scaleIn 0.3s ease-out;
 }
 
 /* Custom scrollbar */
@@ -49,13 +125,56 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100;
+  @apply bg-gray-100/50 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 rounded-full;
+  @apply bg-gray-300 rounded-full hover:bg-gray-400 transition-colors;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400;
+/* Loading animations */
+.loading-dots:after {
+  content: '.';
+  animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% { content: '.'; }
+  40% { content: '..'; }
+  60% { content: '...'; }
+  80%, 100% { content: ''; }
+}
+
+/* Gradient text */
+.gradient-text {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
+}
+
+/* Glass morphism cards */
+.glass-card {
+  @apply relative overflow-hidden rounded-2xl;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transition: 0.5s;
+}
+
+.glass-card:hover::before {
+  left: 100%;
 }

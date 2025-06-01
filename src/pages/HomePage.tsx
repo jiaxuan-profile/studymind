@@ -4,7 +4,32 @@ import { useStore } from '../store';
 import { PlusCircle, Clock, BookOpen, BrainCircuit, Search, GraduationCap } from 'lucide-react';
 
 const HomePage: React.FC = () => {
-  const { notes, concepts, reviews } = useStore();
+  const { notes, concepts, reviews, isLoading, error } = useStore();
+  
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your study materials...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-600 mb-4">Error loading data: {error}</div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="text-primary hover:text-primary-dark"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
   
   // Get recent notes (last 3)
   const recentNotes = [...notes]
@@ -209,3 +234,5 @@ const HomePage: React.FC = () => {
 };
 
 export default HomePage;
+
+export default HomePage
