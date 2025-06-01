@@ -1,11 +1,10 @@
-// src/pages/NotesPage.tsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText } from 'lucide-react';
 import PdfUploader from '../components/PdfUploader';
-import { generateEmbeddingOnClient  } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase  } from '../services/databaseServiceClient';
+import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
+import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 
 const NotesPage: React.FC = () => {
   const { notes, addNote, deleteNote } = useStore();
@@ -18,7 +17,7 @@ const NotesPage: React.FC = () => {
     content: '',
     tags: '',
   });
-  const [isSubmitting, setIsSubmitting] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get all unique tags from notes
   const allTags = Array.from(
@@ -71,8 +70,8 @@ const NotesPage: React.FC = () => {
         title: newNote.title,
         content: newNote.content,
         tags: newNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-        createdAt: now.toISOString(), 
-        updatedAt: now.toISOString(), 
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
         embedding
       };
 
@@ -84,7 +83,7 @@ const NotesPage: React.FC = () => {
         id,
         title: newNote.title,
         content: newNote.content,
-        tags: noteToSaveToDb.tags, 
+        tags: noteToSaveToDb.tags,
         createdAt: now,
         updatedAt: now,
         embedding
@@ -96,16 +95,22 @@ const NotesPage: React.FC = () => {
       console.error("Error creating new note:", error);
       alert(`Failed to create new note: ${(error as Error).message}`);
     } finally {
-      setIsSubmitting(false); 
+      setIsSubmitting(false);
     }
   };
   
-  const handleDelete = (id: string, e: React.MouseEvent) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
     if (window.confirm('Are you sure you want to delete this note?')) {
-      deleteNote(id);
+      try {
+        await deleteNoteFromDatabase(id);
+        deleteNote(id);
+      } catch (error) {
+        console.error("Error deleting note:", error);
+        alert(`Failed to delete note: ${(error as Error).message}`);
+      }
     }
   };
   
