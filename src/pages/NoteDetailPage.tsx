@@ -15,21 +15,23 @@ import {
 } from 'lucide-react';
 
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
+import { saveNoteToDatabase } from '../services/databaseServiceClient'; 
 
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { notes, updateNote, deleteNote, currentNote } = useStore();
+  const { notes, updateNote, deleteNote } = useStore();
   
-  const initialNote = notes.find((n) => n.id === id);
-
   const [note, setNote] = useState(notes.find((n) => n.id === id));
   const [editMode, setEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editedNote, setEditedNote] = useState({
-    title: note?.title || '',
-    content: note?.content || '',
-    tags: note?.tags?.join(', ') || '',
+  const [editedNote, setEditedNote] = useState(() => {
+    const current = notes.find(n => n.id === id);
+    return {
+      title: current?.title || '',
+      content: current?.content || '',
+      tags: current?.tags?.join(', ') || '',
+    };
   });
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
@@ -38,20 +40,23 @@ const NoteDetailPage: React.FC = () => {
   
   useEffect(() => {
     const foundNote = notes.find((n) => n.id === id);
-    if (!foundNote) {
-      console.warn(`Note with id ${id} not found in store.`);
-      navigate('/notes');
+    if (id && !foundNote) {
+      console.warn(`NoteDetailPage: Note with id "${id}" not found in store. Navigating away.`);
+      navigate('/notes', { replace: true });
       return;
     }
-    setNote(foundNote);
-    setEditedNote({
-      title: foundNote.title,
-      content: foundNote.content,
-      tags: foundNote.tags.join(', '),
-    });
+    if (foundNote) {
+      setNote(foundNote);
+      setEditedNote({
+        title: foundNote.title,
+        content: foundNote.content,
+        tags: foundNote.tags.join(', '),
+      });
+    }
   }, [id, notes, navigate]);
   
   if (!note) {
+    console.log("NoteDetailPage: Note is not yet available or not found, rendering null.");
     return null;
   }
   
@@ -84,44 +89,38 @@ const NoteDetailPage: React.FC = () => {
           console.log("New embedding generated.");
         } catch (embeddingError) {
           console.warn("Failed to generate embedding:", embeddingError);
-          // Continue with the save operation even if embedding generation fails
-          newEmbedding = note.embedding; // Keep the existing embedding
+          newEmbedding = note.embedding;
         }
       } else {
         console.log("Content or title did not change significantly, keeping existing embedding.");
       }
 
-      const noteUpdates = {
+      const noteToSave = { 
+        id: note.id,
+        title: updatedTitle,
+        content: updatedContent,
+        tags: updatedTags,
+        embedding: newEmbedding,
+        updatedAt: now.toISOString(),
+        createdAt: note.createdAt.toISOString(),
+      };
+
+      await saveNoteToDatabase(noteToSave);
+      console.log("Note successfully saved to database via API.");
+
+      const noteUpdatesForStore = {
         title: updatedTitle,
         content: updatedContent,
         tags: updatedTags,
         updatedAt: now,
         embedding: newEmbedding,
       };
-
-      updateNote(note.id, noteUpdates);
-
-      // 4. TODO: Update in Supabase (this is where the DB insert/update happens)
-      //    This function would make an API call to a serverless function.
-      //    The serverless function would then use the Supabase client (potentially with service_role)
-      //    to upsert the note data, including the `embedding` vector.
-      /*
-      await updateNoteInSupabase(note.id, {
-        title: updatedTitle,
-        content: updatedContent,
-        tags: updatedTags,
-        embedding: newEmbedding, // Send the embedding to your backend
-        updated_at: now.toISOString(), // Send as ISO string for DB
-      });
-      console.log("Note updated in database.");
-      */
-      // For now, simulating the DB save with a log
-      console.log("Simulating DB save for note:", note.id, "with updates:", noteUpdates);
+      updateNote(note.id, noteUpdatesForStore);
 
       setNote(prevNote => ({
         ...prevNote!,
-        ...noteUpdates,
-        embedding: newEmbedding || prevNote!.embedding // Ensure embedding is updated
+        ...noteUpdatesForStore,
+        embedding: newEmbedding || prevNote!.embedding 
       }));
 
       setEditMode(false);
@@ -334,7 +333,7 @@ I can help with:
               >
                 {showAiPanel ? (
                   <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
-                    <path fillRule="evenodd\" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

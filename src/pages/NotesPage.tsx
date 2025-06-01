@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText } from 'lucide-react';
 import PdfUploader from '../components/PdfUploader';
 import { generateEmbeddingOnClient  } from '../services/embeddingServiceClient';
-import { storeEmbedding } from '../services/database';
+import { saveNoteToDatabase  } from '../services/databaseServiceClient';
 
 const NotesPage: React.FC = () => {
   const { notes, addNote, deleteNote } = useStore();
@@ -18,6 +18,7 @@ const NotesPage: React.FC = () => {
     content: '',
     tags: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   
   // Get all unique tags from notes
   const allTags = Array.from(
@@ -51,32 +52,52 @@ const NotesPage: React.FC = () => {
   
   const handleNewNoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const id = Math.random().toString(36).substring(2, 11);
-    const now = new Date();
-    
-    // Generate embedding from title + content
-    const embedding = await generateEmbeddingOnClient(newNote.content, newNote.title);
+    setIsSubmitting(true);
 
-    if (!embedding) {
-      throw new Error('Failed to generate embedding');
+    try {
+      const id = Math.random().toString(36).substring(2, 11);
+      const now = new Date();
+
+      console.log("Generating embedding for new note...");
+      const embedding = await generateEmbeddingOnClient(newNote.content, newNote.title);
+      console.log("Embedding generated for new note.");
+
+      if (!embedding) {
+        throw new Error('Failed to generate embedding for new note.');
+      }
+
+      const noteToSaveToDb = {
+        id,
+        title: newNote.title,
+        content: newNote.content,
+        tags: newNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+        createdAt: now.toISOString(), 
+        updatedAt: now.toISOString(), 
+        embedding
+      };
+
+      console.log("Saving new note to database via API...");
+      await saveNoteToDatabase(noteToSaveToDb);
+      console.log("New note saved to database.");
+
+      addNote({
+        id,
+        title: newNote.title,
+        content: newNote.content,
+        tags: noteToSaveToDb.tags, 
+        createdAt: now,
+        updatedAt: now,
+        embedding
+      });
+
+      setNewNote({ title: '', content: '', tags: '' });
+      setShowNewNoteForm(false);
+    } catch (error) {
+      console.error("Error creating new note:", error);
+      alert(`Failed to create new note: ${(error as Error).message}`);
+    } finally {
+      setIsSubmitting(false); 
     }
-    
-    addNote({
-      id,
-      title: newNote.title,
-      content: newNote.content,
-      tags: newNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-      createdAt: now,
-      updatedAt: now,
-      embedding
-    });
-    
-    // Store in vector database
-    await storeEmbedding(id, embedding);
-    
-    setNewNote({ title: '', content: '', tags: '' });
-    setShowNewNoteForm(false);
   };
   
   const handleDelete = (id: string, e: React.MouseEvent) => {
@@ -261,6 +282,7 @@ const NotesPage: React.FC = () => {
                 className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
                 value={newNote.content}
                 onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+                disabled={isSubmitting}
               />
             </div>
             <div className="mb-4">
@@ -281,14 +303,16 @@ const NotesPage: React.FC = () => {
                 type="button"
                 className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 onClick={() => setShowNewNoteForm(false)}
+                disabled={isSubmitting}
               >
                 Cancel
               </button>
               <button
                 type="submit"
+                disabled={isSubmitting}
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
               >
-                Create Note
+                {isSubmitting ? 'Creating...' : 'Create Note'}
               </button>
             </div>
           </form>
