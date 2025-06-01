@@ -12,6 +12,13 @@ interface AIAnalysisResult {
   }>;
 }
 
+// Get the base URL for API endpoints based on environment
+const getApiBaseUrl = () => {
+  return import.meta.env.PROD
+    ? 'https://studymind-ai.netlify.app/.netlify/functions'
+    : '/api';
+};
+
 export async function analyzeNote(content: string, title: string): Promise<AIAnalysisResult> {
   try {
     // Generate embedding for the current note
@@ -31,7 +38,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
     // Extract key concepts using the first few paragraphs
     const preview = content.split('\n').slice(0, 3).join('\n');
-    const conceptResponse = await fetch('/.netlify/functions/analyze-concepts', {
+    const conceptResponse = await fetch(`${getApiBaseUrl()}/analyze-concepts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: preview, title })
@@ -59,7 +66,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
 export async function generateNoteSummary(content: string): Promise<string> {
   try {
-    const response = await fetch('/.netlify/functions/summarize', {
+    const response = await fetch(`${getApiBaseUrl()}/summarize`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: content })
