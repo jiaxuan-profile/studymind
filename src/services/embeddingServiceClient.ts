@@ -21,6 +21,9 @@ function generateMockEmbedding(text: string): number[] {
 
 export async function generateEmbeddingOnClient(text: string, title: string): Promise<number[]> {
   try {
+    console.log(`Embedding Service: Calling endpoint ${EMBEDDING_ENDPOINT}`);
+    console.log('Embedding Service: Request payload:', { text, title });
+    
     const response = await fetch(EMBEDDING_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -29,20 +32,29 @@ export async function generateEmbeddingOnClient(text: string, title: string): Pr
       body: JSON.stringify({ text, title }), 
     });
 
+    console.log('Embedding Service: Response status:', response.status);
+    console.log('Embedding Service: Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
       // If we're in development and the API is not available, use mock embeddings
       if (import.meta.env.DEV) {
-        console.warn('Embedding service not available in development. Using mock embeddings.');
+        console.warn('Embedding Service: Service not available in development. Using mock embeddings.');
         return generateMockEmbedding(text + title);
       }
       
-      const errorData = await response.json().catch(() => ({ message: "Unknown API error" }));
+      const errorData = await response.json().catch(() => {
+        console.error('Embedding Service: Failed to parse error response');
+        return { message: "Unknown API error" };
+      });
+      console.error('Embedding Service: API error:', errorData);
       throw new Error(errorData.message || `API Error: ${response.status}`);
     }
 
     const responseData = await response.json();
+    console.log('Embedding Service: Successful response:', responseData);
 
     if (!responseData.embedding) {
+      console.error('Embedding Service: No embedding in response:', responseData);
       throw new Error("Embedding not found in API response");
     }
     return responseData.embedding;
@@ -50,10 +62,10 @@ export async function generateEmbeddingOnClient(text: string, title: string): Pr
   } catch (error) {
     // If we're in development and there's a network error, use mock embeddings
     if (import.meta.env.DEV) {
-      console.warn('Embedding service not available in development. Using mock embeddings.');
+      console.warn('Embedding Service: Service not available in development. Using mock embeddings.');
       return generateMockEmbedding(text + title);
     }
-    console.error('Error calling client-side embedding service:', error);
+    console.error('Embedding Service: Error:', error);
     throw error;
   }
 }
