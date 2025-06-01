@@ -1,18 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Book, 
-  BookOpen,
-  BrainCircuit, 
-  Home, 
-  X, 
-  PenTool, 
-  NotebookText,
-  GraduationCap,
-  Clock,
-  Lightbulb,
-  HelpCircle 
-} from 'lucide-react';
+import { Book, BookOpen, BrainCircuit, Home, X, PenTool, TextQuote as NotebookText, GraduationCap, Clock, Lightbulb, HelpCircle } from 'lucide-react';
 
 interface SidebarProps {
   mobile?: boolean;
