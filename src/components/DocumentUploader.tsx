@@ -1,10 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, AlertCircle } from 'lucide-react';
+import { Upload, FileText, AlertCircle, Lightbulb } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { useStore } from '../store';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase } from '../services/databaseServiceClient';
+import { analyzeNote } from '../services/aiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -16,6 +17,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [useAI, setUseAI] = useState(true);
   const { addNote } = useStore();
 
   const processFile = async (file: File) => {
@@ -45,7 +47,20 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       const id = Math.random().toString(36).substring(2, 11);
       const title = file.name.replace(`.${fileType}`, '');
       const now = new Date();
-      const tags = [fileType.toUpperCase(), 'Imported'];
+      let tags = [fileType.toUpperCase(), 'Imported'];
+      let summary = '';
+
+      // Use AI to analyze content if enabled
+      if (useAI) {
+        try {
+          const analysis = await analyzeNote(content, title);
+          tags = [...new Set([...tags, ...analysis.suggestedTags])];
+          summary = analysis.summary;
+        } catch (aiError) {
+          console.warn('AI analysis failed:', aiError);
+          // Continue without AI analysis
+        }
+      }
 
       // Generate embedding
       console.log("Generating embedding for uploaded document...");
@@ -58,6 +73,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         title,
         content,
         tags,
+        summary,
         embedding,
         createdAt: now.toISOString(),
         updatedAt: now.toISOString()
@@ -73,6 +89,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         title,
         content,
         tags,
+        summary,
         embedding,
         createdAt: now,
         updatedAt: now
@@ -153,6 +170,21 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
 
   return (
     <div className="w-full">
+      <div className="mb-4 flex items-center justify-between">
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            checked={useAI}
+            onChange={(e) => setUseAI(e.target.checked)}
+            className="rounded border-gray-300 text-primary focus:ring-primary"
+          />
+          <span className="text-sm text-gray-600 flex items-center">
+            <Lightbulb className="h-4 w-4 mr-1 text-primary" />
+            Use AI to analyze content and suggest tags
+          </span>
+        </label>
+      </div>
+
       <label className="block w-full">
         <div
           onDragEnter={handleDragEnter}
@@ -180,6 +212,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
               <>
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3"></div>
                 <p className="text-gray-600">Processing file...</p>
+                {useAI && <p className="text-sm text-gray-500">AI analysis in progress...</p>}
               </>
             ) : (
               <>
