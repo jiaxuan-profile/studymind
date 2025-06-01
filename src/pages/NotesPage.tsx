@@ -1,17 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
-import { Plus, Search, Filter, Clock, Trash, FileText } from 'lucide-react';
+import { Plus, Search, Filter, Clock, Trash, FileText, List, Grid } from 'lucide-react';
 import PdfUploader from '../components/PdfUploader';
+import Pagination from '../components/Pagination';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 
 const NotesPage: React.FC = () => {
-  const { notes, addNote, deleteNote } = useStore();
+  const { 
+    notes, 
+    addNote, 
+    deleteNote, 
+    pagination, 
+    setPage, 
+    setPageSize,
+    isLoading,
+    error 
+  } = useStore();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showNewNoteForm, setShowNewNoteForm] = useState(false);
   const [showPdfUploader, setShowPdfUploader] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [newNote, setNewNote] = useState({
     title: '',
     content: '',
@@ -35,12 +47,7 @@ const NotesPage: React.FC = () => {
     
     return matchesSearch && matchesTags;
   });
-  
-  // Sort notes by last updated
-  const sortedNotes = [...filteredNotes].sort(
-    (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime()
-  );
-  
+
   const handleTagToggle = (tag: string) => {
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter((t) => t !== tag));
@@ -75,7 +82,7 @@ const NotesPage: React.FC = () => {
         embedding
       };
 
-      console.log("Saving new note to database via API...");
+      console.log("Saving new note to database...");
       await saveNoteToDatabase(noteToSaveToDb);
       console.log("New note saved to database.");
 
@@ -113,6 +120,72 @@ const NotesPage: React.FC = () => {
       }
     }
   };
+
+  const renderNoteCard = (note: any) => (
+    <Link
+      key={note.id}
+      to={`/notes/${note.id}`}
+      className={`bg-white/90 backdrop-blur-sm border border-gray-100 rounded-xl shadow-lg 
+                 hover:shadow-xl transition-all duration-300 overflow-hidden
+                 ${viewMode === 'grid' ? 'hover:scale-[1.02]' : 'hover:bg-gray-50'}`}
+    >
+      <div className="p-6">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{note.title}</h2>
+        <p className="text-gray-600 mb-4 line-clamp-3">
+          {note.content.replace(/[#*`]/g, '').split('\n')[0]}
+        </p>
+        
+        <div className="flex flex-wrap gap-2 mb-4">
+          {note.tags.map((tag: string, i: number) => (
+            <span
+              key={i}
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+        
+        <div className="flex justify-between items-center text-sm text-gray-500">
+          <div className="flex items-center">
+            <Clock className="h-4 w-4 mr-1" />
+            {new Date(note.updatedAt).toLocaleDateString()}
+          </div>
+          <button
+            onClick={(e) => handleDelete(note.id, e)}
+            className="p-1 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500"
+          >
+            <Trash className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    </Link>
+  );
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading notes...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-600 mb-4">Error: {error}</div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="text-primary hover:text-primary-dark"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
   
   return (
     <div className="fade-in">
@@ -158,53 +231,80 @@ const NotesPage: React.FC = () => {
             />
           </div>
           
-          <div className="relative inline-block text-left">
-            <details className="group">
-              <summary className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-1 focus:ring-primary">
-                <Filter className="h-5 w-5 text-gray-400" />
-                <span className="text-sm font-medium">Filter by Tags</span>
-                <span className="ml-auto transition group-open:rotate-180">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    strokeWidth="1.5"
-                    stroke="currentColor"
-                    className="h-4 w-4"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </span>
-              </summary>
+          <div className="flex gap-2">
+            <div className="relative inline-block text-left">
+              <details className="group">
+                <summary className="flex cursor-pointer items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-900 outline-none focus:ring-1 focus:ring-primary">
+                  <Filter className="h-5 w-5 text-gray-400" />
+                  <span className="text-sm font-medium">Filter by Tags</span>
+                  <span className="ml-auto transition group-open:rotate-180">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth="1.5"
+                      stroke="currentColor"
+                      className="h-4 w-4"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                      />
+                    </svg>
+                  </span>
+                </summary>
 
-              <div className="z-10 mt-2 w-60 rounded-md border border-gray-100 bg-white shadow-lg">
-                <div className="p-2">
-                  {allTags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2 p-2">
-                      {allTags.map((tag) => (
-                        <button
-                          key={tag}
-                          onClick={() => handleTagToggle(tag)}
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            selectedTags.includes(tag)
-                              ? 'bg-primary text-white'
-                              : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                          }`}
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="p-2 text-sm text-gray-500">No tags available</p>
-                  )}
+                <div className="z-10 mt-2 w-60 rounded-md border border-gray-100 bg-white shadow-lg">
+                  <div className="p-2">
+                    {allTags.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 p-2">
+                        {allTags.map((tag) => (
+                          <button
+                            key={tag}
+                            onClick={() => handleTagToggle(tag)}
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              selectedTags.includes(tag)
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                            }`}
+                          >
+                            {tag}
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="p-2 text-sm text-gray-500">No tags available</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </details>
+              </details>
+            </div>
+
+            <div className="flex rounded-lg border border-gray-300 bg-white">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 ${viewMode === 'grid' ? 'text-primary' : 'text-gray-400'}`}
+              >
+                <Grid className="h-5 w-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 ${viewMode === 'list' ? 'text-primary' : 'text-gray-400'}`}
+              >
+                <List className="h-5 w-5" />
+              </button>
+            </div>
+
+            <select
+              value={pagination.pageSize}
+              onChange={(e) => setPageSize(Number(e.target.value))}
+              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
+            >
+              <option value="12">12 per page</option>
+              <option value="24">24 per page</option>
+              <option value="48">48 per page</option>
+            </select>
           </div>
         </div>
         
@@ -306,7 +406,7 @@ const NotesPage: React.FC = () => {
             <div className="flex justify-end space-x-3">
               <button
                 type="button"
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                className="px-4 py-2 border border-gray-300  rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
                 onClick={() => setShowNewNoteForm(false)}
                 disabled={isSubmitting}
               >
@@ -324,48 +424,31 @@ const NotesPage: React.FC = () => {
         </div>
       )}
       
-      {/* Notes Grid */}
-      {sortedNotes.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedNotes.map((note) => (
-            <Link
-              key={note.id}
-              to={`/notes/${note.id}`}
-              className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow overflow-hidden"
-            >
-              <div className="p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{note.title}</h2>
-                <p className="text-gray-600 mb-4 line-clamp-3">
-                  {note.content.replace(/[#*`]/g, '').split('\n')[0]}
-                </p>
-                
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {note.tags.map((tag, i) => (
-                    <span
-                      key={i}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                
-                <div className="flex justify-between items-center text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {new Date(note.updatedAt).toLocaleDateString()}
-                  </div>
-                  <button
-                    onClick={(e) => handleDelete(note.id, e)}
-                    className="p-1 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500"
-                  >
-                    <Trash className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            </Link>
-          ))}
-        </div>
+      {/* Notes Grid/List */}
+      {filteredNotes.length > 0 ? (
+        <>
+          <div className={
+            viewMode === 'grid'
+              ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
+              : 'space-y-4'
+          }>
+            {filteredNotes.map(renderNoteCard)}
+          </div>
+          
+          {/* Pagination */}
+          <div className="mt-8">
+            <Pagination
+              currentPage={pagination.currentPage}
+              totalPages={pagination.totalPages}
+              onPageChange={setPage}
+            />
+            <p className="text-center mt-4 text-sm text-gray-500">
+              Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}
+              {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalNotes)} of{' '}
+              {pagination.totalNotes} notes
+            </p>
+          </div>
+        </>
       ) : (
         <div className="text-center py-12 bg-white rounded-lg shadow-sm">
           <div className="mx-auto h-16 w-16 text-gray-400 mb-4">

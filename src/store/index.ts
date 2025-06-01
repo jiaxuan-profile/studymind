@@ -4,6 +4,13 @@ import { demoConcepts } from '../data/demoConcepts';
 import { demoReviews } from '../data/demoReviews';
 import { getAllNotes } from '../services/databaseServiceClient';
 
+interface PaginationState {
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  totalNotes: number;
+}
+
 interface State {
   notes: Note[];
   concepts: Concept[];
@@ -13,13 +20,16 @@ interface State {
   theme: 'light' | 'dark';
   isLoading: boolean;
   error: string | null;
+  pagination: PaginationState;
   
   // Notes actions
   addNote: (note: Note) => void;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   setCurrentNote: (note: Note | null) => void;
-  loadNotes: () => Promise<void>;
+  loadNotes: (page?: number, pageSize?: number) => Promise<void>;
+  setPage: (page: number) => void;
+  setPageSize: (size: number) => void;
   
   // Concepts actions
   addConcept: (concept: Concept) => void;
@@ -53,20 +63,34 @@ export const useStore = create<State>((set, get) => ({
   theme: 'light',
   isLoading: false,
   error: null,
+  pagination: {
+    currentPage: 1,
+    totalPages: 1,
+    pageSize: 12,
+    totalNotes: 0,
+  },
   
   // Notes actions
-  loadNotes: async () => {
+  loadNotes: async (page = 1, pageSize = 12) => {
     set({ isLoading: true, error: null });
     try {
-      const notes = await getAllNotes();
+      const { data, count } = await getAllNotes(page, pageSize);
+      const totalPages = Math.ceil(count / pageSize);
+      
       set({ 
-        notes: notes.map(note => ({
+        notes: data.map(note => ({
           ...note,
           createdAt: new Date(note.created_at),
           updatedAt: new Date(note.updated_at),
           tags: note.tags || []
         })),
-        isLoading: false 
+        isLoading: false,
+        pagination: {
+          currentPage: page,
+          totalPages,
+          pageSize,
+          totalNotes: count
+        }
       });
     } catch (error) {
       console.error('Failed to load notes:', error);
@@ -75,6 +99,18 @@ export const useStore = create<State>((set, get) => ({
         isLoading: false 
       });
     }
+  },
+  
+  setPage: (page) => {
+    const { pagination: { pageSize } } = get();
+    get().loadNotes(page, pageSize);
+  },
+  
+  setPageSize: (size) => {
+    set(state => ({
+      pagination: { ...state.pagination, pageSize: size }
+    }));
+    get().loadNotes(1, size);
   },
   
   addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),

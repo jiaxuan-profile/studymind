@@ -71,22 +71,39 @@ export async function getNoteById(id: string) {
   }
 }
 
-export async function getAllNotes() {
+export async function getAllNotes(page = 1, pageSize = 12) {
   try {
-    console.log("Database Service: Fetching all notes");
+    console.log("Database Service: Fetching paginated notes", { page, pageSize });
     
+    // First, get the total count
+    const { count, error: countError } = await supabase
+      .from('notes')
+      .select('*', { count: 'exact', head: true });
+
+    if (countError) {
+      throw countError;
+    }
+
+    // Then get the actual page of data
     const { data, error } = await supabase
       .from('notes')
       .select('*')
-      .order('updated_at', { ascending: false });
+      .order('updated_at', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
 
     if (error) {
       console.error("Database Service: Supabase error:", error);
       throw new Error(`Failed to fetch notes: ${error.message}`);
     }
 
-    console.log("Database Service: Notes fetched successfully, count:", data?.length);
-    return data;
+    console.log("Database Service: Notes fetched successfully", {
+      page,
+      pageSize,
+      totalCount: count,
+      fetchedCount: data?.length
+    });
+
+    return { data, count };
 
   } catch (error) {
     console.error('Database Service: Error fetching notes:', error);
