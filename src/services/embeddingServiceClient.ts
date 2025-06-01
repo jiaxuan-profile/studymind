@@ -3,6 +3,8 @@ const API_ENDPOINT = import.meta.env.PROD
   ? 'https://studymind-ai.netlify.app/.netlify/functions/generate-embedding'
   : '/api/generate-embedding';
 
+const MAX_TEXT_LENGTH = 7500;
+
 // Simple function to generate a mock embedding vector
 function generateMockEmbedding(text: string): number[] {
   // Create a deterministic but seemingly random embedding based on the text
@@ -20,17 +22,39 @@ function generateMockEmbedding(text: string): number[] {
   return vector;
 }
 
+function truncateText(text: string, maxLength: number): string {
+  if (text.length <= maxLength) return text;
+  
+  // Try to truncate at the last complete sentence within the limit
+  const truncated = text.substring(0, maxLength);
+  const lastPeriod = truncated.lastIndexOf('.');
+  const lastQuestion = truncated.lastIndexOf('?');
+  const lastExclamation = truncated.lastIndexOf('!');
+  
+  // Find the last sentence ending
+  const lastSentenceEnd = Math.max(lastPeriod, lastQuestion, lastExclamation);
+  
+  // If we found a sentence ending, use it; otherwise just truncate at maxLength
+  return lastSentenceEnd > 0 ? text.substring(0, lastSentenceEnd + 1) : truncated;
+}
+
 export async function generateEmbeddingOnClient(text: string, title: string): Promise<number[]> {
   try {
+    // Truncate text to stay within limits while preserving complete sentences where possible
+    const truncatedText = truncateText(text, MAX_TEXT_LENGTH);
+    
     console.log('Embedding Service: Calling endpoint', API_ENDPOINT);
-    console.log('Embedding Service: Request payload:', { text, title });
+    console.log('Embedding Service: Request payload length:', truncatedText.length);
     
     const response = await fetch(API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text, title }), 
+      body: JSON.stringify({ 
+        text: truncatedText,
+        title 
+      }), 
     });
 
     console.log('Embedding Service: Response status:', response.status);
@@ -40,7 +64,7 @@ export async function generateEmbeddingOnClient(text: string, title: string): Pr
       // If we're in development and the API is not available, use mock embeddings
       if (import.meta.env.DEV) {
         console.warn('Embedding Service: Service not available in development. Using mock embeddings.');
-        return generateMockEmbedding(text + title);
+        return generateMockEmbedding(truncatedText + title);
       }
       
       const errorData = await response.json().catch(() => {
