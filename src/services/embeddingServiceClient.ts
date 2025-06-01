@@ -1,8 +1,7 @@
 // src/services/embeddingServiceClient.ts 
-const API_BASE_URL = import.meta.env.PROD 
-  ? 'https://studymind-ai.netlify.app/.netlify/functions'
-  : '';
-const EMBEDDING_ENDPOINT = `${API_BASE_URL}/generate-embedding`;
+const API_ENDPOINT = import.meta.env.PROD 
+  ? 'https://studymind-ai.netlify.app/.netlify/functions/generate-embedding'
+  : '/api/generate-embedding';
 
 // Simple function to generate a mock embedding vector
 function generateMockEmbedding(text: string): number[] {
@@ -23,10 +22,10 @@ function generateMockEmbedding(text: string): number[] {
 
 export async function generateEmbeddingOnClient(text: string, title: string): Promise<number[]> {
   try {
-    console.log(`Embedding Service: Calling endpoint ${EMBEDDING_ENDPOINT}`);
+    console.log('Embedding Service: Calling endpoint', API_ENDPOINT);
     console.log('Embedding Service: Request payload:', { text, title });
     
-    const response = await fetch(EMBEDDING_ENDPOINT, {
+    const response = await fetch(API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
