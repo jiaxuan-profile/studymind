@@ -78,9 +78,15 @@ const NoteDetailPage: React.FC = () => {
       const contentChanged = updatedTitle !== note.title || updatedContent !== note.content;
 
       if (contentChanged) {
-        console.log("Content changed, generating new embedding...");
-        newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
-        console.log("New embedding generated.");
+        try {
+          console.log("Content changed, generating new embedding...");
+          newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
+          console.log("New embedding generated.");
+        } catch (embeddingError) {
+          console.warn("Failed to generate embedding:", embeddingError);
+          // Continue with the save operation even if embedding generation fails
+          newEmbedding = note.embedding; // Keep the existing embedding
+        }
       } else {
         console.log("Content or title did not change significantly, keeping existing embedding.");
       }
@@ -121,7 +127,7 @@ const NoteDetailPage: React.FC = () => {
       setEditMode(false);
 
     } catch (error) {
-      console.error("Failed to save note or generate embedding:", error);
+      console.error("Failed to save note:", error);
       alert(`Error saving note: ${(error as Error).message}`);
     } finally {
       setIsSaving(false);
@@ -226,9 +232,10 @@ I can help with:
               <button
                 onClick={handleSave}
                 className="flex items-center px-3 py-1.5 border border-primary rounded-md text-sm text-white bg-primary hover:bg-primary-dark"
+                disabled={isSaving}
               >
                 <Save className="h-4 w-4 mr-1" />
-                Save
+                {isSaving ? 'Saving...' : 'Save'}
               </button>
               <button
                 onClick={() => setEditMode(false)}
@@ -326,7 +333,7 @@ I can help with:
                 className="text-gray-500 hover:text-gray-700"
               >
                 {showAiPanel ? (
-                  <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 ) : (
