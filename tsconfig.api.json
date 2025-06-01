@@ -1,0 +1,19 @@
+// tsconfig.api.json 
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ESNext"],
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "outDir": "dist-api-check",
+    "rootDir": ".",
+    "composite": true,
+    "noEmit": true
+  },
+  "include": ["api/**/*.ts"],
+  "exclude": ["node_modules"]
+}
