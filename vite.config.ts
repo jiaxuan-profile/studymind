@@ -7,4 +7,13 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  server: {
+    proxy: {
+      '/api/generate-embedding': {
+        target: 'https://studymind-ai.netlify.app/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/generate-embedding', '/generate-embedding'),
+      },
+    },
+  },
 });
