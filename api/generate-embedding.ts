@@ -64,7 +64,7 @@ export const handler: Handler = async (event, context) => {
     }
 
     // Check for reasonable text length limits
-    const MAX_TEXT_LENGTH = 10000; // Adjust based on your needs
+    const MAX_TEXT_LENGTH = 25000; // Adjust based on your needs
     if (text.length > MAX_TEXT_LENGTH) {
       console.warn(`SERVERLESS: Text too long (${text.length} chars). Max allowed: ${MAX_TEXT_LENGTH}`);
       return {
