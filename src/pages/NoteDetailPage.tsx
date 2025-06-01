@@ -1,3 +1,4 @@
+// src/pages/NoteDetailPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
@@ -13,17 +14,22 @@ import {
   HelpCircle
 } from 'lucide-react';
 
+import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
+
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { notes, updateNote, deleteNote } = useStore();
+  const { notes, updateNote, deleteNote, currentNote } = useStore();
   
+  const initialNote = notes.find((n) => n.id === id);
+
   const [note, setNote] = useState(notes.find((n) => n.id === id));
   const [editMode, setEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [editedNote, setEditedNote] = useState({
     title: note?.title || '',
     content: note?.content || '',
-    tags: note?.tags.join(', ') || '',
+    tags: note?.tags?.join(', ') || '',
   });
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
@@ -33,6 +39,7 @@ const NoteDetailPage: React.FC = () => {
   useEffect(() => {
     const foundNote = notes.find((n) => n.id === id);
     if (!foundNote) {
+      console.warn(`Note with id ${id} not found in store.`);
       navigate('/notes');
       return;
     }
@@ -48,25 +55,98 @@ const NoteDetailPage: React.FC = () => {
     return null;
   }
   
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
       deleteNote(note.id);
+      // TODO: Delete from Supabase (via an API call to a serverless function)
       navigate('/notes');
     }
   };
   
-  const handleSave = () => {
-    updateNote(note.id, {
-      title: editedNote.title,
-      content: editedNote.content,
-      tags: editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
-    });
-    setEditMode(false);
+  const handleSave = async () => {
+    if (!note) return;
+    setIsSaving(true);
+
+    try {
+      const updatedTitle = editedNote.title;
+      const updatedContent = editedNote.content;
+      const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
+      const now = new Date();
+
+      let newEmbedding: number[] | undefined = note.embedding;
+
+      const contentChanged = updatedTitle !== note.title || updatedContent !== note.content;
+
+      if (contentChanged) {
+        console.log("Content changed, generating new embedding...");
+        newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
+        console.log("New embedding generated.");
+      } else {
+        console.log("Content or title did not change significantly, keeping existing embedding.");
+      }
+
+      const noteUpdates = {
+        title: updatedTitle,
+        content: updatedContent,
+        tags: updatedTags,
+        updatedAt: now,
+        embedding: newEmbedding,
+      };
+
+      updateNote(note.id, noteUpdates);
+
+      // 4. TODO: Update in Supabase (this is where the DB insert/update happens)
+      //    This function would make an API call to a serverless function.
+      //    The serverless function would then use the Supabase client (potentially with service_role)
+      //    to upsert the note data, including the `embedding` vector.
+      /*
+      await updateNoteInSupabase(note.id, {
+        title: updatedTitle,
+        content: updatedContent,
+        tags: updatedTags,
+        embedding: newEmbedding, // Send the embedding to your backend
+        updated_at: now.toISOString(), // Send as ISO string for DB
+      });
+      console.log("Note updated in database.");
+      */
+      // For now, simulating the DB save with a log
+      console.log("Simulating DB save for note:", note.id, "with updates:", noteUpdates);
+
+      setNote(prevNote => ({
+        ...prevNote!,
+        ...noteUpdates,
+        embedding: newEmbedding || prevNote!.embedding // Ensure embedding is updated
+      }));
+
+      setEditMode(false);
+
+    } catch (error) {
+      console.error("Failed to save note or generate embedding:", error);
+      alert(`Error saving note: ${(error as Error).message}`);
+    } finally {
+      setIsSaving(false);
+    }
   };
   
   const handleAskAi = () => {
+    if (!note) return;
     setAiLoading(true);
+    setAiResponse(null); 
     
+    // TODO: Replace this with an actual API call to a serverless function
+    // This serverless function would:
+    // 1. Take the note content (or its embedding) and the aiQuestion.
+    // 2. Use the Gemini API (or another LLM) to generate a response.
+    //    - For summarization/explanation based on current note: pass note.content + aiQuestion
+    //    - For finding related notes:
+    //        - Generate embedding for aiQuestion (using `generateEmbeddingOnClient` or a dedicated query embedding function)
+    //        - Call another serverless function that performs a vector similarity search in Supabase
+    //          using the query embedding against the stored note embeddings.
+    //        - That function returns IDs/content of related notes.
+    //        - Format the response.
+
+    console.log(`Simulating AI call with question: "${aiQuestion}" for note: "${note.title}"`);
+
     // Simulating AI response with a delay
     setTimeout(() => {
       let response;
@@ -247,7 +327,7 @@ I can help with:
               >
                 {showAiPanel ? (
                   <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
-                    <path fillRule="evenodd\" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

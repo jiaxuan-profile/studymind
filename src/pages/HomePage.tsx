@@ -18,11 +18,14 @@ const HomePage: React.FC = () => {
   
   return (
     <div className="fade-in">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome to StudyMind</h1>
-        <p className="mt-2 text-gray-600">
-          Your AI-powered study assistant that helps you understand and connect information
-        </p>
+      <div className="mb-6 flex items-center gap-4">
+        <img src="/white_circle_360x360.png" alt="StudyMind Badge" className="w-16 h-16 rounded-full" />
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Welcome to StudyMind</h1>
+          <p className="mt-2 text-gray-600">
+            Your AI-powered study assistant that helps you understand and connect information
+          </p>
+        </div>
       </div>
       
       {/* Quick Actions */}

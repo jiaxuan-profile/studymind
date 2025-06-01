@@ -1,8 +1,11 @@
+// src/pages/NotesPage.tsx
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useStore } from '../store';
-import { Plus, Search, Filter, Clock, Tag, Trash, FileText } from 'lucide-react';
+import { Plus, Search, Filter, Clock, Trash, FileText } from 'lucide-react';
 import PdfUploader from '../components/PdfUploader';
+import { generateEmbeddingOnClient  } from '../services/embeddingServiceClient';
+import { storeEmbedding } from '../services/database';
 
 const NotesPage: React.FC = () => {
   const { notes, addNote, deleteNote } = useStore();
@@ -46,11 +49,18 @@ const NotesPage: React.FC = () => {
     }
   };
   
-  const handleNewNoteSubmit = (e: React.FormEvent) => {
+  const handleNewNoteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     const id = Math.random().toString(36).substring(2, 11);
     const now = new Date();
+    
+    // Generate embedding from title + content
+    const embedding = await generateEmbeddingOnClient(newNote.content, newNote.title);
+
+    if (!embedding) {
+      throw new Error('Failed to generate embedding');
+    }
     
     addNote({
       id,
@@ -59,7 +69,11 @@ const NotesPage: React.FC = () => {
       tags: newNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
       createdAt: now,
       updatedAt: now,
+      embedding
     });
+    
+    // Store in vector database
+    await storeEmbedding(id, embedding);
     
     setNewNote({ title: '', content: '', tags: '' });
     setShowNewNoteForm(false);

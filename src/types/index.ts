@@ -1,3 +1,4 @@
+// src/types/index.ts
 export interface Note {
   id: string;
   title: string;
@@ -5,6 +6,7 @@ export interface Note {
   tags: string[];
   createdAt: Date;
   updatedAt: Date;
+  embedding?: number[];
 }
 
 export interface Concept {
