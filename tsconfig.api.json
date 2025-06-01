@@ -4,15 +4,16 @@
     "target": "ESNext",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ESNext"],
-    "strict": true,
-    "skipLibCheck": true,
+    "outDir": "dist-api",
+    "rootDir": "api",
     "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "outDir": "dist-api-check",
-    "rootDir": ".",
-    "composite": true,
-    "noEmit": true
+    "isolatedModules": false,
+    "noEmit": false,
+    "sourceMap": true
   },
   "include": ["api/**/*.ts"],
   "exclude": ["node_modules"]
