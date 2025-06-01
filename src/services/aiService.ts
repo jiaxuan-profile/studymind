@@ -31,14 +31,15 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
     // Extract key concepts using the first few paragraphs
     const preview = content.split('\n').slice(0, 3).join('\n');
-    const conceptResponse = await fetch('/api/analyze-concepts', {
+    const conceptResponse = await fetch('/.netlify/functions/analyze-concepts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: preview, title })
     });
 
     if (!conceptResponse.ok) {
-      throw new Error('Failed to analyze concepts');
+      const errorData = await conceptResponse.json();
+      throw new Error(errorData.error || 'Failed to analyze concepts');
     }
 
     const conceptData = await conceptResponse.json();
@@ -46,7 +47,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
     return {
       suggestedTags: conceptData.tags || [],
       summary: conceptData.summary || '',
-      keyConcepts: conceptData.concepts || [],
+      keyConcepts: conceptData.concepts?.map(c => c.name) || [],
       relatedNotes: relatedNotes || []
     };
 
@@ -58,7 +59,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
 export async function generateNoteSummary(content: string): Promise<string> {
   try {
-    const response = await fetch('/api/summarize', {
+    const response = await fetch('/.netlify/functions/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: content })
