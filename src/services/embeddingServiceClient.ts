@@ -5,7 +5,7 @@ const EMBEDDING_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/generate-embeddin
 // Simple function to generate a mock embedding vector
 function generateMockEmbedding(text: string): number[] {
   // Create a deterministic but seemingly random embedding based on the text
-  const vector = new Array(384).fill(0); // Standard embedding size
+  const vector = new Array(768).fill(0); // Updated to 768 dimensions to match database schema
   let sum = 0;
   for (let i = 0; i < text.length; i++) {
     sum += text.charCodeAt(i);
