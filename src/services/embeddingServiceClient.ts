@@ -1,6 +1,8 @@
 // src/services/embeddingServiceClient.ts 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const EMBEDDING_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/generate-embedding` : '/api/generate-embedding';
+const API_BASE_URL = import.meta.env.PROD 
+  ? '/.netlify/functions'
+  : '';
+const EMBEDDING_ENDPOINT = `${API_BASE_URL}/generate-embedding`;
 
 // Simple function to generate a mock embedding vector
 function generateMockEmbedding(text: string): number[] {
