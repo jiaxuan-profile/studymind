@@ -24,7 +24,7 @@ interface State {
   pagination: PaginationState;
   
   // Notes actions
-  addNote: (note: Note) => void;
+  addNote: (note: Note) => Promise<Note>;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => void;
   setCurrentNote: (note: Note | null) => void;
@@ -116,7 +116,11 @@ export const useStore = create<State>((set, get) => ({
     get().loadNotes(1, size);
   },
   
-  addNote: (note) => set((state) => ({ notes: [...state.notes, note] })),
+  addNote: async (note) => {
+    set((state) => ({ notes: [note, ...state.notes] }));
+    set({ currentNote: note }); // Set the current note
+    return note;
+  },
   
   updateNote: (id, updates) => set((state) => ({
     notes: state.notes.map((note) => (note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note)),
