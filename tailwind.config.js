@@ -62,24 +62,31 @@ export default {
               fontWeight: '600',
             },
             code: {
-              color: '#E5E7EB', // Light text for dark background
+              color: '#F3F4F6', // Lighter text for better contrast
               backgroundColor: '#1F2937', // Dark background
               padding: '0.25rem 0.5rem',
               borderRadius: '0.375rem',
               fontWeight: '500',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
             },
             'pre code': {
               backgroundColor: 'transparent',
-              color: '#E5E7EB',
+              color: '#F3F4F6',
               padding: '0',
               borderRadius: '0',
+              fontFamily: 'inherit',
             },
             pre: {
               backgroundColor: '#1F2937',
-              color: '#E5E7EB',
-              padding: '1rem',
+              color: '#F3F4F6',
+              padding: '1.25rem',
               borderRadius: '0.5rem',
               border: '1px solid #374151',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              fontSize: '0.875rem',
+              lineHeight: '1.5',
+              margin: '1.5rem 0',
+              overflowX: 'auto',
             }
           },
         },
