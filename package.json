@@ -18,7 +18,8 @@
     "react-markdown": "^8.0.7",
     "zustand": "^4.4.1",
     "pdfjs-dist": "^3.10.111",
-    "@supabase/supabase-js": "^2.33.1"
+    "@supabase/supabase-js": "^2.33.1",
+    "lucide-react": "^0.263.1"
   },
   "devDependencies": {
     "@types/react": "^18.2.15",
