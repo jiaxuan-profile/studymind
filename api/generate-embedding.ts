@@ -1,16 +1,5 @@
-// api/generate-embedding.ts
 import { GoogleGenerativeAI, TaskType, Content } from "@google/generative-ai";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-
-const apiKey = process.env.GEMINI_API_KEY;
-
-if (!apiKey) {
-  console.error("SERVERLESS: GEMINI_API_KEY is not set in environment variables.");
-  throw new Error("Server configuration error: GEMINI_API_KEY is not configured.");
-}
-
-const genAI = new GoogleGenerativeAI(apiKey);
-const embeddingModel = "models/embedding-001";
 
 export default async function handler(
   req: VercelRequest,
@@ -18,15 +7,27 @@ export default async function handler(
 ) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
-    return res.status(405).end('Method Not Allowed');
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      console.error("SERVERLESS: GEMINI_API_KEY is not set in environment variables.");
+      return res.status(500).json({ 
+        error: "Server configuration error: GEMINI_API_KEY is not configured."
+      });
+    }
+
     const { text, title } = req.body;
 
     if (!text || !title) {
       return res.status(400).json({ error: "Missing 'text' or 'title' in request body" });
     }
+
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const embeddingModel = "models/embedding-001";
 
     const contentRequest: Content = {
       parts: [{ text: text }],
@@ -50,7 +51,7 @@ export default async function handler(
     console.error('SERVERLESS Error generating embedding:', error);
     let errorMessage = "An unexpected error occurred while generating the embedding.";
     if (error.message) {
-        errorMessage = error.message;
+      errorMessage = error.message;
     }
     return res.status(500).json({ error: errorMessage });
   }
