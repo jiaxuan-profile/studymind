@@ -1,5 +1,6 @@
 // src/services/embeddingServiceClient.ts 
-const API_ENDPOINT = '/api/generate-embedding';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const EMBEDDING_ENDPOINT = API_BASE_URL ? `${API_BASE_URL}/api/generate-embedding` : '/api/generate-embedding';
 
 // Simple function to generate a mock embedding vector
 function generateMockEmbedding(text: string): number[] {
@@ -20,7 +21,7 @@ function generateMockEmbedding(text: string): number[] {
 
 export async function generateEmbeddingOnClient(text: string, title: string): Promise<number[]> {
   try {
-    const response = await fetch(API_ENDPOINT, {
+    const response = await fetch(EMBEDDING_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -35,10 +36,8 @@ export async function generateEmbeddingOnClient(text: string, title: string): Pr
         return generateMockEmbedding(text + title);
       }
       
-      const errorMessage = response.status === 404 
-        ? 'Embedding service not available' 
-        : `API Error: ${response.status}`;
-      throw new Error(errorMessage);
+      const errorData = await response.json().catch(() => ({ message: "Unknown API error" }));
+      throw new Error(errorData.message || `API Error: ${response.status}`);
     }
 
     const responseData = await response.json();
