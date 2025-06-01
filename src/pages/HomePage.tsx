@@ -1,10 +1,11 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { PlusCircle, Clock, BookOpen, BrainCircuit, Search, GraduationCap } from 'lucide-react';
 
 const HomePage: React.FC = () => {
   const { notes, concepts, reviews, isLoading, error } = useStore();
+  const navigate = useNavigate();
   
   if (isLoading) {
     return (
@@ -40,6 +41,28 @@ const HomePage: React.FC = () => {
   const dueReviews = reviews.filter(
     (review) => review.nextReviewDate <= new Date()
   );
+
+  const handleCreateNote = async () => {
+    try {
+      const id = Math.random().toString(36).substring(2, 11);
+      const now = new Date();
+
+      const newNote = {
+        id,
+        title: 'Untitled Note',
+        content: '',
+        tags: [],
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await useStore.getState().addNote(newNote);
+      navigate(`/notes/${id}`, { state: { isNewNote: true } });
+    } catch (error) {
+      console.error("Error creating new note:", error);
+      alert(`Failed to create note: ${(error as Error).message}`);
+    }
+  };
   
   return (
     <div className="fade-in">
@@ -55,15 +78,15 @@ const HomePage: React.FC = () => {
       
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-        <Link
-          to="/notes"
+        <button
+          onClick={handleCreateNote}
           className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
         >
           <div className="h-12 w-12 bg-primary-light/10 rounded-full flex items-center justify-center mb-3">
             <PlusCircle className="h-6 w-6 text-primary" />
           </div>
           <span className="text-gray-800 font-medium">Create Note</span>
-        </Link>
+        </button>
         
         <Link
           to="/notes"
@@ -234,3 +257,5 @@ const HomePage: React.FC = () => {
 };
 
 export default HomePage;
+
+export default HomePage

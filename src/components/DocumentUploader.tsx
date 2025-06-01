@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Upload, FileText, AlertCircle } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
@@ -13,12 +13,10 @@ interface DocumentUploaderProps {
 const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const { addNote } = useStore();
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
+  const processFile = async (file: File) => {
     try {
       setIsUploading(true);
       setError(null);
@@ -45,7 +43,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       const noteId = Math.random().toString(36).substring(2, 11);
       const now = new Date();
       
-      addNote({
+      await addNote({
         id: noteId,
         title: file.name.replace(`.${fileType}`, ''),
         content: content,
@@ -54,8 +52,6 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         updatedAt: now,
       });
 
-      // Reset the file input
-      event.target.value = '';
       if (onClose) onClose();
       
     } catch (err) {
@@ -65,6 +61,43 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       setIsUploading(false);
     }
   };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+    // Reset the input
+    event.target.value = '';
+  };
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      processFile(file);
+    }
+  }, []);
 
   const extractPdfContent = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -95,11 +128,19 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   return (
     <div className="w-full">
       <label className="block w-full">
-        <div className={`relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-          isUploading 
-            ? 'bg-gray-50 border-gray-300' 
-            : 'hover:bg-primary/5 border-primary/20'
-        }`}>
+        <div
+          onDragEnter={handleDragEnter}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+            isUploading 
+              ? 'bg-gray-50 border-gray-300 cursor-not-allowed' 
+              : isDragging
+              ? 'bg-primary/10 border-primary cursor-pointer'
+              : 'hover:bg-primary/5 border-primary/20 cursor-pointer'
+          }`}
+        >
           <input
             type="file"
             className="hidden"
@@ -118,7 +159,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
               <>
                 <Upload className="h-10 w-10 text-primary mb-3" />
                 <p className="text-gray-600">
-                  Drop your document here or click to upload
+                  {isDragging ? 'Drop your file here' : 'Drop your document here or click to upload'}
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
                   Supported formats: PDF, DOCX, MD, TXT
