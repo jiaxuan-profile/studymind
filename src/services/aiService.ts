@@ -5,6 +5,12 @@ interface AIAnalysisResult {
   suggestedTags: string[];
   summary: string;
   keyConcepts: string[];
+  conceptRelationships: Array<{
+    source: string;
+    target: string;
+    strength: number;
+    type: 'prerequisite' | 'related' | 'builds-upon';
+  }>;
   relatedNotes: Array<{
     id: string;
     title: string;
@@ -12,7 +18,6 @@ interface AIAnalysisResult {
   }>;
 }
 
-// Get the base URL for API endpoints based on environment
 const getApiBaseUrl = () => {
   return import.meta.env.PROD
     ? 'https://studymind-ai.netlify.app/.netlify/functions'
@@ -23,11 +28,15 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
   try {
     console.log('AI Service: Analyzing note content...');
     
-    // Extract key concepts using the analyze-concepts endpoint
+    // Extract key concepts and their relationships
     const conceptResponse = await fetch(`${getApiBaseUrl()}/analyze-concepts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: content, title })
+      body: JSON.stringify({ 
+        text: content, 
+        title,
+        includeRelationships: true // New flag to request relationship analysis
+      })
     });
 
     if (!conceptResponse.ok) {
@@ -61,6 +70,7 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
       suggestedTags,
       summary: conceptData.summary || '',
       keyConcepts: conceptData.concepts?.map((c: any) => c.name) || [],
+      conceptRelationships: conceptData.relationships || [],
       relatedNotes: relatedNotes || []
     };
 

@@ -5,9 +5,35 @@ Given a text, identify:
 1. Key concepts (array of strings) and their brief definitions (array of strings, corresponding to concepts).
 2. The 5 most relevant academic tags/categories (array of strings). IMPORTANT: Return exactly 5 tags, no more, no less.
 3. A concise summary (string).
-Format the response STRICTLY as a JSON object with the following fields: "tags" (array of exactly 5 strings), "concepts" (array of objects, each with "name" and "definition" strings), and "summary" (string).
-Example: {"tags": ["Calculus", "Mathematics", "Derivatives", "Functions", "Limits"], "concepts": [{"name": "Limit", "definition": "The value a function approaches."}, {"name": "Derivative", "definition": "The rate of change of a function."}], "summary": "This text introduces basic calculus concepts."}
-`;
+4. Relationships between concepts, including:
+   - Type: "prerequisite" (concept A is needed to understand B)
+   - Type: "related" (concepts are related but independent)
+   - Type: "builds-upon" (concept B extends or builds upon concept A)
+   - Strength: A number between 0 and 1 indicating relationship strength
+
+Format the response STRICTLY as a JSON object with the following fields:
+- "tags" (array of exactly 5 strings)
+- "concepts" (array of objects, each with "name" and "definition" strings)
+- "relationships" (array of objects with "source", "target", "type", and "strength" fields)
+- "summary" (string)
+
+Example:
+{
+  "tags": ["Calculus", "Mathematics", "Derivatives", "Functions", "Limits"],
+  "concepts": [
+    {"name": "Limit", "definition": "The value a function approaches."},
+    {"name": "Derivative", "definition": "The rate of change of a function."}
+  ],
+  "relationships": [
+    {
+      "source": "Limit",
+      "target": "Derivative",
+      "type": "prerequisite",
+      "strength": 0.9
+    }
+  ],
+  "summary": "This text introduces basic calculus concepts."
+}`;
 
 exports.handler = async (event) => {
   const headers = {
