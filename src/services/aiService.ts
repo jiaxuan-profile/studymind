@@ -21,6 +21,24 @@ const getApiBaseUrl = () => {
 
 export async function analyzeNote(content: string, title: string): Promise<AIAnalysisResult> {
   try {
+    console.log('AI Service: Analyzing note content...');
+    
+    // Extract key concepts using the analyze-concepts endpoint
+    const conceptResponse = await fetch(`${getApiBaseUrl()}/analyze-concepts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: content, title })
+    });
+
+    if (!conceptResponse.ok) {
+      const errorData = await conceptResponse.json();
+      console.error('AI Service: Failed to analyze concepts:', errorData);
+      throw new Error(errorData.error || 'Failed to analyze concepts');
+    }
+
+    const conceptData = await conceptResponse.json();
+    console.log('AI Service: Concept analysis completed:', conceptData);
+
     // Generate embedding for the current note
     const embedding = await generateEmbeddingOnClient(content, title);
 
@@ -32,34 +50,19 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
     });
 
     if (searchError) {
-      console.error('Error finding related notes:', searchError);
+      console.error('AI Service: Error finding related notes:', searchError);
       throw searchError;
     }
-
-    // Extract key concepts using the first few paragraphs
-    const preview = content.split('\n').slice(0, 3).join('\n');
-    const conceptResponse = await fetch(`${getApiBaseUrl()}/analyze-concepts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: preview, title })
-    });
-
-    if (!conceptResponse.ok) {
-      const errorData = await conceptResponse.json();
-      throw new Error(errorData.error || 'Failed to analyze concepts');
-    }
-
-    const conceptData = await conceptResponse.json();
 
     return {
       suggestedTags: conceptData.tags || [],
       summary: conceptData.summary || '',
-      keyConcepts: conceptData.concepts?.map(c => c.name) || [],
+      keyConcepts: conceptData.concepts?.map((c: any) => c.name) || [],
       relatedNotes: relatedNotes || []
     };
 
   } catch (error) {
-    console.error('Error analyzing note:', error);
+    console.error('AI Service: Error analyzing note:', error);
     throw error;
   }
 }
