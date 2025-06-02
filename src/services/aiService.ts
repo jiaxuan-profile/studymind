@@ -30,78 +30,70 @@ async function storeConceptsAndRelationships(
   noteId: string
 ) {
   try {
-    console.log('AI Service: Starting transaction for storing concepts and relationships...');
+    console.log('AI Service: Storing concepts and relationships...');
 
-    // Start a transaction
-    const { error: transactionError } = await supabase.rpc('begin_transaction');
-    if (transactionError) throw transactionError;
+    // First, ensure all concepts exist
+    for (const concept of concepts) {
+      const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
+      const { error: conceptError } = await supabase
+        .from('concepts')
+        .upsert({
+          id: conceptId,
+          name: concept.name,
+          definition: concept.definition
+        }, {
+          onConflict: 'id'
+        });
 
-    try {
-      // First, ensure all concepts exist
-      for (const concept of concepts) {
-        const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
-        const { error: conceptError } = await supabase
-          .from('concepts')
-          .upsert({
-            id: conceptId,
-            name: concept.name,
-            definition: concept.definition
-          }, {
-            onConflict: 'id'
-          });
-
-        if (conceptError) throw conceptError;
+      if (conceptError) {
+        console.error('AI Service: Error storing concept:', conceptError);
+        throw conceptError;
       }
-
-      // Then create relationships
-      for (const rel of relationships) {
-        const sourceId = rel.source.toLowerCase().replace(/\s+/g, '-');
-        const targetId = rel.target.toLowerCase().replace(/\s+/g, '-');
-        
-        const { error: relationshipError } = await supabase
-          .from('concept_relationships')
-          .upsert({
-            id: `${sourceId}-${targetId}`,
-            source_id: sourceId,
-            target_id: targetId,
-            relationship_type: rel.type,
-            strength: rel.strength
-          }, {
-            onConflict: 'id'
-          });
-
-        if (relationshipError) throw relationshipError;
-      }
-
-      // Finally, create note-concept associations
-      for (const concept of concepts) {
-        const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
-        const { error: associationError } = await supabase
-          .from('note_concepts')
-          .upsert({
-            note_id: noteId,
-            concept_id: conceptId,
-            relevance_score: 0.8 // Default score
-          }, {
-            onConflict: ['note_id', 'concept_id']
-          });
-
-        if (associationError) throw associationError;
-      }
-
-      // Commit the transaction
-      const { error: commitError } = await supabase.rpc('commit_transaction');
-      if (commitError) throw commitError;
-
-      console.log('AI Service: Successfully stored concepts and relationships');
-    } catch (error) {
-      // Rollback on any error
-      const { error: rollbackError } = await supabase.rpc('rollback_transaction');
-      if (rollbackError) {
-        console.error('AI Service: Error rolling back transaction:', rollbackError);
-      }
-      throw error;
     }
+
+    // Then create relationships
+    for (const rel of relationships) {
+      const sourceId = rel.source.toLowerCase().replace(/\s+/g, '-');
+      const targetId = rel.target.toLowerCase().replace(/\s+/g, '-');
+      
+      const { error: relationshipError } = await supabase
+        .from('concept_relationships')
+        .upsert({
+          id: `${sourceId}-${targetId}`,
+          source_id: sourceId,
+          target_id: targetId,
+          relationship_type: rel.type,
+          strength: rel.strength
+        }, {
+          onConflict: 'id'
+        });
+
+      if (relationshipError) {
+        console.error('AI Service: Error storing relationship:', relationshipError);
+        throw relationshipError;
+      }
+    }
+
+    // Finally, create note-concept associations
+    for (const concept of concepts) {
+      const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
+      const { error: associationError } = await supabase
+        .from('note_concepts')
+        .upsert({
+          note_id: noteId,
+          concept_id: conceptId,
+          relevance_score: 0.8 // Default score
+        }, {
+          onConflict: ['note_id', 'concept_id']
+        });
+
+      if (associationError) {
+        console.error('AI Service: Error storing note-concept association:', associationError);
+        throw associationError;
+      }
+    }
+
+    console.log('AI Service: Successfully stored concepts and relationships');
   } catch (error) {
     console.error('AI Service: Error in storeConceptsAndRelationships:', error);
     throw error;
@@ -148,12 +140,17 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
     }
 
     // Store concepts and relationships in the database
-    const noteId = title.toLowerCase().replace(/\s+/g, '-');
-    await storeConceptsAndRelationships(
-      conceptData.concepts,
-      conceptData.relationships,
-      noteId
-    );
+    try {
+      const noteId = title.toLowerCase().replace(/\s+/g, '-');
+      await storeConceptsAndRelationships(
+        conceptData.concepts,
+        conceptData.relationships,
+        noteId
+      );
+    } catch (storageError) {
+      // Log the error but don't fail the entire analysis
+      console.error('AI Service: Error storing concepts:', storageError);
+    }
 
     // Ensure we only return exactly 5 tags
     const suggestedTags = conceptData.tags?.slice(0, 5) || [];
