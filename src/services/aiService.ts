@@ -30,7 +30,7 @@ async function storeConceptsAndRelationships(
   noteId: string
 ) {
   try {
-    console.log('AI Service: Storing concepts and relationships...');
+    console.log('AI Service: Starting transaction for storing concepts and relationships...');
 
     // First, check if the note exists
     const { data: noteExists, error: noteCheckError } = await supabase
@@ -46,7 +46,7 @@ async function storeConceptsAndRelationships(
 
     // Store concepts first
     for (const concept of concepts) {
-      const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
+      const conceptId = concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const { error: conceptError } = await supabase
         .from('concepts')
         .upsert({
@@ -65,8 +65,8 @@ async function storeConceptsAndRelationships(
 
     // Then store relationships
     for (const rel of relationships) {
-      const sourceId = rel.source.toLowerCase().replace(/\s+/g, '-');
-      const targetId = rel.target.toLowerCase().replace(/\s+/g, '-');
+      const sourceId = rel.source.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      const targetId = rel.target.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       
       const { error: relationshipError } = await supabase
         .from('concept_relationships')
@@ -88,7 +88,7 @@ async function storeConceptsAndRelationships(
 
     // Finally, create note-concept associations
     for (const concept of concepts) {
-      const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
+      const conceptId = concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const { error: associationError } = await supabase
         .from('note_concepts')
         .upsert({
@@ -112,7 +112,7 @@ async function storeConceptsAndRelationships(
   }
 }
 
-export async function analyzeNote(content: string, title: string): Promise<AIAnalysisResult> {
+export async function analyzeNote(content: string, title: string, noteId: string): Promise<AIAnalysisResult> {
   try {
     console.log('AI Service: Analyzing note content...');
     
@@ -153,7 +153,6 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
 
     // Store concepts and relationships in the database
     // Note: This is now non-blocking and will handle its own errors
-    const noteId = title.toLowerCase().replace(/\s+/g, '-');
     setTimeout(() => {
       storeConceptsAndRelationships(
         conceptData.concepts,

@@ -54,7 +54,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       if (useAI) {
         try {
           console.log("Analyzing document content with AI...");
-          const analysis = await analyzeNote(content, title);
+          const analysis = await analyzeNote(content, title, id);
           console.log("AI analysis result:", analysis);
           tags = [...new Set([...tags, ...analysis.suggestedTags])];
           summary = analysis.summary;
