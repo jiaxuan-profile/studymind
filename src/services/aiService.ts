@@ -32,7 +32,19 @@ async function storeConceptsAndRelationships(
   try {
     console.log('AI Service: Storing concepts and relationships...');
 
-    // First, ensure all concepts exist
+    // First, check if the note exists
+    const { data: noteExists, error: noteCheckError } = await supabase
+      .from('notes')
+      .select('id')
+      .eq('id', noteId)
+      .single();
+
+    if (noteCheckError || !noteExists) {
+      console.error('AI Service: Note does not exist yet:', noteId);
+      return; // Exit early if note doesn't exist yet
+    }
+
+    // Store concepts first
     for (const concept of concepts) {
       const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
       const { error: conceptError } = await supabase
@@ -47,11 +59,11 @@ async function storeConceptsAndRelationships(
 
       if (conceptError) {
         console.error('AI Service: Error storing concept:', conceptError);
-        throw conceptError;
+        continue; // Continue with next concept even if one fails
       }
     }
 
-    // Then create relationships
+    // Then store relationships
     for (const rel of relationships) {
       const sourceId = rel.source.toLowerCase().replace(/\s+/g, '-');
       const targetId = rel.target.toLowerCase().replace(/\s+/g, '-');
@@ -70,7 +82,7 @@ async function storeConceptsAndRelationships(
 
       if (relationshipError) {
         console.error('AI Service: Error storing relationship:', relationshipError);
-        throw relationshipError;
+        continue; // Continue with next relationship even if one fails
       }
     }
 
@@ -89,14 +101,14 @@ async function storeConceptsAndRelationships(
 
       if (associationError) {
         console.error('AI Service: Error storing note-concept association:', associationError);
-        throw associationError;
+        continue; // Continue with next association even if one fails
       }
     }
 
     console.log('AI Service: Successfully stored concepts and relationships');
   } catch (error) {
     console.error('AI Service: Error in storeConceptsAndRelationships:', error);
-    throw error;
+    // Don't throw the error, just log it and continue
   }
 }
 
@@ -140,17 +152,15 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
     }
 
     // Store concepts and relationships in the database
-    try {
-      const noteId = title.toLowerCase().replace(/\s+/g, '-');
-      await storeConceptsAndRelationships(
+    // Note: This is now non-blocking and will handle its own errors
+    const noteId = title.toLowerCase().replace(/\s+/g, '-');
+    setTimeout(() => {
+      storeConceptsAndRelationships(
         conceptData.concepts,
         conceptData.relationships,
         noteId
-      );
-    } catch (storageError) {
-      // Log the error but don't fail the entire analysis
-      console.error('AI Service: Error storing concepts:', storageError);
-    }
+      ).catch(console.error);
+    }, 1000); // Delay to ensure note is saved first
 
     // Ensure we only return exactly 5 tags
     const suggestedTags = conceptData.tags?.slice(0, 5) || [];
