@@ -70,8 +70,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         tags,
         summary,
         embedding,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString()
+        updatedAt: now.toISOString(),
+        createdAt: now.toISOString()
       };
 
       console.log("Saving document to database...");
