@@ -2,115 +2,183 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Search, Info } from 'lucide-react';
-import { GraphData, GraphNode, GraphLink, Concept } from '../types';
+import { GraphData, GraphNode, GraphLink } from '../types';
+import { getAllConcepts, getConceptCategories } from '../services/databaseServiceClient';
+
+interface ConceptDetails {
+  id: string;
+  name: string;
+  definition: string;
+  noteIds: string[];
+  relatedConceptIds: string[];
+}
+
+interface CategoryColors {
+  [key: string]: string;
+}
 
 const ConceptsPage: React.FC = () => {
-  const { notes, concepts } = useStore();
+  const { notes } = useStore();
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
-  const [selectedConcept, setSelectedConcept] = useState<Concept | null>(null);
+  const [selectedConcept, setSelectedConcept] = useState<ConceptDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
   const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [categoryColors, setCategoryColors] = useState<CategoryColors>({});
   const graphRef = useRef<any>(null);
-  
-  // Prepare graph data
+
   useEffect(() => {
-    const nodes: GraphNode[] = concepts.map((concept) => ({
-      id: concept.id,
-      name: concept.name,
-      val: 1 + concept.noteIds.length * 0.5,
-      color: getConceptColor(concept),
-    }));
-    
-    const links: GraphLink[] = [];
-    concepts.forEach((concept) => {
-      concept.relatedConceptIds.forEach((relatedId) => {
-        links.push({
-          source: concept.id,
-          target: relatedId,
-          value: 1,
+    const loadConceptData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Load concepts and relationships from database
+        const { concepts, relationships, noteConcepts } = await getAllConcepts();
+        
+        // Load categories and generate colors
+        const categories = await getConceptCategories();
+        const colors = generateCategoryColors(categories);
+        setCategories(categories);
+        setCategoryColors(colors);
+
+        // Create graph nodes
+        const nodes: GraphNode[] = concepts.map(concept => {
+          const conceptNotes = noteConcepts
+            .filter(nc => nc.concept_id === concept.id)
+            .map(nc => nc.note_id);
+          
+          const noteCategories = conceptNotes
+            .map(noteId => {
+              const note = notes.find(n => n.id === noteId);
+              return note?.tags[0] || '';
+            })
+            .filter(Boolean);
+
+          // Use the most common category for the concept
+          const topCategory = getMostCommonCategory(noteCategories);
+          
+          return {
+            id: concept.id,
+            name: concept.name,
+            val: 1 + conceptNotes.length * 0.5,
+            color: colors[topCategory] || colors.default
+          };
         });
-      });
-    });
-    
-    setGraphData({ nodes, links });
-  }, [concepts, notes]);
-  
-  // Get color based on notes the concept appears in
-  const getConceptColor = (concept: Concept): string => {
-    const noteCategories = concept.noteIds.map(
-      (noteId) => {
-        const note = notes.find((n) => n.id === noteId);
-        return note?.tags[0] || '';
+
+        // Create graph links
+        const links: GraphLink[] = relationships.map(rel => ({
+          source: rel.source_id,
+          target: rel.target_id,
+          value: rel.strength
+        }));
+
+        setGraphData({ nodes, links });
+      } catch (err) {
+        console.error('Error loading concept data:', err);
+        setError('Failed to load concept data. Please try again later.');
+      } finally {
+        setLoading(false);
       }
-    );
-    
-    // Use the most common category to determine color
-    const categoryCounts: Record<string, number> = {};
-    noteCategories.forEach((category) => {
-      if (category) {
-        categoryCounts[category] = (categoryCounts[category] || 0) + 1;
-      }
-    });
-    
-    const topCategory = Object.entries(categoryCounts)
-      .sort((a, b) => b[1] - a[1])
-      [0]?.[0];
-    
-    // Map categories to colors
-    const categoryColors: Record<string, string> = {
-      'AI': '#4F46E5', // primary
-      'Machine Learning': '#6366F1', // primary-light
-      'Neural Networks': '#4338CA', // primary-dark
-      'Biology': '#0D9488', // secondary
-      'Cell': '#14B8A6', // secondary-light
-      'Organelles': '#0F766E', // secondary-dark
-      'Mathematics': '#F59E0B', // accent
-      'Calculus': '#FBBF24', // accent-light
-      'Derivatives': '#D97706', // accent-dark
-      'Integrals': '#B45309', // accent-darker
-      // Add more category-color mappings as needed
     };
+
+    loadConceptData();
+  }, [notes]);
+
+  const generateCategoryColors = (categories: string[]): CategoryColors => {
+    const baseColors = {
+      default: '#94A3B8',
+      primary: ['#4F46E5', '#6366F1', '#818CF8'],
+      secondary: ['#0D9488', '#14B8A6', '#2DD4BF'],
+      accent: ['#F59E0B', '#FBBF24', '#FCD34D']
+    };
+
+    const colors: CategoryColors = { default: baseColors.default };
     
-    return categoryColors[topCategory] || '#94A3B8'; // default gray if no category matches
+    categories.forEach((category, index) => {
+      const colorSet = index % 3 === 0 
+        ? baseColors.primary 
+        : index % 3 === 1 
+        ? baseColors.secondary 
+        : baseColors.accent;
+      
+      colors[category] = colorSet[Math.floor(index / 3) % colorSet.length];
+    });
+
+    return colors;
   };
-  
-  const handleNodeClick = (node: any) => {
-    const clickedConcept = concepts.find((c) => c.id === node.id);
-    setSelectedConcept(clickedConcept || null);
+
+  const getMostCommonCategory = (categories: string[]): string => {
+    if (!categories.length) return 'default';
     
-    if (clickedConcept) {
-      // Highlight the node and its connections
+    const counts: Record<string, number> = {};
+    categories.forEach(cat => {
+      counts[cat] = (counts[cat] || 0) + 1;
+    });
+    
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])[0][0];
+  };
+
+  const handleNodeClick = async (node: any) => {
+    try {
+      const { data: concept, error } = await supabase
+        .from('concepts')
+        .select('*')
+        .eq('id', node.id)
+        .single();
+
+      if (error) throw error;
+
+      const { data: noteConceptsData } = await supabase
+        .from('note_concepts')
+        .select('note_id')
+        .eq('concept_id', node.id);
+
+      const { data: relationships } = await supabase
+        .from('concept_relationships')
+        .select('target_id')
+        .eq('source_id', node.id);
+
+      setSelectedConcept({
+        ...concept,
+        noteIds: noteConceptsData?.map(nc => nc.note_id) || [],
+        relatedConceptIds: relationships?.map(r => r.target_id) || []
+      });
+
+      // Highlight connected nodes and links
       const connectedNodeIds = new Set([
-        clickedConcept.id,
-        ...clickedConcept.relatedConceptIds,
+        node.id,
+        ...(relationships?.map(r => r.target_id) || [])
       ]);
-      
+
       setHighlightNodes(connectedNodeIds);
-      
+
       const connectedLinkIds = new Set<string>();
       graphData.links.forEach((link) => {
         if (
-          (link.source === clickedConcept.id && connectedNodeIds.has(link.target as string)) ||
-          (link.target === clickedConcept.id && connectedNodeIds.has(link.source as string))
+          (link.source === node.id && connectedNodeIds.has(link.target as string)) ||
+          (link.target === node.id && connectedNodeIds.has(link.source as string))
         ) {
           connectedLinkIds.add(`${link.source}-${link.target}`);
         }
       });
-      
+
       setHighlightLinks(connectedLinkIds);
-      
+
       // Center the graph on the selected node
       if (graphRef.current) {
         graphRef.current.centerAt(node.x, node.y, 1000);
         graphRef.current.zoom(2, 1000);
       }
-    } else {
-      setHighlightNodes(new Set());
-      setHighlightLinks(new Set());
+    } catch (error) {
+      console.error('Error fetching concept details:', error);
     }
   };
-  
+
   const handleSearch = () => {
     if (!searchTerm) {
       setHighlightNodes(new Set());
@@ -118,20 +186,42 @@ const ConceptsPage: React.FC = () => {
       setSelectedConcept(null);
       return;
     }
-    
+
     const term = searchTerm.toLowerCase();
-    const matchedConcept = concepts.find(
-      (c) => c.name.toLowerCase().includes(term)
+    const matchedNode = graphData.nodes.find(
+      (n) => n.name.toLowerCase().includes(term)
     );
-    
-    if (matchedConcept) {
-      const matchedNode = graphData.nodes.find((n) => n.id === matchedConcept.id);
-      if (matchedNode) {
-        handleNodeClick(matchedNode);
-      }
+
+    if (matchedNode) {
+      handleNodeClick(matchedNode);
     }
   };
-  
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[600px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading concept graph...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <div className="text-red-600 mb-4">{error}</div>
+        <button 
+          onClick={() => window.location.reload()} 
+          className="text-primary hover:text-primary-dark"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="fade-in">
       <div className="mb-6">
@@ -140,7 +230,7 @@ const ConceptsPage: React.FC = () => {
           Explore how concepts in your notes are connected to each other
         </p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main graph area */}
         <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -163,145 +253,151 @@ const ConceptsPage: React.FC = () => {
               />
             </div>
           </div>
-          
+
           <div className="w-full h-[600px] bg-gray-50">
-            {graphData.nodes.length > 0 && (
+            {graphData.nodes.length > 0 ? (
               <ForceGraph2D
                 ref={graphRef}
                 graphData={graphData}
                 nodeLabel="name"
                 nodeColor={(node) => {
                   const n = node as GraphNode;
-                  return highlightNodes.size === 0 || highlightNodes.has(n.id) 
-                    ? n.color || '#94A3B8' 
+                  return highlightNodes.size === 0 || highlightNodes.has(n.id)
+                    ? n.color
                     : '#E2E8F0';
                 }}
                 nodeRelSize={6}
                 linkWidth={(link) => {
                   const l = link as GraphLink;
                   const id = `${l.source}-${l.target}`;
-                  return highlightLinks.size === 0 || highlightLinks.has(id) ? 2 : 0.5;
+                  return highlightLinks.size === 0 || highlightLinks.has(id)
+                    ? 2 * (l.value || 1)
+                    : 0.5;
                 }}
                 linkColor={(link) => {
                   const l = link as GraphLink;
                   const id = `${l.source}-${l.target}`;
-                  return highlightLinks.size === 0 || highlightLinks.has(id) 
-                    ? 'rgba(79, 70, 229, 0.8)' 
+                  return highlightLinks.size === 0 || highlightLinks.has(id)
+                    ? 'rgba(79, 70, 229, 0.8)'
                     : 'rgba(203, 213, 225, 0.5)';
                 }}
                 onNodeClick={handleNodeClick}
                 cooldownTicks={100}
                 onEngineStop={() => graphRef.current?.zoomToFit(400, 30)}
               />
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-gray-500">No concepts found</p>
+              </div>
             )}
           </div>
         </div>
-        
-        {/* Concept details */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 bg-primary/5 border-b border-gray-200">
-            <div className="flex items-center">
-              <Info className="h-5 w-5 text-primary mr-2" />
-              <h2 className="text-lg font-semibold text-gray-900">Concept Details</h2>
-            </div>
-          </div>
-          
-          {selectedConcept ? (
-            <div className="p-4">
-              <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedConcept.name}</h3>
-              <p className="text-gray-600 mb-4">{selectedConcept.description}</p>
-              
-              <div className="mb-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Found in Notes:</h4>
-                <ul className="space-y-2">
-                  {selectedConcept.noteIds.map((noteId) => {
-                    const note = notes.find((n) => n.id === noteId);
-                    return note ? (
-                      <li key={noteId}>
-                        <a
-                          href={`/notes/${noteId}`}
-                          className="block p-2 rounded-md border border-gray-100 hover:border-gray-300 hover:bg-gray-50"
-                        >
-                          <span className="font-medium text-primary">{note.title}</span>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {note.tags.slice(0, 3).map((tag, i) => (
-                              <span
-                                key={i}
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                              >
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </a>
-                      </li>
-                    ) : null;
-                  })}
-                </ul>
+
+        {/* Concept details and legend */}
+        <div className="space-y-6">
+          {/* Concept details */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="p-4 bg-primary/5 border-b border-gray-200">
+              <div className="flex items-center">
+                <Info className="h-5 w-5 text-primary mr-2" />
+                <h2 className="text-lg font-semibold text-gray-900">Concept Details</h2>
               </div>
-              
-              <div>
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">Related Concepts:</h4>
-                <div className="flex flex-wrap gap-2">
-                  {selectedConcept.relatedConceptIds.map((relatedId) => {
-                    const relatedConcept = concepts.find((c) => c.id === relatedId);
-                    return relatedConcept ? (
-                      <button
-                        key={relatedId}
-                        className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
-                        onClick={() => {
-                          const node = graphData.nodes.find((n) => n.id === relatedId);
-                          if (node) {
-                            handleNodeClick(node);
-                          }
-                        }}
-                      >
-                        {relatedConcept.name}
-                      </button>
-                    ) : null;
-                  })}
+            </div>
+
+            {selectedConcept ? (
+              <div className="p-4">
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedConcept.name}</h3>
+                <p className="text-gray-600 mb-4">{selectedConcept.definition}</p>
+
+                <div className="mb-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Found in Notes:</h4>
+                  <ul className="space-y-2">
+                    {selectedConcept.noteIds.map((noteId) => {
+                      const note = notes.find((n) => n.id === noteId);
+                      return note ? (
+                        <li key={noteId}>
+                          <a
+                            href={`/notes/${noteId}`}
+                            className="block p-2 rounded-md border border-gray-100 hover:border-gray-300 hover:bg-gray-50"
+                          >
+                            <span className="font-medium text-primary">{note.title}</span>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {note.tags.slice(0, 3).map((tag, i) => (
+                                <span
+                                  key={i}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                >
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          </a>
+                        </li>
+                      ) : null;
+                    })}
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Related Concepts:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedConcept.relatedConceptIds.map((relatedId) => {
+                      const relatedNode = graphData.nodes.find((n) => n.id === relatedId);
+                      return relatedNode ? (
+                        <button
+                          key={relatedId}
+                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+                          onClick={() => {
+                            handleNodeClick(relatedNode);
+                          }}
+                        >
+                          {relatedNode.name}
+                        </button>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="p-6 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
-              </svg>
-              <h3 className="mt-2 text-lg font-medium text-gray-900">No concept selected</h3>
-              <p className="mt-1 text-gray-500">Click on a node in the graph to view details</p>
-            </div>
-          )}
-          
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Graph Legend</h3>
-            <div className="space-y-2">
-              <div className="flex items-center">
-                <span className="h-4 w-4 rounded-full bg-primary mr-2"></span>
-                <span className="text-sm text-gray-600">AI & Machine Learning</span>
+            ) : (
+              <div className="p-6 text-center">
+                <svg
+                  className="mx-auto h-12 w-12 text-gray-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                  />
+                </svg>
+                <h3 className="mt-2 text-lg font-medium text-gray-900">No concept selected</h3>
+                <p className="mt-1 text-gray-500">Click on a node in the graph to view details</p>
               </div>
-              <div className="flex items-center">
-                <span className="h-4 w-4 rounded-full bg-secondary mr-2"></span>
-                <span className="text-sm text-gray-600">Biology & Science</span>
-              </div>
-              <div className="flex items-center">
-                <span className="h-4 w-4 rounded-full bg-accent mr-2"></span>
-                <span className="text-sm text-gray-600">Mathematics</span>
-              </div>
-              <div className="flex items-center">
-                <span className="h-4 w-4 rounded-full bg-gray-400 mr-2"></span>
-                <span className="text-sm text-gray-600">Other</span>
+            )}
+          </div>
+
+          {/* Graph Legend */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3">
+              <h3 className="text-sm font-medium text-gray-900 mb-2">Graph Legend</h3>
+              <div className="space-y-2">
+                {categories.map(category => (
+                  <div key={category} className="flex items-center">
+                    <span 
+                      className="h-4 w-4 rounded-full mr-2" 
+                      style={{ backgroundColor: categoryColors[category] }}
+                    />
+                    <span className="text-sm text-gray-600">{category}</span>
+                  </div>
+                ))}
+                <div className="flex items-center">
+                  <span className="h-4 w-4 rounded-full bg-gray-400 mr-2" />
+                  <span className="text-sm text-gray-600">Uncategorized</span>
+                </div>
               </div>
             </div>
           </div>

@@ -161,3 +161,52 @@ export async function updateNoteSummary(id: string, summary: string) {
     throw error;
   }
 }
+
+export async function getAllConcepts() {
+  try {
+    console.log("Database Service: Fetching all concepts");
+    
+    const { data: concepts, error: conceptsError } = await supabase
+      .from('concepts')
+      .select('*');
+
+    if (conceptsError) throw conceptsError;
+
+    const { data: relationships, error: relError } = await supabase
+      .from('concept_relationships')
+      .select('*');
+
+    if (relError) throw relError;
+
+    const { data: noteConcepts, error: ncError } = await supabase
+      .from('note_concepts')
+      .select('*');
+
+    if (ncError) throw ncError;
+
+    return { concepts, relationships, noteConcepts };
+
+  } catch (error) {
+    console.error('Database Service: Error fetching concepts:', error);
+    throw error;
+  }
+}
+
+export async function getConceptCategories() {
+  try {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('tags');
+
+    if (error) throw error;
+
+    // Flatten and deduplicate tags
+    const allTags = data.flatMap(note => note.tags || []);
+    const uniqueTags = [...new Set(allTags)];
+
+    return uniqueTags;
+  } catch (error) {
+    console.error('Database Service: Error fetching concept categories:', error);
+    throw error;
+  }
+}
