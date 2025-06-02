@@ -4,6 +4,7 @@ import ForceGraph2D from 'react-force-graph-2d';
 import { Search, Info } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../types';
 import { getAllConcepts, getConceptCategories } from '../services/databaseServiceClient';
+import { supabase } from '../services/supabase';
 
 interface ConceptDetails {
   id: string;
@@ -408,3 +409,5 @@ const ConceptsPage: React.FC = () => {
 };
 
 export default ConceptsPage;
+
+export default ConceptsPage
