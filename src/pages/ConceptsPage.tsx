@@ -35,6 +35,8 @@ const ConceptsPage: React.FC = () => {
   const [cameraPosition, setCameraPosition] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 250 });
   const [tooltipContent, setTooltipContent] = useState<{ content: string; x: number; y: number } | null>(null);
   const [showControls, setShowControls] = useState(true);
+  const graphRef = useRef<HTMLDivElement>(null);
+  const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
   const [activeTab, setActiveTab] = useState<'overview' | 'learn' | 'practice'>('overview');
   const [learningPath, setLearningPath] = useState<string[]>([]);
@@ -42,6 +44,23 @@ const ConceptsPage: React.FC = () => {
     question: string;
     answer: string;
   }>>([]);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      setMousePosition({ x: event.clientX, y: event.clientY });
+    };
+
+    const graphElement = graphRef.current;
+    if (graphElement) {
+      graphElement.addEventListener('mousemove', handleMouseMove);
+    }
+
+    return () => {
+      if (graphElement) {
+        graphElement.removeEventListener('mousemove', handleMouseMove);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const loadConceptData = async () => {
@@ -260,12 +279,12 @@ const ConceptsPage: React.FC = () => {
     }
   };
 
-  const handleNodeHover = (node: any, event: MouseEvent) => {
+  const handleNodeHover = (node: any) => {
     if (node) {
       setTooltipContent({
         content: node.name,
-        x: event.clientX,
-        y: event.clientY
+        x: mousePosition.x,
+        y: mousePosition.y
       });
     } else {
       setTooltipContent(null);
@@ -349,7 +368,7 @@ const ConceptsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="relative w-full h-[600px] bg-gray-900">
+          <div ref={graphRef} className="relative w-full h-[600px] bg-gray-900">
             {graphData.nodes.length > 0 ? (
               <>
                 <ForceGraph3D
