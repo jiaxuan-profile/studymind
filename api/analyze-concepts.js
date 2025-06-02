@@ -3,15 +3,15 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const SYSTEM_PROMPT = `You are an AI assistant specialized in analyzing academic content.
 Given a text, identify:
 1. Key concepts (array of strings) and their brief definitions (array of strings, corresponding to concepts).
-2. Relevant academic tags/categories (array of strings).
+2. The 5 most relevant academic tags/categories (array of strings). IMPORTANT: Return exactly 5 tags, no more, no less.
 3. A concise summary (string).
-Format the response STRICTLY as a JSON object with the following fields: "tags" (array of strings), "concepts" (array of objects, each with "name" and "definition" strings), and "summary" (string).
-Example: {"tags": ["Calculus", "Mathematics"], "concepts": [{"name": "Limit", "definition": "The value a function approaches."}, {"name": "Derivative", "definition": "The rate of change of a function."}], "summary": "This text introduces basic calculus concepts."}
+Format the response STRICTLY as a JSON object with the following fields: "tags" (array of exactly 5 strings), "concepts" (array of objects, each with "name" and "definition" strings), and "summary" (string).
+Example: {"tags": ["Calculus", "Mathematics", "Derivatives", "Functions", "Limits"], "concepts": [{"name": "Limit", "definition": "The value a function approaches."}, {"name": "Derivative", "definition": "The rate of change of a function."}], "summary": "This text introduces basic calculus concepts."}
 `;
 
 exports.handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*', // Consider restricting in production
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json'
   };

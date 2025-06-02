@@ -54,8 +54,11 @@ export async function analyzeNote(content: string, title: string): Promise<AIAna
       throw searchError;
     }
 
+    // Ensure we only return exactly 5 tags
+    const suggestedTags = conceptData.tags?.slice(0, 5) || [];
+
     return {
-      suggestedTags: conceptData.tags || [],
+      suggestedTags,
       summary: conceptData.summary || '',
       keyConcepts: conceptData.concepts?.map((c: any) => c.name) || [],
       relatedNotes: relatedNotes || []
