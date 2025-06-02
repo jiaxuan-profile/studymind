@@ -1,11 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import { Link } from 'react-router-dom';
-import ForceGraph2D from 'react-force-graph-2d';
+import ForceGraph3D from 'react-force-graph-3d';
 import { Search, Info, BookOpen, Brain, Lightbulb, ArrowRight } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../types';
 import { getAllConcepts, getConceptCategories } from '../services/databaseServiceClient';
 import { supabase } from '../services/supabase';
+import * as THREE from 'three';
 
 interface ConceptDetails {
   id: string;
@@ -30,7 +31,8 @@ const ConceptsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryColors, setCategoryColors] = useState<CategoryColors>({});
-  const graphRef = useRef<any>(null);
+  const fgRef = useRef<any>();
+  const [cameraPosition, setCameraPosition] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 250 });
 
   const [activeTab, setActiveTab] = useState<'overview' | 'learn' | 'practice'>('overview');
   const [learningPath, setLearningPath] = useState<string[]>([]);
@@ -45,16 +47,13 @@ const ConceptsPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Load concepts and relationships from database
         const { concepts, relationships, noteConcepts } = await getAllConcepts();
         
-        // Load categories and generate colors
         const categories = await getConceptCategories();
         const colors = generateCategoryColors(categories);
         setCategories(categories);
         setCategoryColors(colors);
 
-        // Create graph nodes
         const nodes: GraphNode[] = concepts.map(concept => {
           const conceptNotes = noteConcepts
             .filter(nc => nc.concept_id === concept.id)
@@ -67,7 +66,6 @@ const ConceptsPage: React.FC = () => {
             })
             .filter(Boolean);
 
-          // Use the most common category for the concept
           const topCategory = getMostCommonCategory(noteCategories);
           
           return {
@@ -78,7 +76,6 @@ const ConceptsPage: React.FC = () => {
           };
         });
 
-        // Create graph links
         const links: GraphLink[] = relationships.map(rel => ({
           source: rel.source_id,
           target: rel.target_id,
@@ -134,7 +131,6 @@ const ConceptsPage: React.FC = () => {
 
   const generateLearningPath = async (conceptId: string) => {
     try {
-      // Get concept relationships with prerequisite information
       const { data: relationships } = await supabase
         .from('concept_relationships')
         .select('*')
@@ -157,8 +153,6 @@ const ConceptsPage: React.FC = () => {
 
   const generatePracticeQuestions = async (conceptId: string) => {
     try {
-      // In a real implementation, this would call an AI endpoint
-      // For now, we'll generate some example questions
       const concept = graphData.nodes.find(n => n.id === conceptId);
       if (!concept) return;
 
@@ -183,7 +177,7 @@ const ConceptsPage: React.FC = () => {
     }
   };
 
-  const handleNodeClick = async (node: any) => {
+  const handleNodeClick = useCallback(async (node: any) => {
     try {
       const { data: concept, error } = await supabase
         .from('concepts')
@@ -209,11 +203,9 @@ const ConceptsPage: React.FC = () => {
         relatedConceptIds: relationships?.map(r => r.target_id) || []
       });
 
-      // Generate learning path and practice questions
       await generateLearningPath(node.id);
       await generatePracticeQuestions(node.id);
 
-      // Highlight connected nodes and links
       const connectedNodeIds = new Set([
         node.id,
         ...(relationships?.map(r => r.target_id) || [])
@@ -233,15 +225,20 @@ const ConceptsPage: React.FC = () => {
 
       setHighlightLinks(connectedLinkIds);
 
-      // Center the graph on the selected node
-      if (graphRef.current) {
-        graphRef.current.centerAt(node.x, node.y, 1000);
-        graphRef.current.zoom(2, 1000);
+      const distance = 100;
+      const distRatio = 1 + distance/Math.hypot(node.x, node.y, node.z);
+
+      if (fgRef.current) {
+        fgRef.current.cameraPosition(
+          { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+          node,
+          3000
+        );
       }
     } catch (error) {
       console.error('Error fetching concept details:', error);
     }
-  };
+  }, [graphData.links]);
 
   const handleSearch = () => {
     if (!searchTerm) {
@@ -319,8 +316,8 @@ const ConceptsPage: React.FC = () => {
 
           <div className="w-full h-[600px] bg-gray-50">
             {graphData.nodes.length > 0 ? (
-              <ForceGraph2D
-                ref={graphRef}
+              <ForceGraph3D
+                ref={fgRef}
                 graphData={graphData}
                 nodeLabel="name"
                 nodeColor={(node) => {
@@ -330,6 +327,13 @@ const ConceptsPage: React.FC = () => {
                     : '#E2E8F0';
                 }}
                 nodeRelSize={6}
+                nodeThreeObject={node => {
+                  const sprite = new THREE.Sprite(
+                    new THREE.SpriteMaterial({ color: (node as GraphNode).color })
+                  );
+                  sprite.scale.set(12, 12, 1);
+                  return sprite;
+                }}
                 linkWidth={(link) => {
                   const l = link as GraphLink;
                   const id = `${l.source}-${l.target}`;
@@ -345,8 +349,14 @@ const ConceptsPage: React.FC = () => {
                     : 'rgba(203, 213, 225, 0.5)';
                 }}
                 onNodeClick={handleNodeClick}
-                cooldownTicks={100}
-                onEngineStop={() => graphRef.current?.zoomToFit(400, 30)}
+                onNodeDragEnd={node => {
+                  node.fx = node.x;
+                  node.fy = node.y;
+                  node.fz = node.z;
+                }}
+                enableNodeDrag={true}
+                enableNavigationControls={true}
+                showNavInfo={true}
               />
             ) : (
               <div className="flex items-center justify-center h-full">
