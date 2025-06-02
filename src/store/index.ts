@@ -60,17 +60,20 @@ export const useStore = create<State>((set, get) => ({
   },
   
   loadNotes: async (page = 1, pageSize = 12) => {
-    const currentUser = get().user;
-    if (!currentUser) {
-      set({ notes: [], isLoading: false });
-      return;
-    }
-
+    console.log("Store: Starting loadNotes function", { page, pageSize });
     set({ isLoading: true, error: null });
+
     try {
+      console.log("Store: Fetching notes from database");
       const { data, count } = await getAllNotes(page, pageSize);
       const totalPages = Math.ceil(count / pageSize);
       
+      console.log("Store: Processing notes data", {
+        notesCount: data.length,
+        totalPages,
+        totalNotes: count
+      });
+
       set({ 
         notes: data.map(note => ({
           ...note,
@@ -88,7 +91,7 @@ export const useStore = create<State>((set, get) => ({
         }
       });
     } catch (error) {
-      console.error('Failed to load notes:', error);
+      console.error('Store: Failed to load notes:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to load notes',
         isLoading: false 

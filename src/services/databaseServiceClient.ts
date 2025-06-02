@@ -110,7 +110,7 @@ export async function getNoteById(id: string) {
 
 export async function getAllNotes(page = 1, pageSize = 12) {
   try {
-    console.log("Database Service: Fetching paginated notes", { page, pageSize });
+    console.log("Database Service: Starting getAllNotes function");
     
     // Debug: Log the current session
     const { data: { session } } = await supabase.auth.getSession();
@@ -136,11 +136,11 @@ export async function getAllNotes(page = 1, pageSize = 12) {
       .range((page - 1) * pageSize, page * pageSize - 1);
 
     if (error) {
-      console.error("Database Service: Supabase error:", error);
+      console.error("Database Service: Error fetching notes:", error);
       throw new Error(`Failed to fetch notes: ${error.message}`);
     }
 
-    console.log("Database Service: Notes fetched successfully", {
+    console.log("Database Service: Notes fetch result:", {
       page,
       pageSize,
       totalCount: count,
