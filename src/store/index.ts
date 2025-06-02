@@ -40,6 +40,7 @@ interface State {
   
   setUser: (user: User | null) => void;
   toggleTheme: () => void;
+  resetStore: () => void;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -59,6 +60,12 @@ export const useStore = create<State>((set, get) => ({
   },
   
   loadNotes: async (page = 1, pageSize = 12) => {
+    const currentUser = get().user;
+    if (!currentUser) {
+      set({ notes: [], isLoading: false });
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
       const { data, count } = await getAllNotes(page, pageSize);
@@ -172,9 +179,24 @@ export const useStore = create<State>((set, get) => ({
   })),
   
   deleteReview: (id) => set((state) => ({
-    reviews: reviews.filter((review) => review.id !== id),
+    reviews: state.reviews.filter((review) => review.id !== id),
   })),
   
   setUser: (user) => set({ user }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+  
+  resetStore: () => set({
+    notes: [],
+    concepts: [],
+    reviews: [],
+    currentNote: null,
+    isLoading: false,
+    error: null,
+    pagination: {
+      currentPage: 1,
+      totalPages: 1,
+      pageSize: 12,
+      totalNotes: 0,
+    }
+  })
 }));

@@ -14,7 +14,14 @@ import { useStore } from './store';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
+  const { resetStore } = useStore();
   
+  useEffect(() => {
+    if (!user) {
+      resetStore();
+    }
+  }, [user, resetStore]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">

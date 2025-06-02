@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import { Link } from 'react-router-dom';
 import ForceGraph3D from 'react-force-graph-3d';
-import { Search, Info, BookOpen, Brain, Lightbulb, ArrowRight } from 'lucide-react';
+import { Search, Info, BookOpen, Brain, Lightbulb, ArrowRight, RotateCcw, ZoomIn, ZoomOut, Move } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../types';
 import { getAllConcepts, getConceptCategories } from '../services/databaseServiceClient';
 import { supabase } from '../services/supabase';
@@ -33,6 +33,8 @@ const ConceptsPage: React.FC = () => {
   const [categoryColors, setCategoryColors] = useState<CategoryColors>({});
   const fgRef = useRef<any>();
   const [cameraPosition, setCameraPosition] = useState<{ x: number; y: number; z: number }>({ x: 0, y: 0, z: 250 });
+  const [tooltipContent, setTooltipContent] = useState<{ content: string; x: number; y: number } | null>(null);
+  const [showControls, setShowControls] = useState(true);
 
   const [activeTab, setActiveTab] = useState<'overview' | 'learn' | 'practice'>('overview');
   const [learningPath, setLearningPath] = useState<string[]>([]);
@@ -258,6 +260,39 @@ const ConceptsPage: React.FC = () => {
     }
   };
 
+  const handleNodeHover = (node: any, event: MouseEvent) => {
+    if (node) {
+      setTooltipContent({
+        content: node.name,
+        x: event.clientX,
+        y: event.clientY
+      });
+    } else {
+      setTooltipContent(null);
+    }
+  };
+
+  const resetCamera = () => {
+    if (fgRef.current) {
+      fgRef.current.cameraPosition({ x: 0, y: 0, z: 250 }, { x: 0, y: 0, z: 0 }, 1000);
+      fgRef.current.zoomToFit(400, 30);
+    }
+  };
+
+  const zoomIn = () => {
+    if (fgRef.current) {
+      const distance = fgRef.current.camera().position.z;
+      fgRef.current.cameraPosition({ z: distance * 0.7 }, null, 500);
+    }
+  };
+
+  const zoomOut = () => {
+    if (fgRef.current) {
+      const distance = fgRef.current.camera().position.z;
+      fgRef.current.cameraPosition({ z: distance * 1.3 }, null, 500);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[600px]">
@@ -314,53 +349,119 @@ const ConceptsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full h-[600px] bg-gray-50">
+          <div className="relative w-full h-[600px] bg-gray-900">
             {graphData.nodes.length > 0 ? (
-              <ForceGraph3D
-                ref={fgRef}
-                graphData={graphData}
-                nodeLabel="name"
-                nodeColor={(node) => {
-                  const n = node as GraphNode;
-                  return highlightNodes.size === 0 || highlightNodes.has(n.id)
-                    ? n.color
-                    : '#E2E8F0';
-                }}
-                nodeRelSize={6}
-                nodeThreeObject={node => {
-                  const sprite = new THREE.Sprite(
-                    new THREE.SpriteMaterial({ color: (node as GraphNode).color })
-                  );
-                  sprite.scale.set(12, 12, 1);
-                  return sprite;
-                }}
-                linkWidth={(link) => {
-                  const l = link as GraphLink;
-                  const id = `${l.source}-${l.target}`;
-                  return highlightLinks.size === 0 || highlightLinks.has(id)
-                    ? 2 * (l.value || 1)
-                    : 0.5;
-                }}
-                linkColor={(link) => {
-                  const l = link as GraphLink;
-                  const id = `${l.source}-${l.target}`;
-                  return highlightLinks.size === 0 || highlightLinks.has(id)
-                    ? 'rgba(79, 70, 229, 0.8)'
-                    : 'rgba(203, 213, 225, 0.5)';
-                }}
-                onNodeClick={handleNodeClick}
-                onNodeDragEnd={node => {
-                  node.fx = node.x;
-                  node.fy = node.y;
-                  node.fz = node.z;
-                }}
-                enableNodeDrag={true}
-                enableNavigationControls={true}
-                showNavInfo={true}
-              />
+              <>
+                <ForceGraph3D
+                  ref={fgRef}
+                  graphData={graphData}
+                  nodeLabel="name"
+                  backgroundColor="#111827"
+                  nodeColor={(node) => {
+                    const n = node as GraphNode;
+                    return highlightNodes.size === 0 || highlightNodes.has(n.id)
+                      ? n.color
+                      : '#4B5563';
+                  }}
+                  nodeRelSize={6}
+                  nodeThreeObject={node => {
+                    const sprite = new THREE.Sprite(
+                      new THREE.SpriteMaterial({
+                        map: new THREE.TextureLoader().load('/node-texture.png'),
+                        color: (node as GraphNode).color,
+                        transparent: true,
+                        opacity: 0.8
+                      })
+                    );
+                    sprite.scale.set(16, 16, 1);
+                    return sprite;
+                  }}
+                  linkWidth={(link) => {
+                    const l = link as GraphLink;
+                    const id = `${l.source}-${l.target}`;
+                    return highlightLinks.size === 0 || highlightLinks.has(id)
+                      ? 3 * (l.value || 1)
+                      : 1;
+                  }}
+                  linkColor={(link) => {
+                    const l = link as GraphLink;
+                    const id = `${l.source}-${l.target}`;
+                    return highlightLinks.size === 0 || highlightLinks.has(id)
+                      ? '#F3F4F6'
+                      : 'rgba(156, 163, 175, 0.3)';
+                  }}
+                  onNodeClick={handleNodeClick}
+                  onNodeHover={handleNodeHover}
+                  onNodeDragEnd={node => {
+                    node.fx = node.x;
+                    node.fy = node.y;
+                    node.fz = node.z;
+                  }}
+                  enableNodeDrag={true}
+                  enableNavigationControls={true}
+                  showNavInfo={false}
+                />
+
+                {showControls && (
+                  <div className="absolute bottom-4 right-4 flex flex-col gap-2">
+                    <button
+                      onClick={resetCamera}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-sm text-white"
+                      title="Reset View"
+                    >
+                      <RotateCcw className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={zoomIn}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-sm text-white"
+                      title="Zoom In"
+                    >
+                      <ZoomIn className="h-5 w-5" />
+                    </button>
+                    <button
+                      onClick={zoomOut}
+                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-sm text-white"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut className="h-5 w-5" />
+                    </button>
+                  </div>
+                )}
+
+                <div className="absolute bottom-4 left-4 text-xs text-gray-400">
+                  <div className="bg-black/50 rounded-lg p-3 backdrop-blur-sm">
+                    <p className="font-medium mb-2">Keyboard Controls:</p>
+                    <ul className="space-y-1">
+                      <li>
+                        <kbd className="px-2 py-1 bg-gray-700 rounded">Left Click</kbd> + Drag to rotate
+                      </li>
+                      <li>
+                        <kbd className="px-2 py-1 bg-gray-700 rounded">Right Click</kbd> + Drag to pan
+                      </li>
+                      <li>
+                        <kbd className="px-2 py-1 bg-gray-700 rounded">Scroll</kbd> to zoom
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                {tooltipContent && (
+                  <div
+                    className="fixed pointer-events-none bg-white/90 px-2 py-1 rounded text-sm backdrop-blur-sm"
+                    style={{
+                      left: tooltipContent.x + 5,
+                      top: tooltipContent.y - 25,
+                      transform: 'translateX(-50%)',
+                      zIndex: 1000
+                    }}
+                  >
+                    {tooltipContent.content}
+                  </div>
+                )}
+              </>
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No concepts found</p>
+              <div className="flex items-center justify-center h-full text-white">
+                <p>No concepts found</p>
               </div>
             )}
           </div>
