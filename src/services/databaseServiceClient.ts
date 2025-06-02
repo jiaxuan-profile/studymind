@@ -112,14 +112,21 @@ export async function getAllNotes(page = 1, pageSize = 12) {
   try {
     console.log("Database Service: Fetching paginated notes", { page, pageSize });
     
+    // Debug: Log the current session
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log("Database Service: Current session:", session?.user?.id);
+
     // First, get the total count
     const { count, error: countError } = await supabase
       .from('notes')
       .select('*', { count: 'exact', head: true });
 
     if (countError) {
+      console.error("Database Service: Count error:", countError);
       throw countError;
     }
+
+    console.log("Database Service: Total notes count:", count);
 
     // Then get the actual page of data
     const { data, error } = await supabase
@@ -137,10 +144,11 @@ export async function getAllNotes(page = 1, pageSize = 12) {
       page,
       pageSize,
       totalCount: count,
-      fetchedCount: data?.length
+      fetchedCount: data?.length,
+      notes: data
     });
 
-    return { data, count };
+    return { data: data || [], count: count || 0 };
 
   } catch (error) {
     console.error('Database Service: Error fetching notes:', error);
