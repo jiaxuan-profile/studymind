@@ -53,11 +53,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // Use AI to analyze content if enabled
       if (useAI) {
         try {
+          console.log("Analyzing document content with AI...");
           const analysis = await analyzeNote(content, title);
           tags = [...new Set([...tags, ...analysis.suggestedTags])];
           summary = analysis.summary;
+          console.log("AI analysis completed successfully");
         } catch (aiError) {
-          console.warn('AI analysis failed:', aiError);
+          console.error('AI analysis failed:', aiError);
           // Continue without AI analysis
         }
       }
