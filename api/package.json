@@ -2,6 +2,9 @@
   "name": "studymind-api",
   "private": true,
   "version": "1.0.0",
+  "scripts": {
+    "dev": "echo 'API functions are typically developed using `netlify dev` from the project root.'"
+  },
   "dependencies": {
     "@google/generative-ai": "^1.2.0",
     "@netlify/functions": "^2.6.0"
