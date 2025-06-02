@@ -4,6 +4,15 @@ import * as THREE from 'three';
 import { Search, Info, Brain, BookOpen, Lightbulb, ArrowRight, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import ForceGraph3D from 'react-force-graph-3d';
 
+// Define the categories and their colors
+const categories = ['Fundamental', 'Advanced', 'Applied', 'Theoretical'];
+const categoryColors = {
+  'Fundamental': '#4F46E5', // Indigo
+  'Advanced': '#059669',    // Emerald
+  'Applied': '#B45309',     // Amber
+  'Theoretical': '#7C3AED', // Violet
+};
+
 const ConceptsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedConcept, setSelectedConcept] = useState(null);
