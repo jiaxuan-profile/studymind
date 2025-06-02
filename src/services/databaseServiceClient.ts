@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { createHash } from 'crypto';
 
 interface NotePayload {
   id: string;
@@ -13,13 +12,17 @@ interface NotePayload {
   contentHash?: string;
 }
 
-function generateContentHash(content: string): string {
-  return createHash('sha256').update(content).digest('hex');
+async function generateContentHash(content: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(content);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 export async function checkDocumentExists(content: string): Promise<boolean> {
   try {
-    const contentHash = generateContentHash(content);
+    const contentHash = await generateContentHash(content);
     
     const { data, error } = await supabase
       .from('notes')
@@ -50,7 +53,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
     });
 
     // Generate content hash if not provided
-    const contentHash = noteData.contentHash || generateContentHash(noteData.content);
+    const contentHash = noteData.contentHash || await generateContentHash(noteData.content);
 
     const { data, error } = await supabase
       .from('notes')
