@@ -52,6 +52,9 @@ async function storeConceptsAndRelationships(
       return;
     }
 
+    // Track successfully stored concept IDs
+    const storedConceptIds = new Set<string>();
+
     // Store concepts one by one
     for (const concept of concepts) {
       const conceptId = concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -72,6 +75,9 @@ async function storeConceptsAndRelationships(
         continue;
       }
 
+      // Add to set of successfully stored concepts
+      storedConceptIds.add(conceptId);
+
       // Create note-concept association
       const { error: associationError } = await supabase
         .from('note_concepts')
@@ -88,11 +94,20 @@ async function storeConceptsAndRelationships(
       }
     }
 
-    // Store relationships after concepts are created
+    // Store relationships only if both concepts exist
     for (const rel of relationships) {
       const sourceId = rel.source.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const targetId = rel.target.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       
+      // Check if both concepts exist before creating relationship
+      if (!storedConceptIds.has(sourceId) || !storedConceptIds.has(targetId)) {
+        console.warn('AI Service: Skipping relationship - one or both concepts do not exist:', {
+          source: rel.source,
+          target: rel.target
+        });
+        continue;
+      }
+
       const { error: relationshipError } = await supabase
         .from('concept_relationships')
         .upsert({
