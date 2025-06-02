@@ -9,7 +9,7 @@ const ResetPasswordPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { changePassword } = useAuth();
+  const { changePassword, signOut } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +24,8 @@ const ResetPasswordPage: React.FC = () => {
 
     try {
       await changePassword(password);
-      navigate('/');
+      await signOut(); // Sign out to clear invalid tokens
+      navigate('/login'); // Redirect to login page instead of home
     } catch (error) {
       setError((error as Error).message);
     } finally {
