@@ -6,7 +6,7 @@
     "dev": "echo 'API functions are typically developed using `netlify dev` from the project root.'"
   },
   "dependencies": {
-    "@google/generative-ai": "^1.2.0",
+    "@google/generative-ai": "^0.11.4",
     "@netlify/functions": "^2.6.0"
   }
 }
