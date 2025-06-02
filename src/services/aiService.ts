@@ -30,59 +30,78 @@ async function storeConceptsAndRelationships(
   noteId: string
 ) {
   try {
-    console.log('AI Service: Storing concepts and relationships...');
+    console.log('AI Service: Starting transaction for storing concepts and relationships...');
 
-    // Store concepts
-    const conceptsToUpsert = concepts.map(concept => ({
-      id: concept.name.toLowerCase().replace(/\s+/g, '-'),
-      name: concept.name,
-      definition: concept.definition
-    }));
+    // Start a transaction
+    const { error: transactionError } = await supabase.rpc('begin_transaction');
+    if (transactionError) throw transactionError;
 
-    const { error: conceptsError } = await supabase
-      .from('concepts')
-      .upsert(conceptsToUpsert, { onConflict: 'id' });
+    try {
+      // First, ensure all concepts exist
+      for (const concept of concepts) {
+        const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
+        const { error: conceptError } = await supabase
+          .from('concepts')
+          .upsert({
+            id: conceptId,
+            name: concept.name,
+            definition: concept.definition
+          }, {
+            onConflict: 'id'
+          });
 
-    if (conceptsError) {
-      console.error('AI Service: Error storing concepts:', conceptsError);
-      throw conceptsError;
+        if (conceptError) throw conceptError;
+      }
+
+      // Then create relationships
+      for (const rel of relationships) {
+        const sourceId = rel.source.toLowerCase().replace(/\s+/g, '-');
+        const targetId = rel.target.toLowerCase().replace(/\s+/g, '-');
+        
+        const { error: relationshipError } = await supabase
+          .from('concept_relationships')
+          .upsert({
+            id: `${sourceId}-${targetId}`,
+            source_id: sourceId,
+            target_id: targetId,
+            relationship_type: rel.type,
+            strength: rel.strength
+          }, {
+            onConflict: 'id'
+          });
+
+        if (relationshipError) throw relationshipError;
+      }
+
+      // Finally, create note-concept associations
+      for (const concept of concepts) {
+        const conceptId = concept.name.toLowerCase().replace(/\s+/g, '-');
+        const { error: associationError } = await supabase
+          .from('note_concepts')
+          .upsert({
+            note_id: noteId,
+            concept_id: conceptId,
+            relevance_score: 0.8 // Default score
+          }, {
+            onConflict: ['note_id', 'concept_id']
+          });
+
+        if (associationError) throw associationError;
+      }
+
+      // Commit the transaction
+      const { error: commitError } = await supabase.rpc('commit_transaction');
+      if (commitError) throw commitError;
+
+      console.log('AI Service: Successfully stored concepts and relationships');
+    } catch (error) {
+      // Rollback on any error
+      const { error: rollbackError } = await supabase.rpc('rollback_transaction');
+      if (rollbackError) {
+        console.error('AI Service: Error rolling back transaction:', rollbackError);
+      }
+      throw error;
     }
-
-    // Store relationships
-    const relationshipsToUpsert = relationships.map(rel => ({
-      id: `${rel.source}-${rel.target}`.toLowerCase().replace(/\s+/g, '-'),
-      source_id: rel.source.toLowerCase().replace(/\s+/g, '-'),
-      target_id: rel.target.toLowerCase().replace(/\s+/g, '-'),
-      relationship_type: rel.type,
-      strength: rel.strength
-    }));
-
-    const { error: relationshipsError } = await supabase
-      .from('concept_relationships')
-      .upsert(relationshipsToUpsert, { onConflict: 'id' });
-
-    if (relationshipsError) {
-      console.error('AI Service: Error storing relationships:', relationshipsError);
-      throw relationshipsError;
-    }
-
-    // Store note-concept associations
-    const noteConceptsToUpsert = concepts.map(concept => ({
-      note_id: noteId,
-      concept_id: concept.name.toLowerCase().replace(/\s+/g, '-'),
-      relevance_score: 0.8 // Default score, could be made dynamic based on AI analysis
-    }));
-
-    const { error: noteConceptsError } = await supabase
-      .from('note_concepts')
-      .upsert(noteConceptsToUpsert, { onConflict: ['note_id', 'concept_id'] });
-
-    if (noteConceptsError) {
-      console.error('AI Service: Error storing note-concept associations:', noteConceptsError);
-      throw noteConceptsError;
-    }
-
-    console.log('AI Service: Successfully stored concepts and relationships');
   } catch (error) {
     console.error('AI Service: Error in storeConceptsAndRelationships:', error);
     throw error;
