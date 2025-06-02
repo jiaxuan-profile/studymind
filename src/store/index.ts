@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 import { Note, Concept, User, ReviewItem } from '../types';
-import { demoConcepts } from '../data/demoConcepts';
-import { demoReviews } from '../data/demoReviews';
 import { getAllNotes, updateNoteSummary, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
 
@@ -46,18 +44,10 @@ interface State {
 
 export const useStore = create<State>((set, get) => ({
   notes: [],
-  concepts: demoConcepts,
-  reviews: demoReviews,
+  concepts: [],
+  reviews: [],
   currentNote: null,
-  user: {
-    id: '1',
-    name: 'Demo User',
-    email: 'demo@example.com',
-    preferences: {
-      theme: 'light',
-      fontSize: 'medium',
-    },
-  },
+  user: null,
   theme: 'light',
   isLoading: false,
   error: null,
@@ -182,7 +172,7 @@ export const useStore = create<State>((set, get) => ({
   })),
   
   deleteReview: (id) => set((state) => ({
-    reviews: state.reviews.filter((review) => review.id !== id),
+    reviews: reviews.filter((review) => review.id !== id),
   })),
   
   setUser: (user) => set({ user }),

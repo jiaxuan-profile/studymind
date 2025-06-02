@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
       return (
         <>
           <div>
-            <label htmlFor="email-address" className="sr-only">
+            <label htmlFor="email-address\" className="sr-only">
               Email address
             </label>
             <input
