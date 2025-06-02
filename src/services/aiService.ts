@@ -32,14 +32,22 @@ async function storeConceptsAndRelationships(
   try {
     console.log('AI Service: Starting concept storage process...');
 
+    // Wait a moment to ensure the note is saved
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     // First, verify the note exists
     const { data: noteExists, error: noteCheckError } = await supabase
       .from('notes')
       .select('id')
       .eq('id', noteId)
-      .single();
+      .maybeSingle();
 
-    if (noteCheckError || !noteExists) {
+    if (noteCheckError) {
+      console.error('AI Service: Error checking note existence:', noteCheckError);
+      return;
+    }
+
+    if (!noteExists) {
       console.error('AI Service: Note not found:', noteId);
       return;
     }
@@ -147,12 +155,14 @@ export async function analyzeNote(content: string, title: string, noteId: string
       throw searchError;
     }
 
-    // Store concepts and relationships
-    await storeConceptsAndRelationships(
+    // Store concepts and relationships in the background
+    storeConceptsAndRelationships(
       conceptData.concepts,
-      conceptData.relationships,
+      conceptData.relationships || [],
       noteId
-    );
+    ).catch(error => {
+      console.error('AI Service: Background concept storage failed:', error);
+    });
 
     return {
       suggestedTags: conceptData.tags?.slice(0, 5) || [],
