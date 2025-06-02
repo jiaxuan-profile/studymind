@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Search, Info } from 'lucide-react';
+import { Search, Info, BookOpen, Brain, Lightbulb, ArrowRight } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../types';
 import { getAllConcepts, getConceptCategories } from '../services/databaseServiceClient';
 import { supabase } from '../services/supabase';
@@ -30,6 +30,13 @@ const ConceptsPage: React.FC = () => {
   const [categories, setCategories] = useState<string[]>([]);
   const [categoryColors, setCategoryColors] = useState<CategoryColors>({});
   const graphRef = useRef<any>(null);
+
+  const [activeTab, setActiveTab] = useState<'overview' | 'learn' | 'practice'>('overview');
+  const [learningPath, setLearningPath] = useState<string[]>([]);
+  const [practiceQuestions, setPracticeQuestions] = useState<Array<{
+    question: string;
+    answer: string;
+  }>>([]);
 
   useEffect(() => {
     const loadConceptData = async () => {
@@ -124,6 +131,57 @@ const ConceptsPage: React.FC = () => {
       .sort((a, b) => b[1] - a[1])[0][0];
   };
 
+  const generateLearningPath = async (conceptId: string) => {
+    try {
+      // Get concept relationships with prerequisite information
+      const { data: relationships } = await supabase
+        .from('concept_relationships')
+        .select('*')
+        .eq('target_id', conceptId)
+        .eq('relationship_type', 'prerequisite');
+
+      if (relationships && relationships.length > 0) {
+        const path = relationships
+          .sort((a, b) => b.strength - a.strength)
+          .map(rel => rel.source_id);
+        path.push(conceptId);
+        setLearningPath(path);
+      } else {
+        setLearningPath([conceptId]);
+      }
+    } catch (error) {
+      console.error('Error generating learning path:', error);
+    }
+  };
+
+  const generatePracticeQuestions = async (conceptId: string) => {
+    try {
+      // In a real implementation, this would call an AI endpoint
+      // For now, we'll generate some example questions
+      const concept = graphData.nodes.find(n => n.id === conceptId);
+      if (!concept) return;
+
+      const questions = [
+        {
+          question: `Explain the concept of ${concept.name} in your own words.`,
+          answer: "Write your understanding here..."
+        },
+        {
+          question: `What are the key characteristics of ${concept.name}?`,
+          answer: "List the main features..."
+        },
+        {
+          question: `How does ${concept.name} relate to other concepts in this domain?`,
+          answer: "Explain the relationships..."
+        }
+      ];
+
+      setPracticeQuestions(questions);
+    } catch (error) {
+      console.error('Error generating practice questions:', error);
+    }
+  };
+
   const handleNodeClick = async (node: any) => {
     try {
       const { data: concept, error } = await supabase
@@ -149,6 +207,10 @@ const ConceptsPage: React.FC = () => {
         noteIds: noteConceptsData?.map(nc => nc.note_id) || [],
         relatedConceptIds: relationships?.map(r => r.target_id) || []
       });
+
+      // Generate learning path and practice questions
+      await generateLearningPath(node.id);
+      await generatePracticeQuestions(node.id);
 
       // Highlight connected nodes and links
       const connectedNodeIds = new Set([
@@ -233,7 +295,6 @@ const ConceptsPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Main graph area */}
         <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-200">
             <div className="relative">
@@ -294,70 +355,207 @@ const ConceptsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Concept details and legend */}
         <div className="space-y-6">
-          {/* Concept details */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 bg-primary/5 border-b border-gray-200">
-              <div className="flex items-center">
-                <Info className="h-5 w-5 text-primary mr-2" />
-                <h2 className="text-lg font-semibold text-gray-900">Concept Details</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <Info className="h-5 w-5 text-primary mr-2" />
+                  <h2 className="text-lg font-semibold text-gray-900">Concept Details</h2>
+                </div>
+                {selectedConcept && (
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setActiveTab('overview')}
+                      className={`px-3 py-1 rounded-md text-sm ${
+                        activeTab === 'overview'
+                          ? 'bg-primary text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Overview
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('learn')}
+                      className={`px-3 py-1 rounded-md text-sm ${
+                        activeTab === 'learn'
+                          ? 'bg-primary text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Learn
+                    </button>
+                    <button
+                      onClick={() => setActiveTab('practice')}
+                      className={`px-3 py-1 rounded-md text-sm ${
+                        activeTab === 'practice'
+                          ? 'bg-primary text-white'
+                          : 'text-gray-600 hover:bg-gray-100'
+                      }`}
+                    >
+                      Practice
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             {selectedConcept ? (
               <div className="p-4">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedConcept.name}</h3>
-                <p className="text-gray-600 mb-4">{selectedConcept.definition}</p>
+                {activeTab === 'overview' && (
+                  <>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedConcept.name}</h3>
+                    <p className="text-gray-600 mb-4">{selectedConcept.definition}</p>
 
-                <div className="mb-4">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Found in Notes:</h4>
-                  <ul className="space-y-2">
-                    {selectedConcept.noteIds.map((noteId) => {
-                      const note = notes.find((n) => n.id === noteId);
-                      return note ? (
-                        <li key={noteId}>
-                          <a
-                            href={`/notes/${noteId}`}
-                            className="block p-2 rounded-md border border-gray-100 hover:border-gray-300 hover:bg-gray-50"
-                          >
-                            <span className="font-medium text-primary">{note.title}</span>
-                            <div className="mt-1 flex flex-wrap gap-1">
-                              {note.tags.slice(0, 3).map((tag, i) => (
-                                <span
-                                  key={i}
-                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-                                >
-                                  {tag}
-                                </span>
-                              ))}
+                    <div className="mb-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Found in Notes:</h4>
+                      <ul className="space-y-2">
+                        {selectedConcept.noteIds.map((noteId) => {
+                          const note = notes.find((n) => n.id === noteId);
+                          return note ? (
+                            <li key={noteId}>
+                              <a
+                                href={`/notes/${noteId}`}
+                                className="block p-2 rounded-md border border-gray-100 hover:border-gray-300 hover:bg-gray-50"
+                              >
+                                <span className="font-medium text-primary">{note.title}</span>
+                                <div className="mt-1 flex flex-wrap gap-1">
+                                  {note.tags.slice(0, 3).map((tag, i) => (
+                                    <span
+                                      key={i}
+                                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                                    >
+                                      {tag}
+                                    </span>
+                                  ))}
+                                </div>
+                              </a>
+                            </li>
+                          ) : null;
+                        })}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Related Concepts:</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {selectedConcept.relatedConceptIds.map((relatedId) => {
+                          const relatedNode = graphData.nodes.find((n) => n.id === relatedId);
+                          return relatedNode ? (
+                            <button
+                              key={relatedId}
+                              className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+                              onClick={() => {
+                                handleNodeClick(relatedNode);
+                              }}
+                            >
+                              {relatedNode.name}
+                            </button>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {activeTab === 'learn' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Brain className="h-5 w-5 mr-2 text-primary" />
+                        Learning Path
+                      </h3>
+                      <div className="space-y-4">
+                        {learningPath.map((conceptId, index) => {
+                          const concept = graphData.nodes.find(n => n.id === conceptId);
+                          return concept ? (
+                            <div key={conceptId} className="flex items-center">
+                              <div className="flex-1">
+                                <div className="flex items-center">
+                                  <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-sm font-medium">
+                                    {index + 1}
+                                  </span>
+                                  <h4 className="ml-3 font-medium text-gray-900">{concept.name}</h4>
+                                </div>
+                                {index < learningPath.length - 1 && (
+                                  <div className="ml-3 pl-3 border-l-2 border-gray-200 h-8" />
+                                )}
+                              </div>
                             </div>
-                          </a>
-                        </li>
-                      ) : null;
-                    })}
-                  </ul>
-                </div>
+                          ) : null;
+                        })}
+                      </div>
+                    </div>
 
-                <div>
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Related Concepts:</h4>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedConcept.relatedConceptIds.map((relatedId) => {
-                      const relatedNode = graphData.nodes.find((n) => n.id === relatedId);
-                      return relatedNode ? (
-                        <button
-                          key={relatedId}
-                          className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
-                          onClick={() => {
-                            handleNodeClick(relatedNode);
-                          }}
-                        >
-                          {relatedNode.name}
-                        </button>
-                      ) : null;
-                    })}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <BookOpen className="h-5 w-5 mr-2 text-primary" />
+                        Key Points
+                      </h3>
+                      <ul className="space-y-2">
+                        <li className="flex items-start">
+                          <ArrowRight className="h-5 w-5 mr-2 text-primary flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700">Understand the basic definition and purpose</span>
+                        </li>
+                        <li className="flex items-start">
+                          <ArrowRight className="h-5 w-5 mr-2 text-primary flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700">Study related concepts and their connections</span>
+                        </li>
+                        <li className="flex items-start">
+                          <ArrowRight className="h-5 w-5 mr-2 text-primary flex-shrink-0 mt-0.5" />
+                          <span className="text-gray-700">Review practical examples from your notes</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-3 flex items-center">
+                        <Lightbulb className="h-5 w-5 mr-2 text-primary" />
+                        Study Tips
+                      </h3>
+                      <div className="bg-primary/5 rounded-lg p-4">
+                        <ul className="space-y-2 text-gray-700">
+                          <li>• Create your own examples to reinforce understanding</li>
+                          <li>• Explain the concept to others in your own words</li>
+                          <li>• Connect this concept to real-world applications</li>
+                          <li>• Review related notes and practice regularly</li>
+                        </ul>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {activeTab === 'practice' && (
+                  <div className="space-y-6">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Practice Questions</h3>
+                      <div className="space-y-6">
+                        {practiceQuestions.map((q, index) => (
+                          <div key={index} className="bg-gray-50 rounded-lg p-4">
+                            <p className="font-medium text-gray-900 mb-2">
+                              {index + 1}. {q.question}
+                            </p>
+                            <textarea
+                              className="mt-2 w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                              rows={3}
+                              placeholder={q.answer}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-primary/5 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-900 mb-2">Self-Assessment Tips:</h4>
+                      <ul className="space-y-2 text-gray-700 text-sm">
+                        <li>• Write detailed explanations</li>
+                        <li>• Compare your answers with the notes</li>
+                        <li>• Identify areas that need more review</li>
+                        <li>• Create your own additional questions</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-6 text-center">
@@ -381,7 +579,6 @@ const ConceptsPage: React.FC = () => {
             )}
           </div>
 
-          {/* Graph Legend */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="px-4 py-3">
               <h3 className="text-sm font-medium text-gray-900 mb-2">Graph Legend</h3>
@@ -409,5 +606,3 @@ const ConceptsPage: React.FC = () => {
 };
 
 export default ConceptsPage;
-
-export default ConceptsPage
