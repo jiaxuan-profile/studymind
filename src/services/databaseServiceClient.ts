@@ -1,4 +1,3 @@
-// src/services/databaseServiceClient.ts
 import { supabase } from './supabase';
 
 interface NotePayload {
@@ -114,7 +113,7 @@ export async function getAllNotes(page = 1, pageSize = 12) {
   }
 }
 
-export async function deleteNoteFromDatabase(id: string) {
+export async function deleteNoteFromDatabase(id: string): Promise<void> {
   try {
     console.log("Database Service: Deleting note:", id);
     

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Note, Concept, User, ReviewItem } from '../types';
 import { demoConcepts } from '../data/demoConcepts';
 import { demoReviews } from '../data/demoReviews';
-import { getAllNotes, updateNoteSummary } from '../services/databaseServiceClient';
+import { getAllNotes, updateNoteSummary, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
 
 interface PaginationState {
@@ -23,27 +23,23 @@ interface State {
   error: string | null;
   pagination: PaginationState;
   
-  // Notes actions
   addNote: (note: Note) => Promise<Note>;
   updateNote: (id: string, updates: Partial<Note>) => void;
-  deleteNote: (id: string) => void;
+  deleteNote: (id: string) => Promise<void>;
   setCurrentNote: (note: Note | null) => void;
   loadNotes: (page?: number, pageSize?: number) => Promise<void>;
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
   summarizeNote: (id: string) => Promise<void>;
   
-  // Concepts actions
   addConcept: (concept: Concept) => void;
   updateConcept: (id: string, updates: Partial<Concept>) => void;
   deleteConcept: (id: string) => void;
   
-  // Reviews actions
   addReview: (review: ReviewItem) => void;
   updateReview: (id: string, updates: Partial<ReviewItem>) => void;
   deleteReview: (id: string) => void;
   
-  // User actions
   setUser: (user: User | null) => void;
   toggleTheme: () => void;
 }
@@ -72,7 +68,6 @@ export const useStore = create<State>((set, get) => ({
     totalNotes: 0,
   },
   
-  // Notes actions
   loadNotes: async (page = 1, pageSize = 12) => {
     set({ isLoading: true, error: null });
     try {
@@ -118,7 +113,7 @@ export const useStore = create<State>((set, get) => ({
   
   addNote: async (note) => {
     set((state) => ({ notes: [note, ...state.notes] }));
-    set({ currentNote: note }); // Set the current note
+    set({ currentNote: note });
     return note;
   },
   
@@ -126,9 +121,17 @@ export const useStore = create<State>((set, get) => ({
     notes: state.notes.map((note) => (note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note)),
   })),
   
-  deleteNote: (id) => set((state) => ({
-    notes: state.notes.filter((note) => note.id !== id),
-  })),
+  deleteNote: async (id) => {
+    try {
+      await deleteNoteFromDatabase(id);
+      set((state) => ({
+        notes: state.notes.filter((note) => note.id !== id),
+      }));
+    } catch (error) {
+      console.error("Error deleting note:", error);
+      throw error;
+    }
+  },
   
   setCurrentNote: (note) => set({ currentNote: note }),
 
@@ -162,7 +165,6 @@ export const useStore = create<State>((set, get) => ({
     }
   },
   
-  // Concepts actions
   addConcept: (concept) => set((state) => ({ concepts: [...state.concepts, concept] })),
   
   updateConcept: (id, updates) => set((state) => ({
@@ -173,7 +175,6 @@ export const useStore = create<State>((set, get) => ({
     concepts: state.concepts.filter((concept) => concept.id !== id),
   })),
   
-  // Reviews actions
   addReview: (review) => set((state) => ({ reviews: [...state.reviews, review] })),
   
   updateReview: (id, updates) => set((state) => ({
@@ -184,7 +185,6 @@ export const useStore = create<State>((set, get) => ({
     reviews: state.reviews.filter((review) => review.id !== id),
   })),
   
-  // User actions
   setUser: (user) => set({ user }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
 }));
