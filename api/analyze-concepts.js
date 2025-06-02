@@ -43,14 +43,41 @@ exports.handler = async (event) => {
     console.log(`Netlify Function (analyze-concepts): Received text (len: ${text.length}), title: ${title}`);
 
     const genAI = new GoogleGenerativeAI(apiKey);
-    const modelName = 'gemini-1.5-flash-latest'; // CORRECTED MODEL NAME
+    const modelName = 'gemini-1.5-flash-latest';
     console.log(`Netlify Function (analyze-concepts): Using Gemini model: ${modelName}`);
 
     const model = genAI.getGenerativeModel({
       model: modelName,
       generationConfig: {
-        responseMimeType: "application/json",
+        temperature: 0.7,
       },
+      tools: [{
+        functionDeclarations: [{
+          name: 'processAnalysis',
+          description: 'Process the analysis results',
+          parameters: {
+            type: 'object',
+            properties: {
+              tags: {
+                type: 'array',
+                items: { type: 'string' }
+              },
+              concepts: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    name: { type: 'string' },
+                    definition: { type: 'string' }
+                  }
+                }
+              },
+              summary: { type: 'string' }
+            },
+            required: ['tags', 'concepts', 'summary']
+          }
+        }]
+      }],
       systemInstruction: SYSTEM_PROMPT,
     });
 
@@ -62,7 +89,7 @@ exports.handler = async (event) => {
     const analysisText = response.text();
 
     console.log("Netlify Function (analyze-concepts): Raw JSON response from Gemini:", analysisText);
-    const analysis = JSON.parse(analysisText); // This should now reliably be JSON
+    const analysis = JSON.parse(analysisText);
 
     return {
       statusCode: 200,
