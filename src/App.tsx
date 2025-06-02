@@ -9,6 +9,7 @@ import ConceptsPage from './pages/ConceptsPage';
 import ReviewPage from './pages/ReviewPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import { useStore } from './store';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -38,6 +39,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
       
       <Route path="/" element={
         <PrivateRoute>
