@@ -1,6 +1,12 @@
+// src/store/index.ts
 import { create } from 'zustand';
 import { Note, Concept, User, ReviewItem } from '../types';
-import { getAllNotes, updateNoteSummary, deleteNoteFromDatabase } from '../services/databaseServiceClient';
+import { 
+  getAllNotes, 
+  updateNoteSummary, 
+  deleteNoteFromDatabase,
+  getAllConcepts // Add this import
+} from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
 
 interface PaginationState {
@@ -41,6 +47,7 @@ interface State {
   setUser: (user: User | null) => void;
   toggleTheme: () => void;
   resetStore: () => void;
+  loadConcepts: () => Promise<void>;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -201,5 +208,19 @@ export const useStore = create<State>((set, get) => ({
       pageSize: 12,
       totalNotes: 0,
     }
-  })
+  }),
+
+  loadConcepts: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const conceptsData = await getAllConcepts();
+      set({ concepts: conceptsData, isLoading: false });
+    } catch (error) {
+      console.error('Store: Failed to load concepts:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load concepts',
+        isLoading: false,
+      });
+    }
+  },
 }));

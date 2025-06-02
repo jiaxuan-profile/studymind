@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import sha256 from 'js-sha256';
 
 interface NotePayload {
   id: string;
@@ -8,21 +9,16 @@ interface NotePayload {
   tags: string[];
   embedding?: number[]; 
   updatedAt: string;
-  createdAt?: string;
-  contentHash?: string;
+  createdAt?: string; 
 }
 
-async function generateContentHash(content: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(content);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(byte => byte.toString(16).padStart(2, '0')).join('');
+function generateContentHash(content: string): string {
+  return sha256(content);
 }
 
 export async function checkDocumentExists(content: string): Promise<boolean> {
   try {
-    const contentHash = await generateContentHash(content);
+    const contentHash = generateContentHash(content);
     
     const { data, error } = await supabase
       .from('notes')
@@ -52,9 +48,6 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       hasEmbedding: !!noteData.embedding
     });
 
-    // Generate content hash if not provided
-    const contentHash = noteData.contentHash || await generateContentHash(noteData.content);
-
     const { data, error } = await supabase
       .from('notes')
       .upsert({
@@ -65,8 +58,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         tags: noteData.tags,
         embedding: noteData.embedding,
         updated_at: noteData.updatedAt,
-        created_at: noteData.createdAt || noteData.updatedAt,
-        content_hash: contentHash
+        created_at: noteData.createdAt || noteData.updatedAt
       })
       .select();
 
@@ -110,23 +102,16 @@ export async function getNoteById(id: string) {
 
 export async function getAllNotes(page = 1, pageSize = 12) {
   try {
-    console.log("Database Service: Starting getAllNotes function");
+    console.log("Database Service: Fetching paginated notes", { page, pageSize });
     
-    // Debug: Log the current session
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log("Database Service: Current session:", session?.user?.id);
-
     // First, get the total count
     const { count, error: countError } = await supabase
       .from('notes')
       .select('*', { count: 'exact', head: true });
 
     if (countError) {
-      console.error("Database Service: Count error:", countError);
       throw countError;
     }
-
-    console.log("Database Service: Total notes count:", count);
 
     // Then get the actual page of data
     const { data, error } = await supabase
@@ -136,19 +121,18 @@ export async function getAllNotes(page = 1, pageSize = 12) {
       .range((page - 1) * pageSize, page * pageSize - 1);
 
     if (error) {
-      console.error("Database Service: Error fetching notes:", error);
+      console.error("Database Service: Supabase error:", error);
       throw new Error(`Failed to fetch notes: ${error.message}`);
     }
 
-    console.log("Database Service: Notes fetch result:", {
+    console.log("Database Service: Notes fetched successfully", {
       page,
       pageSize,
       totalCount: count,
-      fetchedCount: data?.length,
-      notes: data
+      fetchedCount: data?.length
     });
 
-    return { data: data || [], count: count || 0 };
+    return { data, count };
 
   } catch (error) {
     console.error('Database Service: Error fetching notes:', error);

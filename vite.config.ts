@@ -10,17 +10,17 @@ export default defineConfig({
   server: {
     proxy: {
       '/api/generate-embedding': {
-        target: 'https://studymind-ai.netlify.app/.netlify/functions',
+        target: 'https://studymindai.me/.netlify/functions',
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/generate-embedding', '/generate-embedding'),
       },
       '/api/analyze-concepts': {
-        target: 'https://studymind-ai.netlify.app/.netlify/functions',
+        target: 'https://studymindai.me/.netlify/functions',
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/analyze-concepts', '/analyze-concepts'),
       },
       '/api/summarize': {
-        target: 'https://studymind-ai.netlify.app/.netlify/functions',
+        target: 'https://studymindai.me/.netlify/functions',
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/summarize', '/summarize'),
       },
