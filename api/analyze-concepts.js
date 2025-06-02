@@ -50,34 +50,8 @@ exports.handler = async (event) => {
       model: modelName,
       generationConfig: {
         temperature: 0.7,
+        responseMimeType: 'application/json'
       },
-      tools: [{
-        functionDeclarations: [{
-          name: 'processAnalysis',
-          description: 'Process the analysis results',
-          parameters: {
-            type: 'object',
-            properties: {
-              tags: {
-                type: 'array',
-                items: { type: 'string' }
-              },
-              concepts: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    name: { type: 'string' },
-                    definition: { type: 'string' }
-                  }
-                }
-              },
-              summary: { type: 'string' }
-            },
-            required: ['tags', 'concepts', 'summary']
-          }
-        }]
-      }],
       systemInstruction: SYSTEM_PROMPT,
     });
 
