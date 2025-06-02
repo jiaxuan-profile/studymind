@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store';
+import { Link } from 'react-router-dom';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Search, Info, BookOpen, Brain, Lightbulb, ArrowRight } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../types';
@@ -414,8 +415,8 @@ const ConceptsPage: React.FC = () => {
                           const note = notes.find((n) => n.id === noteId);
                           return note ? (
                             <li key={noteId}>
-                              <a
-                                href={`/notes/${noteId}`}
+                              <Link
+                                to={`/notes/${noteId}`}
                                 className="block p-2 rounded-md border border-gray-100 hover:border-gray-300 hover:bg-gray-50"
                               >
                                 <span className="font-medium text-primary">{note.title}</span>
@@ -429,7 +430,7 @@ const ConceptsPage: React.FC = () => {
                                     </span>
                                   ))}
                                 </div>
-                              </a>
+                              </Link>
                             </li>
                           ) : null;
                         })}

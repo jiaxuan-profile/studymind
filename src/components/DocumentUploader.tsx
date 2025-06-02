@@ -4,7 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { useStore } from '../store';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase } from '../services/databaseServiceClient';
+import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseServiceClient';
 import { analyzeNote } from '../services/aiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -41,6 +41,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           break;
         default:
           throw new Error('Unsupported file type');
+      }
+
+      // Check if document already exists
+      const exists = await checkDocumentExists(content);
+      if (exists) {
+        setError('This document has already been uploaded.');
+        return;
       }
 
       // Create note data

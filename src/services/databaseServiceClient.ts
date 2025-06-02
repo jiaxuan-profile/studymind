@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { createHash } from 'crypto';
 
 interface NotePayload {
   id: string;
@@ -8,7 +9,34 @@ interface NotePayload {
   tags: string[];
   embedding?: number[]; 
   updatedAt: string;
-  createdAt?: string; 
+  createdAt?: string;
+  contentHash?: string;
+}
+
+function generateContentHash(content: string): string {
+  return createHash('sha256').update(content).digest('hex');
+}
+
+export async function checkDocumentExists(content: string): Promise<boolean> {
+  try {
+    const contentHash = generateContentHash(content);
+    
+    const { data, error } = await supabase
+      .from('notes')
+      .select('id')
+      .eq('content_hash', contentHash)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Database Service: Error checking document existence:", error);
+      throw error;
+    }
+
+    return !!data;
+  } catch (error) {
+    console.error('Database Service: Error checking document:', error);
+    throw error;
+  }
 }
 
 export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
@@ -21,6 +49,9 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       hasEmbedding: !!noteData.embedding
     });
 
+    // Generate content hash if not provided
+    const contentHash = noteData.contentHash || generateContentHash(noteData.content);
+
     const { data, error } = await supabase
       .from('notes')
       .upsert({
@@ -31,7 +62,8 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         tags: noteData.tags,
         embedding: noteData.embedding,
         updated_at: noteData.updatedAt,
-        created_at: noteData.createdAt || noteData.updatedAt
+        created_at: noteData.createdAt || noteData.updatedAt,
+        content_hash: contentHash
       })
       .select();
 
