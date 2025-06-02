@@ -375,39 +375,34 @@ const ConceptsPage: React.FC = () => {
                   ref={fgRef}
                   graphData={graphData}
                   nodeLabel="name"
-                  backgroundColor="#111827"
+                  backgroundColor="#ffffff"
                   nodeColor={(node) => {
                     const n = node as GraphNode;
                     return highlightNodes.size === 0 || highlightNodes.has(n.id)
                       ? n.color
-                      : '#4B5563';
+                      : '#E5E7EB';
                   }}
-                  nodeRelSize={6}
+                  nodeRelSize={4}
                   nodeThreeObject={node => {
                     const sprite = new THREE.Sprite(
                       new THREE.SpriteMaterial({
                         map: new THREE.TextureLoader().load('/node-texture.png'),
                         color: (node as GraphNode).color,
                         transparent: true,
-                        opacity: 0.8
+                        opacity: 0.9,
+                        sizeAttenuation: false
                       })
                     );
-                    sprite.scale.set(16, 16, 1);
+                    sprite.scale.set(12, 12, 1);
                     return sprite;
                   }}
-                  linkWidth={(link) => {
-                    const l = link as GraphLink;
-                    const id = `${l.source}-${l.target}`;
-                    return highlightLinks.size === 0 || highlightLinks.has(id)
-                      ? 3 * (l.value || 1)
-                      : 1;
-                  }}
+                  linkWidth={1}
                   linkColor={(link) => {
                     const l = link as GraphLink;
                     const id = `${l.source}-${l.target}`;
                     return highlightLinks.size === 0 || highlightLinks.has(id)
-                      ? '#F3F4F6'
-                      : 'rgba(156, 163, 175, 0.3)';
+                      ? '#6366F1'
+                      : 'rgba(99, 102, 241, 0.2)';
                   }}
                   onNodeClick={handleNodeClick}
                   onNodeHover={handleNodeHover}
@@ -419,27 +414,36 @@ const ConceptsPage: React.FC = () => {
                   enableNodeDrag={true}
                   enableNavigationControls={true}
                   showNavInfo={false}
+                  onEngineStop={() => {
+                    if (!selectedConcept) {
+                      fgRef.current?.zoomToFit(400, 30);
+                    }
+                  }}
                 />
 
                 {showControls && (
                   <div className="absolute bottom-4 right-4 flex flex-col gap-2">
                     <button
-                      onClick={resetCamera}
-                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-sm text-white"
+                      onClick={() => {
+                        if (fgRef.current) {
+                          fgRef.current.zoomToFit(400, 30);
+                        }
+                      }}
+                      className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-md text-gray-700 border border-gray-200"
                       title="Reset View"
                     >
                       <RotateCcw className="h-5 w-5" />
                     </button>
                     <button
                       onClick={zoomIn}
-                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-sm text-white"
+                      className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-md text-gray-700 border border-gray-200"
                       title="Zoom In"
                     >
                       <ZoomIn className="h-5 w-5" />
                     </button>
                     <button
                       onClick={zoomOut}
-                      className="p-2 bg-white/10 hover:bg-white/20 rounded-lg backdrop-blur-sm text-white"
+                      className="p-2 bg-white hover:bg-gray-50 rounded-lg shadow-md text-gray-700 border border-gray-200"
                       title="Zoom Out"
                     >
                       <ZoomOut className="h-5 w-5" />
@@ -447,18 +451,18 @@ const ConceptsPage: React.FC = () => {
                   </div>
                 )}
 
-                <div className="absolute bottom-4 left-4 text-xs text-gray-400">
-                  <div className="bg-black/50 rounded-lg p-3 backdrop-blur-sm">
-                    <p className="font-medium mb-2">Keyboard Controls:</p>
+                <div className="absolute bottom-4 left-4 text-xs text-gray-600">
+                  <div className="bg-white/90 rounded-lg p-3 shadow-md border border-gray-200 backdrop-blur-sm">
+                    <p className="font-medium mb-2">Navigation Controls:</p>
                     <ul className="space-y-1">
                       <li>
-                        <kbd className="px-2 py-1 bg-gray-700 rounded">Left Click</kbd> + Drag to rotate
+                        <kbd className="px-2 py-1 bg-gray-100 rounded text-gray-800">Left Click</kbd> + Drag to rotate
                       </li>
                       <li>
-                        <kbd className="px-2 py-1 bg-gray-700 rounded">Right Click</kbd> + Drag to pan
+                        <kbd className="px-2 py-1 bg-gray-100 rounded text-gray-800">Right Click</kbd> + Drag to pan
                       </li>
                       <li>
-                        <kbd className="px-2 py-1 bg-gray-700 rounded">Scroll</kbd> to zoom
+                        <kbd className="px-2 py-1 bg-gray-100 rounded text-gray-800">Scroll</kbd> to zoom
                       </li>
                     </ul>
                   </div>
