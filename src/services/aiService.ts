@@ -30,9 +30,9 @@ async function storeConceptsAndRelationships(
   noteId: string
 ) {
   try {
-    console.log('AI Service: Starting transaction for storing concepts and relationships...');
+    console.log('AI Service: Starting concept storage process...');
 
-    // First, check if the note exists
+    // First, verify the note exists
     const { data: noteExists, error: noteCheckError } = await supabase
       .from('notes')
       .select('id')
@@ -40,13 +40,15 @@ async function storeConceptsAndRelationships(
       .single();
 
     if (noteCheckError || !noteExists) {
-      console.error('AI Service: Note does not exist yet:', noteId);
-      return; // Exit early if note doesn't exist yet
+      console.error('AI Service: Note not found:', noteId);
+      return;
     }
 
-    // Store concepts first
+    // Store concepts one by one
     for (const concept of concepts) {
       const conceptId = concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+      
+      // Upsert concept
       const { error: conceptError } = await supabase
         .from('concepts')
         .upsert({
@@ -59,11 +61,26 @@ async function storeConceptsAndRelationships(
 
       if (conceptError) {
         console.error('AI Service: Error storing concept:', conceptError);
-        continue; // Continue with next concept even if one fails
+        continue;
+      }
+
+      // Create note-concept association
+      const { error: associationError } = await supabase
+        .from('note_concepts')
+        .upsert({
+          note_id: noteId,
+          concept_id: conceptId,
+          relevance_score: 0.8
+        }, {
+          onConflict: ['note_id', 'concept_id']
+        });
+
+      if (associationError) {
+        console.error('AI Service: Error creating note-concept association:', associationError);
       }
     }
 
-    // Then store relationships
+    // Store relationships after concepts are created
     for (const rel of relationships) {
       const sourceId = rel.source.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const targetId = rel.target.toLowerCase().replace(/[^a-z0-9]+/g, '-');
@@ -82,39 +99,18 @@ async function storeConceptsAndRelationships(
 
       if (relationshipError) {
         console.error('AI Service: Error storing relationship:', relationshipError);
-        continue; // Continue with next relationship even if one fails
-      }
-    }
-
-    // Finally, create note-concept associations
-    for (const concept of concepts) {
-      const conceptId = concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-      const { error: associationError } = await supabase
-        .from('note_concepts')
-        .upsert({
-          note_id: noteId,
-          concept_id: conceptId,
-          relevance_score: 0.8 // Default score
-        }, {
-          onConflict: ['note_id', 'concept_id']
-        });
-
-      if (associationError) {
-        console.error('AI Service: Error storing note-concept association:', associationError);
-        continue; // Continue with next association even if one fails
       }
     }
 
     console.log('AI Service: Successfully stored concepts and relationships');
   } catch (error) {
     console.error('AI Service: Error in storeConceptsAndRelationships:', error);
-    // Don't throw the error, just log it and continue
   }
 }
 
 export async function analyzeNote(content: string, title: string, noteId: string): Promise<AIAnalysisResult> {
   try {
-    console.log('AI Service: Analyzing note content...');
+    console.log('AI Service: Starting note analysis...');
     
     // Extract key concepts and their relationships
     const conceptResponse = await fetch(`${getApiBaseUrl()}/analyze-concepts`, {
@@ -134,12 +130,12 @@ export async function analyzeNote(content: string, title: string, noteId: string
     }
 
     const conceptData = await conceptResponse.json();
-    console.log('AI Service: Concept analysis completed:', conceptData);
+    console.log('AI Service: Concept analysis completed');
 
-    // Generate embedding for the current note
+    // Generate embedding for similarity search
     const embedding = await generateEmbeddingOnClient(content, title);
 
-    // Find related notes using vector similarity search
+    // Find related notes
     const { data: relatedNotes, error: searchError } = await supabase.rpc('match_notes', {
       query_embedding: embedding,
       match_threshold: 0.7,
@@ -151,21 +147,15 @@ export async function analyzeNote(content: string, title: string, noteId: string
       throw searchError;
     }
 
-    // Store concepts and relationships in the database
-    // Note: This is now non-blocking and will handle its own errors
-    setTimeout(() => {
-      storeConceptsAndRelationships(
-        conceptData.concepts,
-        conceptData.relationships,
-        noteId
-      ).catch(console.error);
-    }, 1000); // Delay to ensure note is saved first
-
-    // Ensure we only return exactly 5 tags
-    const suggestedTags = conceptData.tags?.slice(0, 5) || [];
+    // Store concepts and relationships
+    await storeConceptsAndRelationships(
+      conceptData.concepts,
+      conceptData.relationships,
+      noteId
+    );
 
     return {
-      suggestedTags,
+      suggestedTags: conceptData.tags?.slice(0, 5) || [],
       summary: conceptData.summary || '',
       keyConcepts: conceptData.concepts?.map((c: any) => c.name) || [],
       conceptRelationships: conceptData.relationships || [],

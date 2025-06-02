@@ -50,27 +50,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       let tags = [fileType.toUpperCase(), 'Imported'];
       let summary = '';
 
-      // Use AI to analyze content if enabled
-      if (useAI) {
-        try {
-          console.log("Analyzing document content with AI...");
-          const analysis = await analyzeNote(content, title, id);
-          console.log("AI analysis result:", analysis);
-          tags = [...new Set([...tags, ...analysis.suggestedTags])];
-          summary = analysis.summary;
-          console.log("AI analysis completed successfully");
-        } catch (aiError) {
-          console.error('AI analysis failed:', aiError);
-          // Continue without AI analysis
-        }
-      }
-
       // Generate embedding
       console.log("Generating embedding for uploaded document...");
       const embedding = await generateEmbeddingOnClient(content, title);
       console.log("Embedding generated successfully");
 
-      // Save to database
+      // Save to database first
       const noteData = {
         id,
         title,
@@ -82,9 +67,32 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         updatedAt: now.toISOString()
       };
 
-      console.log("Saving uploaded document to database...");
+      console.log("Saving document to database...");
       await saveNoteToDatabase(noteData);
       console.log("Document saved to database successfully");
+
+      // Use AI to analyze content if enabled
+      if (useAI) {
+        try {
+          console.log("Analyzing document content with AI...");
+          const analysis = await analyzeNote(content, title, id);
+          console.log("AI analysis result:", analysis);
+          tags = [...new Set([...tags, ...analysis.suggestedTags])];
+          summary = analysis.summary;
+          
+          // Update the note with AI-generated tags and summary
+          const updatedNoteData = {
+            ...noteData,
+            tags,
+            summary
+          };
+          await saveNoteToDatabase(updatedNoteData);
+          console.log("Note updated with AI analysis results");
+        } catch (aiError) {
+          console.error('AI analysis failed:', aiError);
+          // Continue without AI analysis
+        }
+      }
 
       // Add to store
       await addNote({
