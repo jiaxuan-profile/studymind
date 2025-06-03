@@ -1,3 +1,4 @@
+// src/pages/ConceptsPage.tsx
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store';
 import ForceGraph2D from 'react-force-graph-2d';
@@ -37,16 +38,25 @@ const ConceptsPage: React.FC = () => {
         setLoading(true);
         setError(null);
 
-        // Load concepts and relationships from database
-        const { concepts, relationships, noteConcepts } = await getAllConcepts();
-        
-        // Load categories and generate colors
-        const categories = await getConceptCategories();
+        const [conceptsResult, relationshipsResult, noteConceptsResult, categoriesResult] = await Promise.all([
+          supabase.from('concepts').select('*'),
+          supabase.from('concept_relationships').select('*'),
+          supabase.from('note_concepts').select('note_id, concept_id'),
+          getConceptCategories()
+        ]);
+
+        if (conceptsResult.error || relationshipsResult.error || noteConceptsResult.error) {
+          throw new Error(`Supabase error: ${conceptsResult.error?.message || relationshipsResult.error?.message || noteConceptsResult.error?.message}`);
+        }
+
+        const concepts = conceptsResult.data;
+        const relationships = relationshipsResult.data;
+        const noteConcepts = noteConceptsResult.data;
+        const categories = categoriesResult;
         const colors = generateCategoryColors(categories);
         setCategories(categories);
         setCategoryColors(colors);
 
-        // Create graph nodes
         const nodes: GraphNode[] = concepts.map(concept => {
           const conceptNotes = noteConcepts
             .filter(nc => nc.concept_id === concept.id)
@@ -59,25 +69,24 @@ const ConceptsPage: React.FC = () => {
             })
             .filter(Boolean);
 
-          // Use the most common category for the concept
           const topCategory = getMostCommonCategory(noteCategories);
-          
-          return {
+          const node: GraphNode = {
             id: concept.id,
             name: concept.name,
             val: 1 + conceptNotes.length * 0.5,
-            color: colors[topCategory] || colors.default
+            color: colors[topCategory] || '#94A3B8', // Default color if category not found
           };
+          console.log("Created Node:", node); // Add this log
+          return node;
         });
 
-        // Create graph links
         const links: GraphLink[] = relationships.map(rel => ({
           source: rel.source_id,
           target: rel.target_id,
           value: rel.strength
         }));
 
-        setGraphData({ nodes, links });
+        setGraphData({ nodes, links });          
       } catch (err) {
         console.error('Error loading concept data:', err);
         setError('Failed to load concept data. Please try again later.');
@@ -87,7 +96,13 @@ const ConceptsPage: React.FC = () => {
     };
 
     loadConceptData();
-  }, [notes]);
+  }, []);
+
+  useEffect(() => {
+    if (graphRef.current && graphData.nodes.length > 0) {
+      graphRef.current.zoomToFit(700, 20); // Initial zoom
+    }
+  }, [graphData.nodes]);
 
   const generateCategoryColors = (categories: string[]): CategoryColors => {
     const baseColors = {
@@ -143,7 +158,8 @@ const ConceptsPage: React.FC = () => {
         .from('concept_relationships')
         .select('target_id')
         .eq('source_id', node.id);
-
+      
+      console.log("Node to center:", node.x, node.y);
       setSelectedConcept({
         ...concept,
         noteIds: noteConceptsData?.map(nc => nc.note_id) || [],
@@ -170,10 +186,12 @@ const ConceptsPage: React.FC = () => {
 
       setHighlightLinks(connectedLinkIds);
 
-      // Center the graph on the selected node
       if (graphRef.current) {
-        graphRef.current.centerAt(node.x, node.y, 1000);
-        graphRef.current.zoom(2, 1000);
+        // Smooth transition to selected node
+        graphRef.current.centerAt(node.x, node.y, 1000); // Smooth centering
+        setTimeout(() => {
+          graphRef.current.zoom(5, 500); // Adjust the zoom level and animation duration as needed
+        }, 10000);
       }
     } catch (error) {
       console.error('Error fetching concept details:', error);
@@ -255,17 +273,15 @@ const ConceptsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full h-[600px] bg-gray-50">
+          <div className="w-full h-[600px]">
             {graphData.nodes.length > 0 ? (
               <ForceGraph2D
                 ref={graphRef}
                 graphData={graphData}
                 nodeLabel="name"
-                nodeColor={(node) => {
+                nodeColor={node => {
                   const n = node as GraphNode;
-                  return highlightNodes.size === 0 || highlightNodes.has(n.id)
-                    ? n.color
-                    : '#E2E8F0';
+                  return (selectedConcept && selectedConcept.id === n.id) ? '#6366F1' : '#94A3B8';
                 }}
                 nodeRelSize={6}
                 linkWidth={(link) => {
@@ -284,7 +300,7 @@ const ConceptsPage: React.FC = () => {
                 }}
                 onNodeClick={handleNodeClick}
                 cooldownTicks={100}
-                onEngineStop={() => graphRef.current?.zoomToFit(400, 30)}
+                onEngineStop={() => graphRef.current?.zoomToFit(1000, 30)}
               />
             ) : (
               <div className="flex items-center justify-center h-full">
