@@ -44,6 +44,12 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         throw new Error('Supabase configuration is missing. Please check your environment variables.');
       }
 
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('You must be logged in to upload documents');
+      }
+
       setIsUploading(true);
       setError(null);
 
@@ -87,6 +93,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // Save to database first
       const noteData = {
         id,
+        user_id: user.id, // Add user_id to the note data
         title,
         content,
         tags,

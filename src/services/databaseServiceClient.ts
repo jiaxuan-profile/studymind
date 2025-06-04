@@ -3,6 +3,7 @@ import { createHash } from 'crypto';
 
 interface NotePayload {
   id: string;
+  user_id: string; // Added user_id field
   title: string;
   content: string;
   summary?: string;
@@ -21,10 +22,15 @@ export async function checkDocumentExists(content: string): Promise<boolean> {
   try {
     const contentHash = generateContentHash(content);
     
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
       .from('notes')
       .select('id')
       .eq('content_hash', contentHash)
+      .eq('user_id', user.id)
       .maybeSingle();
 
     if (error) {
@@ -56,6 +62,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       .from('notes')
       .upsert({
         id: noteData.id,
+        user_id: noteData.user_id,
         title: noteData.title,
         content: noteData.content,
         summary: noteData.summary,
@@ -85,10 +92,15 @@ export async function getNoteById(id: string) {
   try {
     console.log("Database Service: Fetching note by ID:", id);
     
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
       .from('notes')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (error) {
@@ -109,10 +121,15 @@ export async function getAllNotes(page = 1, pageSize = 12) {
   try {
     console.log("Database Service: Fetching paginated notes", { page, pageSize });
     
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+    
     // First, get the total count
     const { count, error: countError } = await supabase
       .from('notes')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', user.id);
 
     if (countError) {
       throw countError;
@@ -122,6 +139,7 @@ export async function getAllNotes(page = 1, pageSize = 12) {
     const { data, error } = await supabase
       .from('notes')
       .select('*')
+      .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -149,10 +167,15 @@ export async function deleteNoteFromDatabase(id: string): Promise<void> {
   try {
     console.log("Database Service: Deleting note:", id);
     
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { error } = await supabase
       .from('notes')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (error) {
       console.error("Database Service: Supabase error:", error);
@@ -171,6 +194,10 @@ export async function updateNoteSummary(id: string, summary: string) {
   try {
     console.log("Database Service: Updating note summary:", { id, summaryLength: summary.length });
     
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
       .from('notes')
       .update({ 
@@ -178,6 +205,7 @@ export async function updateNoteSummary(id: string, summary: string) {
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
+      .eq('user_id', user.id)
       .select();
 
     if (error) {
@@ -226,9 +254,14 @@ export async function getAllConcepts() {
 
 export async function getConceptCategories() {
   try {
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
     const { data, error } = await supabase
       .from('notes')
-      .select('tags');
+      .select('tags')
+      .eq('user_id', user.id);
 
     if (error) throw error;
 

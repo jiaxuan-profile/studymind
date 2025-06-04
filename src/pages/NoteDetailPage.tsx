@@ -12,7 +12,7 @@ import {
   Lightbulb,
   HelpCircle
 } from 'lucide-react';
-
+import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase } from '../services/databaseServiceClient'; 
 
@@ -80,6 +80,10 @@ const NoteDetailPage: React.FC = () => {
     setIsSaving(true);
 
     try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const updatedTitle = editedNote.title;
       const updatedContent = editedNote.content;
       const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
@@ -104,6 +108,7 @@ const NoteDetailPage: React.FC = () => {
 
       const noteToSave = { 
         id: note.id,
+        user_id: user.id, // Add user_id to the note data
         title: updatedTitle,
         content: updatedContent,
         tags: updatedTags,
