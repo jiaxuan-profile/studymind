@@ -24,6 +24,49 @@ const getApiBaseUrl = () => {
     : '/api';
 };
 
+// Add these utility functions for saving questions and gaps
+async function saveNoteQuestions(noteId: string, questions: any[]) {
+  try {
+    const { data, error } = await supabase
+      .from('note_questions')
+      .upsert({
+        id: `${noteId}-questions`,
+        note_id: noteId,
+        questions,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id'
+      });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error saving note questions:', error);
+    throw error;
+  }
+}
+
+async function saveNoteGaps(noteId: string, gaps: any[]) {
+  try {
+    const { data, error } = await supabase
+      .from('note_gaps')
+      .upsert({
+        id: `${noteId}-gaps`,
+        note_id: noteId,
+        gaps,
+        updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id'
+      });
+
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error saving note gaps:', error);
+    throw error;
+  }
+}
+
 async function storeConceptsAndRelationships(
   concepts: Array<{ name: string; definition: string }>,
   relationships: Array<{ source: string; target: string; type: string; strength: number }>,
@@ -212,3 +255,92 @@ export async function generateNoteSummary(content: string): Promise<string> {
     throw error;
   }
 }
+
+export const generateQuestionsForNote = async (noteId: string, content: string, title: string) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/generate-questions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ noteId, content, title }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to generate questions');
+    }
+    
+    const { questions } = await response.json();
+    
+    // Save to database
+    await saveNoteQuestions(noteId, questions);
+    
+    return questions;
+    
+  } catch (error) {
+    console.error('Question generation failed:', error);
+    throw error;
+  }
+};
+
+export const analyzeGapsForNote = async (noteId: string, content: string, title: string) => {
+  try {
+    const response = await fetch(`${getApiBaseUrl()}/analyze-gaps`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ noteId, content, title }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to analyze gaps');
+    }
+    
+    const { gaps } = await response.json();
+    
+    // Save to database
+    await saveNoteGaps(noteId, gaps);
+    
+    return gaps;
+    
+  } catch (error) {
+    console.error('Gap analysis failed:', error);
+    throw error;
+  }
+};
+
+// Add these helper functions for retrieving saved data
+export const getSavedQuestionsForNote = async (noteId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('note_questions')
+      .select('questions')
+      .eq('note_id', noteId)
+      .single();
+
+    if (error) throw error;
+    return data?.questions || [];
+  } catch (error) {
+    console.error('Error fetching saved questions:', error);
+    return [];
+  }
+};
+
+export const getSavedGapsForNote = async (noteId: string) => {
+  try {
+    const { data, error } = await supabase
+      .from('note_gaps')
+      .select('gaps')
+      .eq('note_id', noteId)
+      .single();
+
+    if (error) throw error;
+    return data?.gaps || [];
+  } catch (error) {
+    console.error('Error fetching saved gaps:', error);
+    return [];
+  }
+};

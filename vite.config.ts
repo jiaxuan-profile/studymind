@@ -40,6 +40,16 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/summarize', '/summarize'),
       },
+      '/api/save-note-questions': {
+        target: 'https://studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/save-note-questions', '/save-note-questions'),
+      },
+      '/api/save-note-gaps': {
+        target: 'https://studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/save-note-gaps', '/save-note-gaps'),
+      },
     },
   },
 });

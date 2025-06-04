@@ -242,3 +242,27 @@ export async function getConceptCategories() {
     throw error;
   }
 }
+
+export const saveNoteQuestions = async (noteId: string, questions: any[]) => {
+  const response = await fetch('/api/save-note-questions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ noteId, questions }),
+  });
+  if (!response.ok) throw new Error('Failed to save questions');
+  return response.json();
+};
+
+export const saveNoteGaps = async (noteId: string, gaps: any[]) => {
+  const response = await fetch('/api/save-note-gaps', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ noteId, gaps }),
+  });
+  if (!response.ok) throw new Error('Failed to save gaps');
+  return response.json();
+};

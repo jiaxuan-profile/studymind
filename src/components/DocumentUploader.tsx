@@ -1,11 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { Upload, FileText, AlertCircle, Lightbulb } from 'lucide-react';
+import { Upload, AlertCircle, Lightbulb } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { useStore } from '../store';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseServiceClient';
-import { analyzeNote } from '../services/aiService';
+import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -70,6 +70,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         tags,
         summary,
         embedding,
+        analysis_status: 'pending',
         updatedAt: now.toISOString(),
         createdAt: now.toISOString()
       };
@@ -81,25 +82,50 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // Use AI to analyze content if enabled
       if (useAI) {
         try {
-          console.log("Analyzing document content with AI...");
+          console.log("Starting full document analysis...");
+          
+          // 1. Basic content analysis (tags and summary)
           const analysis = await analyzeNote(content, title, id);
           console.log("AI analysis result:", analysis);
           tags = [...new Set([...tags, ...analysis.suggestedTags])];
           summary = analysis.summary;
-          
-          // Update the note with AI-generated tags and summary
+  
+          // 2. Generate and store questions
+          console.log("Generating practice questions...");
+          const questions = await generateQuestionsForNote(id, content, title);
+          console.log("Generated questions:", questions);
+  
+          // 3. Analyze knowledge gaps
+          console.log("Analyzing knowledge gaps...");
+          const gaps = await analyzeGapsForNote(id, content, title);
+          console.log("Identified gaps:", gaps);
+  
+          // Update the note with all analysis results
           const updatedNoteData = {
             ...noteData,
             tags,
-            summary
+            summary,
+            analysis_status: 'complete'
           };
+          
           await saveNoteToDatabase(updatedNoteData);
-          console.log("Note updated with AI analysis results");
+          console.log("Note updated with all analysis results");
+  
         } catch (aiError) {
           console.error('AI analysis failed:', aiError);
-          // Continue without AI analysis
+          // Update status to failed
+          await saveNoteToDatabase({
+            ...noteData,
+            analysis_status: 'failed'
+          });
         }
-      }
+      } else {
+        // Mark as complete if no AI analysis
+        await saveNoteToDatabase({
+          ...noteData,
+          analysis_status: 'complete'
+        });
+      }  
 
       // Add to store
       await addNote({
