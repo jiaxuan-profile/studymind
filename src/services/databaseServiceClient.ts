@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import sha256 from 'js-sha256';
+import { createHash } from 'crypto';
 
 interface NotePayload {
   id: string;
@@ -9,11 +9,12 @@ interface NotePayload {
   tags: string[];
   embedding?: number[]; 
   updatedAt: string;
-  createdAt?: string; 
+  createdAt?: string;
+  contentHash?: string;
 }
 
 function generateContentHash(content: string): string {
-  return sha256(content);
+  return createHash('sha256').update(content).digest('hex');
 }
 
 export async function checkDocumentExists(content: string): Promise<boolean> {
@@ -48,6 +49,9 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       hasEmbedding: !!noteData.embedding
     });
 
+    // Generate content hash if not provided
+    const contentHash = noteData.contentHash || generateContentHash(noteData.content);
+
     const { data, error } = await supabase
       .from('notes')
       .upsert({
@@ -58,7 +62,8 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         tags: noteData.tags,
         embedding: noteData.embedding,
         updated_at: noteData.updatedAt,
-        created_at: noteData.createdAt || noteData.updatedAt
+        created_at: noteData.createdAt || noteData.updatedAt,
+        content_hash: contentHash
       })
       .select();
 

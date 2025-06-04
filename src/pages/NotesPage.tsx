@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText, List, Grid } from 'lucide-react';
 import DocumentUploader from '../components/DocumentUploader';
 import Pagination from '../components/Pagination';
-import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
+import { deleteNoteFromDatabase } from '../services/databaseServiceClient';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -24,7 +23,6 @@ const NotesPage: React.FC = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showPdfUploader, setShowPdfUploader] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Get all unique tags from notes
   const allTags = Array.from(

@@ -1,29 +1,38 @@
 -- Enable required extensions
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Notes table with vector support
+-- Create subjects table first (referenced by notes)
+CREATE TABLE IF NOT EXISTS subjects (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  description TEXT
+);
+
+-- Notes table with vector support and subject relationship
 CREATE TABLE notes (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     content TEXT NOT NULL,
-    tags TEXT[],
+    tags TEXT[],  -- Keeping the original tags array column
+    subject_id INTEGER REFERENCES subjects(id) ON DELETE SET DEFAULT DEFAULT 1, -- Default to 'General' subject
+    year_level INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
-    embedding VECTOR(768)
+    embedding VECTOR(768),
+    summary TEXT,
+    content_hash TEXT
 );
 
--- Add additional columns to notes table
-ALTER TABLE notes
-ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT 'General',
-ADD COLUMN IF NOT EXISTS year_level INTEGER,
-ADD COLUMN IF NOT EXISTS summary TEXT,
-ADD COLUMN IF NOT EXISTS content_hash TEXT;
+-- Add default 'General' subject if it doesn't exist
+INSERT INTO subjects (name, description)
+SELECT 'General', 'General subject for all notes'
+WHERE NOT EXISTS (SELECT 1 FROM subjects WHERE name = 'General');
 
 -- Create HNSW index for fast vector similarity search
 CREATE INDEX IF NOT EXISTS notes_embedding_idx ON notes USING hnsw (embedding vector_l2_ops);
 
--- Create indexes for new columns
-CREATE INDEX IF NOT EXISTS idx_notes_subject ON notes(subject);
+-- Create indexes for note columns
+CREATE INDEX IF NOT EXISTS idx_notes_subject ON notes(subject_id);
 CREATE INDEX IF NOT EXISTS idx_notes_year_level ON notes(year_level);
 CREATE INDEX IF NOT EXISTS idx_notes_content_hash ON notes(content_hash);
 
@@ -81,49 +90,12 @@ CREATE POLICY "Public notes access" ON notes
     FOR ALL USING (true)
     WITH CHECK (true);
 
--- Create subjects table
-CREATE TABLE IF NOT EXISTS subjects (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  description TEXT
-);
-
--- Create tags table for AI-powered connections
-CREATE TABLE IF NOT EXISTS tags (
-  id SERIAL PRIMARY KEY,
-  name TEXT NOT NULL UNIQUE,
-  ai_generated BOOLEAN DEFAULT false
-);
-
--- Junction table for note-tag relationships
-CREATE TABLE IF NOT EXISTS note_tags (
-  note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
-  tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
-  PRIMARY KEY (note_id, tag_id)
-);
-
--- Create indexes for junction tables
-CREATE INDEX IF NOT EXISTS idx_note_tags_note_id ON note_tags(note_id);
-CREATE INDEX IF NOT EXISTS idx_note_tags_tag_id ON note_tags(tag_id);
-
--- Set up RLS for new tables
+-- Set up RLS for subjects table
 ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public subjects are viewable by all users" ON subjects FOR SELECT USING (true);
 CREATE POLICY "Public subjects can be inserted by anyone" ON subjects FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public subjects can be updated by anyone" ON subjects FOR UPDATE USING (true) WITH CHECK (true);
 CREATE POLICY "Public subjects can be deleted by anyone" ON subjects FOR DELETE USING (true);
-
-ALTER TABLE tags ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public tags are viewable by all users" ON tags FOR SELECT USING (true);
-CREATE POLICY "Public tags can be inserted by anyone" ON tags FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public tags can be updated by anyone" ON tags FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY "Public tags can be deleted by anyone" ON tags FOR DELETE USING (true);
-
-ALTER TABLE note_tags ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public note_tags are viewable by all users" ON note_tags FOR SELECT USING (true);
-CREATE POLICY "Public note_tags can be inserted by anyone" ON note_tags FOR INSERT WITH CHECK (true);
-CREATE POLICY "Public note_tags can be updated by anyone" ON note_tags FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY "Public note_tags can be deleted by anyone" ON note_tags FOR DELETE USING (true);
 
 -- Concepts tables and functions
 CREATE TABLE IF NOT EXISTS concepts (
