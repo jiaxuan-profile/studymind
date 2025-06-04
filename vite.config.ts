@@ -40,15 +40,15 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/summarize', '/summarize'),
       },
-      '/api/save-note-questions': {
+      '/api/generate-questions': {
         target: 'https://studymindai.me/.netlify/functions',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/api/save-note-questions', '/save-note-questions'),
+        rewrite: (path) => path.replace('/api/generate-questions', '/generate-questions'),
       },
-      '/api/save-note-gaps': {
+      '/api/analyze-gaps': {
         target: 'https://studymindai.me/.netlify/functions',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/api/save-note-gaps', '/save-note-gaps'),
+        rewrite: (path) => path.replace('/api/analyze-gaps', '/analyze-gaps'),
       },
     },
   },
