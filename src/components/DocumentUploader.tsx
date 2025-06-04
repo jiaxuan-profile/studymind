@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, AlertCircle, Lightbulb } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
+import { supabase } from '../services/supabase';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -20,8 +21,29 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [useAI, setUseAI] = useState(true);
   const { addNote } = useStore();
 
+  // Check Supabase configuration on component mount
+  useEffect(() => {
+    const checkSupabaseConfig = async () => {
+      try {
+        // Test Supabase connection
+        const { error } = await supabase.from('notes').select('id').limit(1);
+        if (error) throw error;
+      } catch (err) {
+        setError('Database connection error. Please ensure Supabase is properly configured.');
+        console.error('Supabase connection error:', err);
+      }
+    };
+
+    checkSupabaseConfig();
+  }, []);
+
   const processFile = async (file: File) => {
     try {
+      // Check if Supabase is properly configured before proceeding
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        throw new Error('Supabase configuration is missing. Please check your environment variables.');
+      }
+
       setIsUploading(true);
       setError(null);
 
