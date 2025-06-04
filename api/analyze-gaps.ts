@@ -4,7 +4,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 exports.handler = async (event) => {
   try {
     const { noteId } = event.queryStringParameters;
-    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
     // 1. Fetch note with knowledge_graph and mastery levels
