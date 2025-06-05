@@ -125,20 +125,10 @@ export async function getAllNotes(page = 1, pageSize = 12) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
-    // First, get the total count
-    const { count, error: countError } = await supabase
+    // Get both data and count in a single query
+    const { data, error, count } = await supabase
       .from('notes')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', user.id);
-
-    if (countError) {
-      throw countError;
-    }
-
-    // Then get the actual page of data
-    const { data, error } = await supabase
-      .from('notes')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
