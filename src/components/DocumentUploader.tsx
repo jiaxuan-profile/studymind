@@ -111,50 +111,38 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // Use AI to analyze content if enabled
       if (useAI) {
         try {
-          console.log("Starting full document analysis...");
-          
-          // 1. Basic content analysis (tags and summary)
+          console.log("Analyzing document content with AI...");
           const analysis = await analyzeNote(content, title, id);
           console.log("AI analysis result:", analysis);
           tags = [...new Set([...tags, ...analysis.suggestedTags])];
           summary = analysis.summary;
-  
-          // 2. Generate and store questions
+
           console.log("Generating practice questions...");
           const questions = await generateQuestionsForNote(id, content, title);
           console.log("Generated questions:", questions);
-  
-          // 3. Analyze knowledge gaps
+
+
           console.log("Analyzing knowledge gaps...");
-          const gaps = await analyzeGapsForNote(id, content, title);
+          const gaps = await analyzeGapsForNote(id, content, title); // Call analyzeGapsForNote
           console.log("Identified gaps:", gaps);
-  
-          // Update the note with all analysis results
+
+          // Update the note with AI-generated data, questions, and gaps
           const updatedNoteData = {
             ...noteData,
             tags,
             summary,
-            analysis_status: 'complete'
+            knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships }, // Assuming your analyzeNote returns keyConcepts and conceptRelationships
+            note_questions: questions,
+            note_gaps: gaps // Add gaps to updatedNoteData
           };
-          
           await saveNoteToDatabase(updatedNoteData);
-          console.log("Note updated with all analysis results");
-  
+          console.log("Note updated with AI analysis results");
         } catch (aiError) {
           console.error('AI analysis failed:', aiError);
-          // Update status to failed
-          await saveNoteToDatabase({
-            ...noteData,
-            analysis_status: 'failed'
-          });
+          // Continue without AI analysis
         }
-      } else {
-        // Mark as complete if no AI analysis
-        await saveNoteToDatabase({
-          ...noteData,
-          analysis_status: 'complete'
-        });
-      }  
+      }
+
 
       // Add to store
       await addNote({

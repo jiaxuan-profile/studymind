@@ -20,7 +20,7 @@ interface AIAnalysisResult {
 
 const getApiBaseUrl = () => {
   return import.meta.env.PROD
-    ? 'https://studymind-ai.netlify.app/.netlify/functions'
+    ? 'https://studymindai.me/.netlify/functions'
     : '/api';
 };
 
@@ -78,6 +78,13 @@ async function storeConceptsAndRelationships(
     // Wait a moment to ensure the note is saved
     await new Promise(resolve => setTimeout(resolve, 1000));
 
+    // Get current user ID
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error('AI Service: User not authenticated:', userError);
+      return;
+    }
+
     // First, verify the note exists
     const { data: noteExists, error: noteCheckError } = await supabase
       .from('notes')
@@ -102,13 +109,14 @@ async function storeConceptsAndRelationships(
     for (const concept of concepts) {
       const conceptId = concept.name.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       
-      // Upsert concept
+      // Upsert concept with user_id
       const { error: conceptError } = await supabase
         .from('concepts')
         .upsert({
           id: conceptId,
           name: concept.name,
-          definition: concept.definition
+          definition: concept.definition,
+          user_id: user.id  // Add this required field
         }, {
           onConflict: 'id'
         });
@@ -151,6 +159,7 @@ async function storeConceptsAndRelationships(
         continue;
       }
 
+      // Upsert relationship with user_id
       const { error: relationshipError } = await supabase
         .from('concept_relationships')
         .upsert({
@@ -158,7 +167,8 @@ async function storeConceptsAndRelationships(
           source_id: sourceId,
           target_id: targetId,
           relationship_type: rel.type,
-          strength: rel.strength
+          strength: rel.strength,
+          user_id: user.id  // Add this required field
         }, {
           onConflict: 'id'
         });
