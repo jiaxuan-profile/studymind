@@ -1,6 +1,6 @@
 // src/services/embeddingServiceClient.ts 
 const API_ENDPOINT = import.meta.env.PROD 
-  ? 'https://studymind-ai.netlify.app/.netlify/functions/generate-embedding'
+  ? 'https://studymindai.me/.netlify/functions/generate-embedding'
   : '/api/generate-embedding';
 
 const MAX_TEXT_LENGTH = 7500;

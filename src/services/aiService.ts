@@ -19,21 +19,38 @@ interface AIAnalysisResult {
 }
 
 const getApiBaseUrl = () => {
-  return import.meta.env.PROD
-    ? 'https://studymindai.me/.netlify/functions'
-    : '/api';
+  // Check if we're in development mode
+  const isDev = process.env.NODE_ENV === 'development';
+  
+  if (isDev) {
+    return '/api'; 
+  } else {
+    return 'https://studymindai.me/.netlify/functions';
+  }
 };
+
+// Helper function to get authenticated user ID
+async function getAuthenticatedUserId(): Promise<string> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error || !data.session || !data.session.user || !data.session.user.id) {
+    throw new Error('User not authenticated');
+  }
+  return data.session.user.id;
+}
 
 // Add these utility functions for saving questions and gaps
 async function saveNoteQuestions(noteId: string, questions: any[]) {
   try {
+    const userId = await getAuthenticatedUserId();
+    
     const { data, error } = await supabase
       .from('note_questions')
       .upsert({
         id: `${noteId}-questions`,
         note_id: noteId,
         questions,
-        updated_at: new Date().toISOString()
+        user_id: userId,
+        updated_at: new Date().toISOString(),
       }, {
         onConflict: 'id'
       });
@@ -48,12 +65,15 @@ async function saveNoteQuestions(noteId: string, questions: any[]) {
 
 async function saveNoteGaps(noteId: string, gaps: any[]) {
   try {
+    const userId = await getAuthenticatedUserId();
+    
     const { data, error } = await supabase
       .from('note_gaps')
       .upsert({
         id: `${noteId}-gaps`,
         note_id: noteId,
         gaps,
+        user_id: userId,
         updated_at: new Date().toISOString()
       }, {
         onConflict: 'id'
@@ -78,12 +98,8 @@ async function storeConceptsAndRelationships(
     // Wait a moment to ensure the note is saved
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Get current user ID
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error('AI Service: User not authenticated:', userError);
-      return;
-    }
+    const userId = await getAuthenticatedUserId();
+    console.info('AI Service: Verifying if note exists for:', userId);
 
     // First, verify the note exists
     const { data: noteExists, error: noteCheckError } = await supabase
@@ -111,15 +127,15 @@ async function storeConceptsAndRelationships(
       
       // Upsert concept with user_id
       const { error: conceptError } = await supabase
-        .from('concepts')
-        .upsert({
-          id: conceptId,
-          name: concept.name,
-          definition: concept.definition,
-          user_id: user.id  // Add this required field
-        }, {
-          onConflict: 'id'
-        });
+      .from('concepts')
+      .upsert({
+        id: conceptId,
+        name: concept.name,
+        definition: concept.definition,
+        user_id: userId 
+      }, {
+        onConflict: 'id'
+      });
 
       if (conceptError) {
         console.error('AI Service: Error storing concept:', conceptError);
@@ -135,7 +151,8 @@ async function storeConceptsAndRelationships(
         .upsert({
           note_id: noteId,
           concept_id: conceptId,
-          relevance_score: 0.8
+          relevance_score: 0.8,
+          user_id: userId 
         }, {
           onConflict: ['note_id', 'concept_id']
         });
@@ -168,7 +185,7 @@ async function storeConceptsAndRelationships(
           target_id: targetId,
           relationship_type: rel.type,
           strength: rel.strength,
-          user_id: user.id  // Add this required field
+          user_id: userId
         }, {
           onConflict: 'id'
         });
@@ -181,32 +198,35 @@ async function storeConceptsAndRelationships(
     console.log('AI Service: Successfully stored concepts and relationships');
   } catch (error) {
     console.error('AI Service: Error in storeConceptsAndRelationships:', error);
+    throw error;
   }
 }
 
-export async function analyzeNote(content: string, title: string, noteId: string): Promise<AIAnalysisResult> {
+export async function analyzeNote(content: string, title: string, noteId: string): Promise<AIAnalysisResult | null> { 
   try {
     console.log('AI Service: Starting note analysis...');
+    const apiUrl = `${getApiBaseUrl()}/analyze-concepts`;
+    console.log('AI Service: API URL:', apiUrl);
     
-    // Extract key concepts and their relationships
-    const conceptResponse = await fetch(`${getApiBaseUrl()}/analyze-concepts`, {
+    const conceptResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        text: content, 
-        title,
-        includeRelationships: true
-      })
+      body: JSON.stringify({ text: content, title, includeRelationships: true }),
     });
 
     if (!conceptResponse.ok) {
-      const errorData = await conceptResponse.json();
+      const errorText = await conceptResponse.text(); 
+      const errorData = errorText ? JSON.parse(errorText) : {error: `HTTP error ${conceptResponse.status}`}; 
       console.error('AI Service: Failed to analyze concepts:', errorData);
-      throw new Error(errorData.error || 'Failed to analyze concepts');
+      console.error('AI Service: Concept response status:', conceptResponse.status);
+      console.error('AI Service: Concept response headers:', conceptResponse.headers);
+      throw new Error(errorData.error || `Failed to analyze concepts: HTTP ${conceptResponse.status}`);
     }
 
     const conceptData = await conceptResponse.json();
-    console.log('AI Service: Concept analysis completed');
+    console.log('AI Service: Concept analysis response:', conceptData);
+    console.log('AI Service: Concept analysis concepts property:', conceptData.concepts);
+    console.log('AI Service: Type of concepts:', typeof conceptData.concepts);
 
     // Generate embedding for similarity search
     const embedding = await generateEmbeddingOnClient(content, title);
@@ -240,9 +260,10 @@ export async function analyzeNote(content: string, title: string, noteId: string
       relatedNotes: relatedNotes || []
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('AI Service: Error analyzing note:', error);
-    throw error;
+    console.error('AI Service: Error stack:', error.stack); 
+    return null;
   }
 }
 
@@ -268,20 +289,35 @@ export async function generateNoteSummary(content: string): Promise<string> {
 
 export const generateQuestionsForNote = async (noteId: string, content: string, title: string) => {
   try {
-    const response = await fetch(`${getApiBaseUrl()}/generate-questions`, {
+    console.log('AI Service: Generating questions for note:', noteId);
+    console.log('AI Service: Using API base URL:', getApiBaseUrl());
+    
+    const response = await fetch(`${getApiBaseUrl()}/generate-questions?noteId=${noteId}`, { 
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ noteId, content, title }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content, title }), //Removed noteId from body
     });
     
+    console.log('AI Service: Response status:', response.status);
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to generate questions');
+      const errorText = await response.text();
+      console.error('AI Service: Error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: `HTTP ${response.status}: ${errorText}` };
+      }
+      
+      throw new Error(errorData.error || `Failed to generate questions: ${response.status}`);
     }
     
-    const { questions } = await response.json();
+    const data = await response.json();
+    const questions = data.questions || data;
+    
+    console.log('AI Service: Generated questions:', questions);
     
     // Save to database
     await saveNoteQuestions(noteId, questions);
@@ -289,13 +325,15 @@ export const generateQuestionsForNote = async (noteId: string, content: string, 
     return questions;
     
   } catch (error) {
-    console.error('Question generation failed:', error);
+    console.error('AI Service: Question generation failed:', error);
     throw error;
   }
 };
 
 export const analyzeGapsForNote = async (noteId: string, content: string, title: string) => {
   try {
+    console.log('AI Service: Analyzing gaps for note:', noteId);
+    
     const response = await fetch(`${getApiBaseUrl()}/analyze-gaps`, {
       method: 'POST',
       headers: {
@@ -305,11 +343,23 @@ export const analyzeGapsForNote = async (noteId: string, content: string, title:
     });
     
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to analyze gaps');
+      const errorText = await response.text();
+      console.error('AI Service: Gap analysis error response:', errorText);
+      
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: `HTTP ${response.status}: ${errorText}` };
+      }
+      
+      throw new Error(errorData.error || `Failed to analyze gaps: ${response.status}`);
     }
     
-    const { gaps } = await response.json();
+    const data = await response.json();
+    const gaps = data.gaps || data;
+    
+    console.log('AI Service: Analyzed gaps:', gaps);
     
     // Save to database
     await saveNoteGaps(noteId, gaps);
@@ -317,7 +367,7 @@ export const analyzeGapsForNote = async (noteId: string, content: string, title:
     return gaps;
     
   } catch (error) {
-    console.error('Gap analysis failed:', error);
+    console.error('AI Service: Gap analysis failed:', error);
     throw error;
   }
 };
@@ -325,10 +375,13 @@ export const analyzeGapsForNote = async (noteId: string, content: string, title:
 // Add these helper functions for retrieving saved data
 export const getSavedQuestionsForNote = async (noteId: string) => {
   try {
+    const userId = await getAuthenticatedUserId();
+    
     const { data, error } = await supabase
       .from('note_questions')
       .select('questions')
       .eq('note_id', noteId)
+      .eq('user_id', userId) // Add user filter for security
       .single();
 
     if (error) throw error;
@@ -341,10 +394,13 @@ export const getSavedQuestionsForNote = async (noteId: string) => {
 
 export const getSavedGapsForNote = async (noteId: string) => {
   try {
+    const userId = await getAuthenticatedUserId();
+    
     const { data, error } = await supabase
       .from('note_gaps')
       .select('gaps')
       .eq('note_id', noteId)
+      .eq('user_id', userId) // Add user filter for security
       .single();
 
     if (error) throw error;

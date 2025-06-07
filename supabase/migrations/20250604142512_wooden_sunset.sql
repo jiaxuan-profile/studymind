@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS note_concepts (
     concept_id TEXT REFERENCES concepts(id) ON DELETE CASCADE,
     relevance_score FLOAT NOT NULL CHECK (relevance_score >= 0 AND relevance_score <= 1),
     mastery_level FLOAT DEFAULT 0.5,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     PRIMARY KEY (note_id, concept_id)
 );
@@ -135,6 +136,7 @@ CREATE TABLE IF NOT EXISTS note_questions (
   id TEXT PRIMARY KEY,
   note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
   questions JSONB NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -143,6 +145,7 @@ CREATE TABLE IF NOT EXISTS note_gaps (
   id TEXT PRIMARY KEY,
   note_id TEXT REFERENCES notes(id) ON DELETE CASCADE,
   gaps JSONB NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
