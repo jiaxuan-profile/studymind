@@ -4,11 +4,12 @@ import { useStore } from '../store';
 import { PlusCircle, Clock, BookOpen, BrainCircuit, Search, GraduationCap } from 'lucide-react';
 
 const HomePage: React.FC = () => {
-  const { notes, concepts, reviews, isLoading, error } = useStore();
+  const { notes, concepts, reviews, isLoading, error, loadReviews } = useStore();
   const navigate = useNavigate();
   
   useEffect(() => {
     useStore.getState().loadConcepts();
+    useStore.getState().loadReviews();
   }, []);
 
   if (isLoading) {
@@ -120,6 +121,11 @@ const HomePage: React.FC = () => {
             <GraduationCap className="h-6 w-6 text-success" />
           </div>
           <span className="text-gray-800 font-medium">Study Review</span>
+          {dueReviews.length > 0 && (
+            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              {dueReviews.length} due
+            </span>
+          )}
         </Link>
       </div>
       
@@ -187,7 +193,7 @@ const HomePage: React.FC = () => {
             <div className="space-y-3">
               {dueReviews.slice(0, 3).map((review) => (
                 <div key={review.id} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="font-medium text-gray-800">{review.question}</p>
+                  <p className="font-medium text-gray-800 text-sm line-clamp-2">{review.question}</p>
                   <div className="mt-2 flex justify-between items-center">
                     <span className="text-xs text-gray-500">
                       From: {notes.find(n => n.id === review.noteId)?.title}
@@ -202,6 +208,18 @@ const HomePage: React.FC = () => {
                       {review.difficulty}
                     </span>
                   </div>
+                  {review.connects && review.connects.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {review.connects.slice(0, 2).map((concept, i) => (
+                        <span
+                          key={i}
+                          className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary"
+                        >
+                          {concept}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
               
@@ -226,13 +244,13 @@ const HomePage: React.FC = () => {
       {/* Concepts and Statistics */}
       <div className="mt-6 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800">Concept Overview</h2>
+          <h2 className="text-xl font-bold text-gray-800">Study Overview</h2>
           <Link to="/concepts" className="text-primary hover:text-primary-dark text-sm font-medium">
             View Concept Graph
           </Link>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="p-4 rounded-lg bg-gray-50 border border-gray-100 text-center">
             <p className="text-2xl font-bold text-primary">{notes.length}</p>
             <p className="text-gray-600">Notes</p>
@@ -247,12 +265,16 @@ const HomePage: React.FC = () => {
             <p className="text-2xl font-bold text-accent">{reviews.length}</p>
             <p className="text-gray-600">Review Items</p>
           </div>
+
+          <div className="p-4 rounded-lg bg-gray-50 border border-gray-100 text-center">
+            <p className="text-2xl font-bold text-success">{dueReviews.length}</p>
+            <p className="text-gray-600">Due Today</p>
+          </div>
         </div>
         
         <div className="mt-4">
           <p className="text-gray-600 text-sm">
-            StudyMind has automatically identified and connected key concepts from your notes.
-            Explore the concept graph to see how different ideas relate to each other.
+            StudyMind automatically generates review questions from your notes and schedules them using spaced repetition for optimal learning.
           </p>
         </div>
       </div>

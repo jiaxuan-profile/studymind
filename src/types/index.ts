@@ -62,4 +62,7 @@ export interface ReviewItem {
   lastReviewed: Date | null;
   nextReviewDate: Date;
   difficulty: 'easy' | 'medium' | 'hard';
+  connects?: string[];
+  masteryContext?: string;
+  hint?: string;
 }

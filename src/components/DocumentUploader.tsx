@@ -19,7 +19,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [useAI, setUseAI] = useState(true);
-  const { addNote } = useStore();
+  const { addNote, generateReviewsFromNote } = useStore();
 
   // Check Supabase configuration on component mount
   useEffect(() => {
@@ -121,9 +121,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           const questions = await generateQuestionsForNote(id, content, title);
           console.log("Generated questions:", questions);
 
-
           console.log("Analyzing knowledge gaps...");
-          const gaps = await analyzeGapsForNote(id, content, title); // Call analyzeGapsForNote
+          const gaps = await analyzeGapsForNote(id, content, title);
           console.log("Identified gaps:", gaps);
 
           // Update the note with AI-generated data, questions, and gaps
@@ -131,18 +130,23 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
             ...noteData,
             tags,
             summary,
-            knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships }, // Assuming your analyzeNote returns keyConcepts and conceptRelationships
+            knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships },
             note_questions: questions,
-            note_gaps: gaps // Add gaps to updatedNoteData
+            note_gaps: gaps
           };
           await saveNoteToDatabase(updatedNoteData);
           console.log("Note updated with AI analysis results");
+
+          // Generate review items from the questions
+          console.log("Converting questions to review items...");
+          await generateReviewsFromNote(id);
+          console.log("Review items generated successfully");
+
         } catch (aiError) {
           console.error('AI analysis failed:', aiError);
           // Continue without AI analysis
         }
       }
-
 
       // Add to store
       await addNote({
@@ -241,7 +245,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           />
           <span className="text-sm text-gray-600 flex items-center">
             <Lightbulb className="h-4 w-4 mr-1 text-primary" />
-            Use AI to analyze content and suggest tags
+            Use AI to analyze content and generate review questions
           </span>
         </label>
       </div>
@@ -273,7 +277,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
               <>
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3"></div>
                 <p className="text-gray-600">Processing file...</p>
-                {useAI && <p className="text-sm text-gray-500">AI analysis in progress...</p>}
+                {useAI && <p className="text-sm text-gray-500">AI analysis and review generation in progress...</p>}
               </>
             ) : (
               <>
