@@ -19,7 +19,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [useAI, setUseAI] = useState(true);
-  const { addNote, generateReviewsFromNote } = useStore();
+  const { addNote } = useStore();
 
   // Check Supabase configuration on component mount
   useEffect(() => {
@@ -136,11 +136,6 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           };
           await saveNoteToDatabase(updatedNoteData);
           console.log("Note updated with AI analysis results");
-
-          // Generate review items from the questions
-          console.log("Converting questions to review items...");
-          await generateReviewsFromNote(id);
-          console.log("Review items generated successfully");
 
         } catch (aiError) {
           console.error('AI analysis failed:', aiError);
