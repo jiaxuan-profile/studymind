@@ -1,6 +1,6 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User, ReviewItem } from '../types';
+import { Note, Concept, User } from '../types';
 import { 
   getAllNotes, 
   updateNoteSummary, 
@@ -8,12 +8,6 @@ import {
   getAllConcepts
 } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
-import { 
-  loadAllReviews, 
-  saveReviewToDatabase, 
-  updateReviewInDatabase,
-  convertNoteQuestionsToReviews 
-} from '../services/reviewService';
 
 interface PaginationState {
   currentPage: number;
@@ -25,7 +19,6 @@ interface PaginationState {
 interface State {
   notes: Note[];
   concepts: Concept[];
-  reviews: ReviewItem[];
   currentNote: Note | null;
   user: User | null;
   theme: 'light' | 'dark';
@@ -46,12 +39,6 @@ interface State {
   updateConcept: (id: string, updates: Partial<Concept>) => void;
   deleteConcept: (id: string) => void;
   
-  addReview: (review: ReviewItem) => void;
-  updateReview: (id: string, updates: Partial<ReviewItem>) => void;
-  deleteReview: (id: string) => void;
-  loadReviews: () => Promise<void>;
-  generateReviewsFromNote: (noteId: string) => Promise<void>;
-  
   setUser: (user: User | null) => void;
   toggleTheme: () => void;
   resetStore: () => void;
@@ -61,7 +48,6 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   notes: [],
   concepts: [],
-  reviews: [],
   currentNote: null,
   user: null,
   theme: 'light',
@@ -181,54 +167,6 @@ export const useStore = create<State>((set, get) => ({
   deleteConcept: (id) => set((state) => ({
     concepts: state.concepts.filter((concept) => concept.id !== id),
   })),
-  
-  addReview: (review) => set((state) => ({ reviews: [...state.reviews, review] })),
-  
-  updateReview: (id, updates) => {
-    // Update in store
-    set((state) => ({
-      reviews: state.reviews.map((review) => (review.id === id ? { ...review, ...updates } : review)),
-    }));
-    
-    // Update in database
-    updateReviewInDatabase(id, updates).catch(error => {
-      console.error('Failed to update review in database:', error);
-    });
-  },
-  
-  deleteReview: (id) => set((state) => ({
-    reviews: state.reviews.filter((review) => review.id !== id),
-  })),
-
-  loadReviews: async () => {
-    try {
-      const reviews = await loadAllReviews();
-      set({ reviews });
-    } catch (error) {
-      console.error('Failed to load reviews:', error);
-      set({ error: 'Failed to load reviews' });
-    }
-  },
-
-  generateReviewsFromNote: async (noteId: string) => {
-    try {
-      const newReviews = await convertNoteQuestionsToReviews(noteId);
-      
-      // Save each review to database
-      for (const review of newReviews) {
-        await saveReviewToDatabase(review);
-      }
-      
-      // Add to store
-      set((state) => ({
-        reviews: [...state.reviews, ...newReviews]
-      }));
-      
-      console.log(`Generated ${newReviews.length} reviews from note ${noteId}`);
-    } catch (error) {
-      console.error('Failed to generate reviews from note:', error);
-    }
-  },
   
   setUser: (user) => set({ user }),
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
