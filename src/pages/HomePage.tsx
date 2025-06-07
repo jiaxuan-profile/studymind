@@ -76,7 +76,7 @@ const HomePage: React.FC = () => {
       </div>
       
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <button
           onClick={handleCreateNote}
           className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
@@ -106,12 +106,11 @@ const HomePage: React.FC = () => {
           </div>
           <span className="text-gray-800 font-medium">Explore Concepts</span>
         </Link>
-              
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Recent Notes */}
-        <div className="lg:col-span-2 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold text-gray-800">Recent Notes</h2>
             <Link to="/notes" className="text-primary hover:text-primary-dark text-sm font-medium">
@@ -159,7 +158,6 @@ const HomePage: React.FC = () => {
             </div>
           )}
         </div>        
-
       </div>
       
       {/* Concepts and Statistics */}
@@ -171,7 +169,7 @@ const HomePage: React.FC = () => {
           </Link>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 rounded-lg bg-gray-50 border border-gray-100 text-center">
             <p className="text-2xl font-bold text-primary">{notes.length}</p>
             <p className="text-gray-600">Notes</p>
@@ -181,7 +179,6 @@ const HomePage: React.FC = () => {
             <p className="text-2xl font-bold text-secondary">{concepts.length}</p>
             <p className="text-gray-600">Concepts</p>
           </div>
-
         </div>
         
         <div className="mt-4">
