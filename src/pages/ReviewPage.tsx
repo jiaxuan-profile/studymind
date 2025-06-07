@@ -21,7 +21,9 @@ import {
   Filter,
   Play,
   ChevronRight,
-  FileText
+  FileText,
+  Save,
+  Edit3
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
@@ -40,6 +42,13 @@ interface NoteWithQuestions {
   questions: Question[];
 }
 
+interface UserAnswer {
+  questionIndex: number;
+  answer: string;
+  timestamp: Date;
+  difficulty_rating?: 'easy' | 'medium' | 'hard';
+}
+
 const ReviewPage: React.FC = () => {
   const { notes } = useStore();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
@@ -48,7 +57,6 @@ const ReviewPage: React.FC = () => {
   const [notesWithQuestions, setNotesWithQuestions] = useState<NoteWithQuestions[]>([]);
   const [currentQuestions, setCurrentQuestions] = useState<(Question & { noteId: string; noteTitle: string })[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
   const [showHint, setShowHint] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [sessionStats, setSessionStats] = useState({
@@ -58,11 +66,24 @@ const ReviewPage: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [isReviewComplete, setIsReviewComplete] = useState(false);
+  
+  // New state for user answers
+  const [userAnswer, setUserAnswer] = useState('');
+  const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
+  const [isAnswerSaved, setIsAnswerSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load notes with questions on component mount
   useEffect(() => {
     loadNotesWithQuestions();
   }, []);
+
+  // Reset answer state when question changes
+  useEffect(() => {
+    setUserAnswer('');
+    setIsAnswerSaved(false);
+    setShowHint(false);
+  }, [currentQuestionIndex]);
 
   const loadNotesWithQuestions = async () => {
     setLoading(true);
@@ -130,15 +151,68 @@ const ReviewPage: React.FC = () => {
     
     setCurrentQuestions(shuffledQuestions);
     setCurrentQuestionIndex(0);
-    setShowAnswer(false);
-    setShowHint(false);
     setReviewedCount(0);
     setSessionStats({ easy: 0, medium: 0, hard: 0 });
+    setUserAnswers([]);
     setIsReviewComplete(shuffledQuestions.length === 0);
     setCurrentStep('review');
   };
 
+  const saveAnswer = async () => {
+    if (!userAnswer.trim()) return;
+    
+    setIsSaving(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const currentQuestion = currentQuestions[currentQuestionIndex];
+      
+      // Save to database
+      const { error } = await supabase
+        .from('review_answers')
+        .insert({
+          user_id: user.id,
+          note_id: currentQuestion.noteId,
+          question_text: currentQuestion.question,
+          question_index: currentQuestionIndex,
+          answer_text: userAnswer.trim(),
+          session_id: `session-${Date.now()}`, // Simple session ID
+          created_at: new Date().toISOString()
+        });
+
+      if (error) throw error;
+
+      // Save to local state
+      const newAnswer: UserAnswer = {
+        questionIndex: currentQuestionIndex,
+        answer: userAnswer.trim(),
+        timestamp: new Date()
+      };
+      
+      setUserAnswers(prev => [...prev, newAnswer]);
+      setIsAnswerSaved(true);
+      
+    } catch (error) {
+      console.error('Error saving answer:', error);
+      alert('Failed to save answer. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDifficultyResponse = (difficulty: 'easy' | 'medium' | 'hard') => {
+    // Update the answer with difficulty rating
+    if (isAnswerSaved) {
+      setUserAnswers(prev => 
+        prev.map(answer => 
+          answer.questionIndex === currentQuestionIndex 
+            ? { ...answer, difficulty_rating: difficulty }
+            : answer
+        )
+      );
+    }
+
     setReviewedCount(prev => prev + 1);
     setSessionStats(prev => ({
       ...prev,
@@ -148,8 +222,6 @@ const ReviewPage: React.FC = () => {
     const nextIndex = currentQuestionIndex + 1;
     if (nextIndex < currentQuestions.length) {
       setCurrentQuestionIndex(nextIndex);
-      setShowAnswer(false);
-      setShowHint(false);
     } else {
       setIsReviewComplete(true);
     }
@@ -161,11 +233,13 @@ const ReviewPage: React.FC = () => {
     setSelectedDifficulty('all');
     setCurrentQuestions([]);
     setCurrentQuestionIndex(0);
-    setShowAnswer(false);
     setShowHint(false);
     setReviewedCount(0);
     setSessionStats({ easy: 0, medium: 0, hard: 0 });
     setIsReviewComplete(false);
+    setUserAnswer('');
+    setUserAnswers([]);
+    setIsAnswerSaved(false);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -415,7 +489,11 @@ const ReviewPage: React.FC = () => {
             
             {reviewedCount > 0 && (
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 mb-8 inline-block">
-                <div className="grid grid-cols-3 gap-6 text-center">
+                <div className="grid grid-cols-4 gap-6 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-primary">{userAnswers.length}</div>
+                    <div className="text-sm text-gray-700">Answered</div>
+                  </div>
                   <div>
                     <div className="text-2xl font-bold text-green-600">{sessionStats.easy}</div>
                     <div className="text-sm text-green-700">Easy</div>
@@ -579,45 +657,110 @@ const ReviewPage: React.FC = () => {
                   </div>
                 )}
                 
-                {/* Self Assessment */}
+                {/* Answer Text Area */}
                 <div className="mb-8">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <Award className="h-5 w-5 text-primary mr-2" />
-                    How well did you understand this question?
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <button
-                      onClick={() => handleDifficultyResponse('hard')}
-                      className="flex items-center justify-center gap-3 p-4 border-2 border-red-200 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 transition-all"
-                    >
-                      <XCircle className="h-6 w-6" />
-                      <div className="text-left">
-                        <div className="font-semibold">Difficult</div>
-                        <div className="text-sm opacity-75">Need more practice</div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => handleDifficultyResponse('medium')}
-                      className="flex items-center justify-center gap-3 p-4 border-2 border-yellow-200 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 hover:border-yellow-300 transition-all"
-                    >
-                      <HelpCircle className="h-6 w-6" />
-                      <div className="text-left">
-                        <div className="font-semibold">Somewhat</div>
-                        <div className="text-sm opacity-75">Getting there</div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={() => handleDifficultyResponse('easy')}
-                      className="flex items-center justify-center gap-3 p-4 border-2 border-green-200 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-300 transition-all"
-                    >
-                      <CheckCircle className="h-6 w-6" />
-                      <div className="text-left">
-                        <div className="font-semibold">Easy</div>
-                        <div className="text-sm opacity-75">Well understood</div>
-                      </div>
-                    </button>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                      <Edit3 className="h-5 w-5 text-primary mr-2" />
+                      Your Answer
+                    </h3>
+                    {isAnswerSaved && (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Saved
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <textarea
+                      value={userAnswer}
+                      onChange={(e) => setUserAnswer(e.target.value)}
+                      placeholder="Type your answer here... Take your time to think through the question and provide a detailed response."
+                      className="w-full h-40 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none"
+                      disabled={isAnswerSaved}
+                    />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">
+                        {userAnswer.length} characters
+                      </span>
+                      
+                      {!isAnswerSaved ? (
+                        <button
+                          onClick={saveAnswer}
+                          disabled={!userAnswer.trim() || isSaving}
+                          className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          {isSaving ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="h-4 w-4 mr-2" />
+                              Save Answer
+                            </>
+                          )}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setIsAnswerSaved(false);
+                            setUserAnswer(userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.answer || '');
+                          }}
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                        >
+                          <Edit3 className="h-4 w-4 mr-2" />
+                          Edit Answer
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
+                
+                {/* Self Assessment - Only show if answer is saved */}
+                {isAnswerSaved && (
+                  <div className="mb-8">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                      <Award className="h-5 w-5 text-primary mr-2" />
+                      How well did you understand this question?
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <button
+                        onClick={() => handleDifficultyResponse('hard')}
+                        className="flex items-center justify-center gap-3 p-4 border-2 border-red-200 rounded-lg bg-red-50 text-red-700 hover:bg-red-100 hover:border-red-300 transition-all"
+                      >
+                        <XCircle className="h-6 w-6" />
+                        <div className="text-left">
+                          <div className="font-semibold">Difficult</div>
+                          <div className="text-sm opacity-75">Need more practice</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleDifficultyResponse('medium')}
+                        className="flex items-center justify-center gap-3 p-4 border-2 border-yellow-200 rounded-lg bg-yellow-50 text-yellow-700 hover:bg-yellow-100 hover:border-yellow-300 transition-all"
+                      >
+                        <HelpCircle className="h-6 w-6" />
+                        <div className="text-left">
+                          <div className="font-semibold">Somewhat</div>
+                          <div className="text-sm opacity-75">Getting there</div>
+                        </div>
+                      </button>
+                      <button
+                        onClick={() => handleDifficultyResponse('easy')}
+                        className="flex items-center justify-center gap-3 p-4 border-2 border-green-200 rounded-lg bg-green-50 text-green-700 hover:bg-green-100 hover:border-green-300 transition-all"
+                      >
+                        <CheckCircle className="h-6 w-6" />
+                        <div className="text-left">
+                          <div className="font-semibold">Easy</div>
+                          <div className="text-sm opacity-75">Well understood</div>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -636,6 +779,11 @@ const ReviewPage: React.FC = () => {
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">{reviewedCount}</div>
                   <div className="text-sm text-gray-600">Completed</div>
+                </div>
+                
+                <div className="text-center">
+                  <div className="text-lg font-bold text-secondary">{userAnswers.length}</div>
+                  <div className="text-sm text-gray-600">Answers Saved</div>
                 </div>
                 
                 <div className="space-y-2">
