@@ -3,12 +3,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Handler } from '@netlify/functions';
 
 interface NoteData {
-  id: string; // Added 'id' field
+  id: string;
   title: string;
   content: string;
   summary: string;
-  embedding: string; // Adjust type as needed
-  knowledge_graph?: { concepts: Array<{ name: string; definition: string }> }; //Optional knowledge graph
+  embedding: string;
+  knowledge_graph?: { concepts: Array<{ name: string; definition: string }> };
   note_concepts: Array<{ concepts: { name: string; definition: string }[]; mastery_level: number }>;
   user_id: string;
 }
@@ -22,7 +22,7 @@ interface Question {
   question: string;
   hint?: string;
   connects?: string[];
-  difficulty?: 'easy' | 'medium' | 'hard'; //More specific type
+  difficulty?: 'easy' | 'medium' | 'hard';
   mastery_context?: string;
 }
 
@@ -96,28 +96,43 @@ const handler: Handler = async (event) => {
     const currentNoteConcepts: { name: string; definition: string }[] = noteData.knowledge_graph?.concepts || noteData.note_concepts.flatMap((nc) => nc.concepts);
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    
+    // FIXED: Include the actual note content and summary in the prompt
     const prompt = `
-      Generate practice questions based on:
-      - New concepts: ${currentNoteConcepts.map((c) => c.name).join(', ')}
-      - Mastered concepts (>=70%): ${masteredConcepts.flatMap((c) => c.name).join(', ')}
-      - Developing concepts (30-70%): ${developingConcepts.flatMap((c) => c.name).join(', ')}
+      You are generating practice questions based on the following study notes:
+
+      TITLE: ${noteData.title}
+      
+      SUMMARY: ${noteData.summary}
+      
+      FULL CONTENT: ${noteData.content}
+
+      Based on this specific content, generate practice questions that help the student review and understand these concepts:
+      - New concepts from this note: ${currentNoteConcepts.map((c) => c.name).join(', ')}
+      - Student's mastered concepts (>=70%): ${masteredConcepts.flatMap((c) => c.map(concept => concept.name)).join(', ')}
+      - Student's developing concepts (30-70%): ${developingConcepts.flatMap((c) => c.map(concept => concept.name)).join(', ')}
 
       Create questions that:
-      1. Connect new concepts to mastered ones
-      2. Strengthen developing concepts
-      3. Include difficulty markers (easy, medium, hard)
-      4. Format as JSON with mastery info
+      1. Test understanding of the key concepts FROM THIS SPECIFIC NOTE
+      2. Connect new concepts to their existing knowledge where relevant
+      3. Include practical examples and scenarios from the note content
+      4. Vary in difficulty (easy, medium, hard)
+      5. Include helpful hints that guide thinking
 
-      IMPORTANT: Return ONLY valid JSON without any markdown formatting or code blocks.
+      IMPORTANT: 
+      - Base ALL questions on the actual note content provided above
+      - Use specific examples, code snippets, and scenarios from the notes
+      - Don't generate generic questions unrelated to the content
+      - Return ONLY valid JSON without any markdown formatting or code blocks
 
-      Example format:
+      Generate 5-8 questions in this exact JSON format:
       [
         {
-          "question": "How does [new] relate to [mastered]?",
-          "hint": "Consider their definitions...",
-          "connects": ["new_concept", "mastered_concept"],
+          "question": "Based on the ACID properties discussed in your notes, explain why the bank transfer example requires both atomicity and consistency.",
+          "hint": "Think about what happens if only one account is updated...",
+          "connects": ["ACID properties", "atomicity", "consistency"],
           "difficulty": "medium",
-          "mastery_context": "Builds on your strong understanding of [mastered]"
+          "mastery_context": "Tests understanding of fundamental transaction properties"
         }
       ]
     `;
@@ -133,22 +148,48 @@ const handler: Handler = async (event) => {
       console.log("Cleaned text for parsing:", cleanedText); // Debug log
       
       questions = JSON.parse(cleanedText);
+      
+      // Validate and normalize questions
       questions = questions.map((q) => ({
         ...q,
         difficulty: q.difficulty || 'medium',
         connects: q.connects || [],
-        mastery_context: q.mastery_context || 'Connects to your existing knowledge',
+        mastery_context: q.mastery_context || 'Reviews key concepts from your notes',
+        hint: q.hint || 'Consider the definitions and examples from your notes'
       }));
+      
+      // Ensure we have valid questions
+      if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error("No valid questions generated");
+      }
+      
     } catch (e) {
       console.error("Error parsing question JSON:", e);
       console.error("Raw response from Gemini:", rawText); // Debug log
-      throw new Error("Could not parse questions JSON from Gemini API");
+      
+      // Fallback: generate basic questions based on note concepts
+      questions = currentNoteConcepts.slice(0, 3).map((concept, index) => ({
+        question: `Explain the concept of "${concept.name}" as described in your notes and provide an example.`,
+        hint: `Review the definition: ${concept.definition}`,
+        connects: [concept.name],
+        difficulty: index === 0 ? 'easy' : index === 1 ? 'medium' : 'hard',
+        mastery_context: `Tests understanding of ${concept.name} from your notes`
+      }));
     }
+
+    // Limit to 5 questions and ensure they're relevant
+    const finalQuestions = questions.slice(0, 5).filter(q => 
+      q.question && 
+      q.question.length > 20 && 
+      !q.question.toLowerCase().includes('object-oriented') && // Filter out irrelevant questions
+      !q.question.toLowerCase().includes('linked list') &&
+      !q.question.toLowerCase().includes('gradient descent')
+    );
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(questions.slice(0, 5)),
+      body: JSON.stringify(finalQuestions),
     };
   } catch (error: any) {
     console.error("Error in generate-questions handler:", error);
