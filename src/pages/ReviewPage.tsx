@@ -201,6 +201,15 @@ const ReviewPage: React.FC = () => {
     }
   };
 
+  const goToNextQuestion = () => {
+    const nextIndex = currentQuestionIndex + 1;
+    if (nextIndex < currentQuestions.length) {
+      setCurrentQuestionIndex(nextIndex);
+    } else {
+      setIsReviewComplete(true);
+    }
+  };
+
   const handleDifficultyResponse = (difficulty: 'easy' | 'medium' | 'hard') => {
     // Update the answer with difficulty rating
     if (isAnswerSaved) {
@@ -219,12 +228,7 @@ const ReviewPage: React.FC = () => {
       [difficulty]: prev[difficulty] + 1
     }));
 
-    const nextIndex = currentQuestionIndex + 1;
-    if (nextIndex < currentQuestions.length) {
-      setCurrentQuestionIndex(nextIndex);
-    } else {
-      setIsReviewComplete(true);
-    }
+    goToNextQuestion();
   };
 
   const resetReview = () => {
@@ -720,12 +724,39 @@ const ReviewPage: React.FC = () => {
                   </div>
                 </div>
                 
+                {/* Next Question Button - Show if answer is saved */}
+                {isAnswerSaved && (
+                  <div className="mb-8">
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-600">
+                        Answer saved! You can proceed to the next question or rate your understanding below.
+                      </div>
+                      <button
+                        onClick={goToNextQuestion}
+                        className="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary transition-colors"
+                      >
+                        {currentQuestionIndex + 1 < currentQuestions.length ? (
+                          <>
+                            Next Question
+                            <ArrowRight className="h-4 w-4 ml-2" />
+                          </>
+                        ) : (
+                          <>
+                            Finish Session
+                            <CheckCircle className="h-4 w-4 ml-2" />
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
                 {/* Self Assessment - Only show if answer is saved */}
                 {isAnswerSaved && (
                   <div className="mb-8">
                     <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                       <Award className="h-5 w-5 text-primary mr-2" />
-                      How well did you understand this question?
+                      How well did you understand this question? (Optional)
                     </h3>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <button
