@@ -87,13 +87,25 @@ const handler: Handler = async (event) => {
 
     if (userConceptsError) {
       console.error("Error fetching user concepts:", userConceptsError);
-      throw new Error(`Error fetching user concepts: ${userConceptsError.message}`);
+      // Don't throw error, just continue with empty arrays
     }
 
-    const masteredConcepts: { name: string; definition: string }[][] = userConcepts?.length > 0 ? userConcepts.filter((uc) => uc.mastery_level >= 0.7).map((uc) => uc.concepts) : [];
-    const developingConcepts: { name: string; definition: string }[][] = userConcepts?.length > 0 ? userConcepts.filter((uc) => uc.mastery_level >= 0.3 && uc.mastery_level < 0.7).map((uc) => uc.concepts) : [];
+    console.log("Raw userConcepts data:", JSON.stringify(userConcepts, null, 2)); // Debug log
 
-    const currentNoteConcepts: { name: string; definition: string }[] = noteData.knowledge_graph?.concepts || noteData.note_concepts.flatMap((nc) => nc.concepts);
+    // Fixed: Handle cases where concepts might not be an array
+    const masteredConcepts: { name: string; definition: string }[] = userConcepts?.length > 0 
+      ? userConcepts
+          .filter((uc) => uc.mastery_level >= 0.7)
+          .flatMap((uc) => Array.isArray(uc.concepts) ? uc.concepts : [])
+      : [];
+      
+    const developingConcepts: { name: string; definition: string }[] = userConcepts?.length > 0 
+      ? userConcepts
+          .filter((uc) => uc.mastery_level >= 0.3 && uc.mastery_level < 0.7)
+          .flatMap((uc) => Array.isArray(uc.concepts) ? uc.concepts : [])
+      : [];
+
+    const currentNoteConcepts: { name: string; definition: string }[] = noteData.knowledge_graph?.concepts || noteData.note_concepts.flatMap((nc) => Array.isArray(nc.concepts) ? nc.concepts : []);
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
     
@@ -109,8 +121,8 @@ const handler: Handler = async (event) => {
 
       Based on this specific content, generate practice questions that help the student review and understand these concepts:
       - New concepts from this note: ${currentNoteConcepts.map((c) => c.name).join(', ')}
-      - Student's mastered concepts (>=70%): ${masteredConcepts.flatMap((c) => c.map(concept => concept.name)).join(', ')}
-      - Student's developing concepts (30-70%): ${developingConcepts.flatMap((c) => c.map(concept => concept.name)).join(', ')}
+      - Student's mastered concepts (>=70%): ${masteredConcepts.map(c => c.name).join(', ')}
+      - Student's developing concepts (30-70%): ${developingConcepts.map(c => c.name).join(', ')}
 
       Create questions that:
       1. Test understanding of the key concepts FROM THIS SPECIFIC NOTE
