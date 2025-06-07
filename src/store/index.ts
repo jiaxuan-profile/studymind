@@ -174,7 +174,6 @@ export const useStore = create<State>((set, get) => ({
   resetStore: () => set({
     notes: [],
     concepts: [],
-    reviews: [],
     currentNote: null,
     isLoading: false,
     error: null,
