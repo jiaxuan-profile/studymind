@@ -5,7 +5,7 @@ import {
   getAllNotes, 
   updateNoteSummary, 
   deleteNoteFromDatabase,
-  getAllConcepts // Add this import
+  getAllConcepts
 } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
 
@@ -67,20 +67,12 @@ export const useStore = create<State>((set, get) => ({
   },
   
   loadNotes: async (page = 1, pageSize = 12) => {
-    console.log("Store: Starting loadNotes function", { page, pageSize });
     set({ isLoading: true, error: null });
 
     try {
-      console.log("Store: Fetching notes from database");
       const { data, count } = await getAllNotes(page, pageSize);
       const totalPages = Math.ceil(count / pageSize);
       
-      console.log("Store: Processing notes data", {
-        notesCount: data.length,
-        totalPages,
-        totalNotes: count
-      });
-
       set({ 
         notes: data.map(note => ({
           ...note,
@@ -213,8 +205,8 @@ export const useStore = create<State>((set, get) => ({
   loadConcepts: async () => {
     set({ isLoading: true, error: null });
     try {
-      const conceptsData = await getAllConcepts();
-      set({ concepts: conceptsData, isLoading: false });
+      const { concepts } = await getAllConcepts(); // Destructure
+      set({ concepts, isLoading: false }); // Save array
     } catch (error) {
       console.error('Store: Failed to load concepts:', error);
       set({

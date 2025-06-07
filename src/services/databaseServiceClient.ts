@@ -137,14 +137,6 @@ export async function getAllNotes(page = 1, pageSize = 12) {
       console.error("Database Service: Supabase error:", error);
       throw new Error(`Failed to fetch notes: ${error.message}`);
     }
-
-    console.log("Database Service: Notes fetched successfully", {
-      page,
-      pageSize,
-      totalCount: count,
-      fetchedCount: data?.length
-    });
-
     return { data, count };
 
   } catch (error) {

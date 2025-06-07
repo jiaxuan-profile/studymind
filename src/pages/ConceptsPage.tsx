@@ -4,8 +4,9 @@ import { useStore } from '../store';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Search, Info } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../types';
-import { getAllConcepts, getConceptCategories } from '../services/databaseServiceClient';
+import { getConceptCategories } from '../services/databaseServiceClient';
 import { supabase } from '../services/supabase';
+import { Link } from 'react-router-dom';
 
 interface ConceptDetails {
   id: string;
@@ -24,7 +25,6 @@ const ConceptsPage: React.FC = () => {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [selectedConcept, setSelectedConcept] = useState<ConceptDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [highlightNodes, setHighlightNodes] = useState<Set<string>>(new Set());
   const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +69,11 @@ const ConceptsPage: React.FC = () => {
             })
             .filter(Boolean);
 
+          if (!concept) {
+            console.error("Error: concept is undefined or null");
+            return null; // Or handle the error appropriately
+          }
+
           const topCategory = getMostCommonCategory(noteCategories);
           const node: GraphNode = {
             id: concept.id,
@@ -76,7 +81,6 @@ const ConceptsPage: React.FC = () => {
             val: 1 + conceptNotes.length * 0.5,
             color: colors[topCategory] || '#94A3B8', // Default color if category not found
           };
-          console.log("Created Node:", node); // Add this log
           return node;
         });
 
@@ -97,12 +101,6 @@ const ConceptsPage: React.FC = () => {
 
     loadConceptData();
   }, []);
-
-  useEffect(() => {
-    if (graphRef.current && graphData.nodes.length > 0) {
-      graphRef.current.zoomToFit(700, 20); // Initial zoom
-    }
-  }, [graphData.nodes]);
 
   const generateCategoryColors = (categories: string[]): CategoryColors => {
     const baseColors = {
@@ -159,7 +157,6 @@ const ConceptsPage: React.FC = () => {
         .select('target_id')
         .eq('source_id', node.id);
       
-      console.log("Node to center:", node.x, node.y);
       setSelectedConcept({
         ...concept,
         noteIds: noteConceptsData?.map(nc => nc.note_id) || [],
@@ -172,8 +169,6 @@ const ConceptsPage: React.FC = () => {
         ...(relationships?.map(r => r.target_id) || [])
       ]);
 
-      setHighlightNodes(connectedNodeIds);
-
       const connectedLinkIds = new Set<string>();
       graphData.links.forEach((link) => {
         if (
@@ -184,15 +179,7 @@ const ConceptsPage: React.FC = () => {
         }
       });
 
-      setHighlightLinks(connectedLinkIds);
-
-      if (graphRef.current) {
-        // Smooth transition to selected node
-        graphRef.current.centerAt(node.x, node.y, 1000); // Smooth centering
-        setTimeout(() => {
-          graphRef.current.zoom(5, 500); // Adjust the zoom level and animation duration as needed
-        }, 10000);
-      }
+      setHighlightLinks(connectedLinkIds);      
     } catch (error) {
       console.error('Error fetching concept details:', error);
     }
@@ -200,7 +187,6 @@ const ConceptsPage: React.FC = () => {
 
   const handleSearch = () => {
     if (!searchTerm) {
-      setHighlightNodes(new Set());
       setHighlightLinks(new Set());
       setSelectedConcept(null);
       return;
@@ -300,7 +286,7 @@ const ConceptsPage: React.FC = () => {
                 }}
                 onNodeClick={handleNodeClick}
                 cooldownTicks={100}
-                onEngineStop={() => graphRef.current?.zoomToFit(1000, 30)}
+                onEngineStop={() => graphRef.current?.zoomToFit(100, 20)}
               />
             ) : (
               <div className="flex items-center justify-center h-full">
@@ -333,8 +319,8 @@ const ConceptsPage: React.FC = () => {
                       const note = notes.find((n) => n.id === noteId);
                       return note ? (
                         <li key={noteId}>
-                          <a
-                            href={`/notes/${noteId}`}
+                          <Link
+                            to={`/notes/${noteId}`}
                             className="block p-2 rounded-md border border-gray-100 hover:border-gray-300 hover:bg-gray-50"
                           >
                             <span className="font-medium text-primary">{note.title}</span>
@@ -348,7 +334,7 @@ const ConceptsPage: React.FC = () => {
                                 </span>
                               ))}
                             </div>
-                          </a>
+                          </Link>
                         </li>
                       ) : null;
                     })}
@@ -395,28 +381,6 @@ const ConceptsPage: React.FC = () => {
                 <p className="mt-1 text-gray-500">Click on a node in the graph to view details</p>
               </div>
             )}
-          </div>
-
-          {/* Graph Legend */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3">
-              <h3 className="text-sm font-medium text-gray-900 mb-2">Graph Legend</h3>
-              <div className="space-y-2">
-                {categories.map(category => (
-                  <div key={category} className="flex items-center">
-                    <span 
-                      className="h-4 w-4 rounded-full mr-2" 
-                      style={{ backgroundColor: categoryColors[category] }}
-                    />
-                    <span className="text-sm text-gray-600">{category}</span>
-                  </div>
-                ))}
-                <div className="flex items-center">
-                  <span className="h-4 w-4 rounded-full bg-gray-400 mr-2" />
-                  <span className="text-sm text-gray-600">Uncategorized</span>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       </div>

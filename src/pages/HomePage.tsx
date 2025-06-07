@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { PlusCircle, Clock, BookOpen, BrainCircuit, Search, GraduationCap } from 'lucide-react';
@@ -7,6 +7,10 @@ const HomePage: React.FC = () => {
   const { notes, concepts, reviews, isLoading, error } = useStore();
   const navigate = useNavigate();
   
+  useEffect(() => {
+    useStore.getState().loadConcepts();
+  }, []);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
