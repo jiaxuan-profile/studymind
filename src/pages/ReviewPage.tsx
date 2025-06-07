@@ -23,7 +23,8 @@ import {
   ChevronRight,
   FileText,
   Save,
-  Edit3
+  Edit3,
+  History
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
@@ -49,9 +50,25 @@ interface UserAnswer {
   difficulty_rating?: 'easy' | 'medium' | 'hard';
 }
 
+interface ReviewSession {
+  id: string;
+  session_name?: string;
+  selected_notes: string[];
+  selected_difficulty: string;
+  total_questions: number;
+  questions_answered: number;
+  questions_rated: number;
+  session_status: 'in_progress' | 'completed' | 'abandoned';
+  started_at: string;
+  completed_at?: string;
+  easy_ratings: number;
+  medium_ratings: number;
+  hard_ratings: number;
+}
+
 const ReviewPage: React.FC = () => {
   const { notes } = useStore();
-  const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
+  const [currentStep, setCurrentStep] = useState<'select' | 'review' | 'history'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
   const [notesWithQuestions, setNotesWithQuestions] = useState<NoteWithQuestions[]>([]);
@@ -67,6 +84,10 @@ const ReviewPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isReviewComplete, setIsReviewComplete] = useState(false);
   
+  // Session tracking
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [reviewSessions, setReviewSessions] = useState<ReviewSession[]>([]);
+  
   // New state for user answers
   const [userAnswer, setUserAnswer] = useState('');
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
@@ -76,6 +97,7 @@ const ReviewPage: React.FC = () => {
   // Load notes with questions on component mount
   useEffect(() => {
     loadNotesWithQuestions();
+    loadReviewSessions();
   }, []);
 
   // Reset answer state when question changes
@@ -120,6 +142,81 @@ const ReviewPage: React.FC = () => {
     }
   };
 
+  const loadReviewSessions = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const { data: sessions, error } = await supabase
+        .from('review_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('started_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      setReviewSessions(sessions || []);
+    } catch (error) {
+      console.error('Error loading review sessions:', error);
+    }
+  };
+
+  const createReviewSession = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      const totalQuestions = selectedNotes.reduce((total, noteId) => {
+        const note = notesWithQuestions.find(n => n.id === noteId);
+        if (!note) return total;
+        return total + note.questions.filter(q => 
+          selectedDifficulty === 'all' || q.difficulty === selectedDifficulty
+        ).length;
+      }, 0);
+
+      const sessionName = `Review Session - ${new Date().toLocaleDateString()}`;
+
+      const { data: session, error } = await supabase
+        .from('review_sessions')
+        .insert({
+          user_id: user.id,
+          session_name: sessionName,
+          selected_notes: selectedNotes,
+          selected_difficulty: selectedDifficulty,
+          total_questions: totalQuestions,
+          session_status: 'in_progress'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setCurrentSessionId(session.id);
+      return session.id;
+    } catch (error) {
+      console.error('Error creating review session:', error);
+      throw error;
+    }
+  };
+
+  const completeReviewSession = async () => {
+    if (!currentSessionId) return;
+
+    try {
+      const { error } = await supabase
+        .from('review_sessions')
+        .update({
+          session_status: 'completed',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', currentSessionId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error completing review session:', error);
+    }
+  };
+
   const handleNoteSelection = (noteId: string) => {
     setSelectedNotes(prev => 
       prev.includes(noteId) 
@@ -128,38 +225,46 @@ const ReviewPage: React.FC = () => {
     );
   };
 
-  const startReview = () => {
-    const questions: (Question & { noteId: string; noteTitle: string })[] = [];
-    
-    selectedNotes.forEach(noteId => {
-      const noteWithQuestions = notesWithQuestions.find(n => n.id === noteId);
-      if (noteWithQuestions) {
-        noteWithQuestions.questions.forEach(question => {
-          if (selectedDifficulty === 'all' || question.difficulty === selectedDifficulty) {
-            questions.push({
-              ...question,
-              noteId: noteWithQuestions.id,
-              noteTitle: noteWithQuestions.title
-            });
-          }
-        });
-      }
-    });
+  const startReview = async () => {
+    try {
+      const questions: (Question & { noteId: string; noteTitle: string })[] = [];
+      
+      selectedNotes.forEach(noteId => {
+        const noteWithQuestions = notesWithQuestions.find(n => n.id === noteId);
+        if (noteWithQuestions) {
+          noteWithQuestions.questions.forEach(question => {
+            if (selectedDifficulty === 'all' || question.difficulty === selectedDifficulty) {
+              questions.push({
+                ...question,
+                noteId: noteWithQuestions.id,
+                noteTitle: noteWithQuestions.title
+              });
+            }
+          });
+        }
+      });
 
-    // Shuffle questions for variety
-    const shuffledQuestions = questions.sort(() => Math.random() - 0.5);
-    
-    setCurrentQuestions(shuffledQuestions);
-    setCurrentQuestionIndex(0);
-    setReviewedCount(0);
-    setSessionStats({ easy: 0, medium: 0, hard: 0 });
-    setUserAnswers([]);
-    setIsReviewComplete(shuffledQuestions.length === 0);
-    setCurrentStep('review');
+      // Shuffle questions for variety
+      const shuffledQuestions = questions.sort(() => Math.random() - 0.5);
+      
+      // Create session in database
+      await createReviewSession();
+      
+      setCurrentQuestions(shuffledQuestions);
+      setCurrentQuestionIndex(0);
+      setReviewedCount(0);
+      setSessionStats({ easy: 0, medium: 0, hard: 0 });
+      setUserAnswers([]);
+      setIsReviewComplete(shuffledQuestions.length === 0);
+      setCurrentStep('review');
+    } catch (error) {
+      console.error('Error starting review:', error);
+      alert('Failed to start review session. Please try again.');
+    }
   };
 
   const saveAnswer = async () => {
-    if (!userAnswer.trim()) return;
+    if (!userAnswer.trim() || !currentSessionId) return;
     
     setIsSaving(true);
     try {
@@ -173,12 +278,11 @@ const ReviewPage: React.FC = () => {
         .from('review_answers')
         .insert({
           user_id: user.id,
+          session_id: currentSessionId,
           note_id: currentQuestion.noteId,
           question_text: currentQuestion.question,
           question_index: currentQuestionIndex,
-          answer_text: userAnswer.trim(),
-          session_id: `session-${Date.now()}`, // Simple session ID
-          created_at: new Date().toISOString()
+          answer_text: userAnswer.trim()
         });
 
       if (error) throw error;
@@ -206,29 +310,49 @@ const ReviewPage: React.FC = () => {
     if (nextIndex < currentQuestions.length) {
       setCurrentQuestionIndex(nextIndex);
     } else {
+      completeReviewSession();
       setIsReviewComplete(true);
     }
   };
 
-  const handleDifficultyResponse = (difficulty: 'easy' | 'medium' | 'hard') => {
-    // Update the answer with difficulty rating
-    if (isAnswerSaved) {
-      setUserAnswers(prev => 
-        prev.map(answer => 
-          answer.questionIndex === currentQuestionIndex 
-            ? { ...answer, difficulty_rating: difficulty }
-            : answer
-        )
-      );
+  const handleDifficultyResponse = async (difficulty: 'easy' | 'medium' | 'hard') => {
+    if (!currentSessionId) return;
+
+    try {
+      // Update the answer with difficulty rating in database
+      const currentQuestion = currentQuestions[currentQuestionIndex];
+      
+      const { error } = await supabase
+        .from('review_answers')
+        .update({ difficulty_rating: difficulty })
+        .eq('session_id', currentSessionId)
+        .eq('question_index', currentQuestionIndex);
+
+      if (error) throw error;
+
+      // Update local state
+      if (isAnswerSaved) {
+        setUserAnswers(prev => 
+          prev.map(answer => 
+            answer.questionIndex === currentQuestionIndex 
+              ? { ...answer, difficulty_rating: difficulty }
+              : answer
+          )
+        );
+      }
+
+      setReviewedCount(prev => prev + 1);
+      setSessionStats(prev => ({
+        ...prev,
+        [difficulty]: prev[difficulty] + 1
+      }));
+
+      goToNextQuestion();
+    } catch (error) {
+      console.error('Error saving difficulty rating:', error);
+      // Still proceed to next question even if rating fails
+      goToNextQuestion();
     }
-
-    setReviewedCount(prev => prev + 1);
-    setSessionStats(prev => ({
-      ...prev,
-      [difficulty]: prev[difficulty] + 1
-    }));
-
-    goToNextQuestion();
   };
 
   const resetReview = () => {
@@ -244,6 +368,7 @@ const ReviewPage: React.FC = () => {
     setUserAnswer('');
     setUserAnswers([]);
     setIsAnswerSaved(false);
+    setCurrentSessionId(null);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -266,17 +391,129 @@ const ReviewPage: React.FC = () => {
 
   const currentQuestion = currentQuestions[currentQuestionIndex];
 
+  // History View
+  if (currentStep === 'history') {
+    return (
+      <div className="fade-in">
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <History className="h-8 w-8 text-primary mr-3" />
+              Review History
+            </h1>
+            <p className="mt-2 text-gray-600">
+              View your past review sessions and track your progress
+            </p>
+          </div>
+          <button
+            onClick={() => setCurrentStep('select')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Review
+          </button>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="p-6">
+            {reviewSessions.length === 0 ? (
+              <div className="text-center py-12">
+                <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Review Sessions Yet</h3>
+                <p className="text-gray-600 mb-4">
+                  Start your first review session to see your progress here.
+                </p>
+                <button
+                  onClick={() => setCurrentStep('select')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  Start Review Session
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {reviewSessions.map((session) => (
+                  <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">
+                          {session.session_name || `Session ${session.id.slice(0, 8)}`}
+                        </h3>
+                        <div className="mt-2 flex items-center space-x-4 text-sm text-gray-600">
+                          <span>
+                            {session.questions_answered}/{session.total_questions} answered
+                          </span>
+                          <span>
+                            {session.questions_rated} rated
+                          </span>
+                          <span className="capitalize">
+                            {session.selected_difficulty} difficulty
+                          </span>
+                        </div>
+                        <div className="mt-2 flex items-center space-x-2">
+                          {session.easy_ratings > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                              {session.easy_ratings} easy
+                            </span>
+                          )}
+                          {session.medium_ratings > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                              {session.medium_ratings} medium
+                            </span>
+                          )}
+                          {session.hard_ratings > 0 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                              {session.hard_ratings} hard
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          session.session_status === 'completed' 
+                            ? 'bg-green-100 text-green-800'
+                            : session.session_status === 'in_progress'
+                            ? 'bg-blue-100 text-blue-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {session.session_status.replace('_', ' ')}
+                        </div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          {new Date(session.started_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (currentStep === 'select') {
     return (
       <div className="fade-in">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <GraduationCap className="h-8 w-8 text-primary mr-3" />
-            Review Session Setup
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Select notes and difficulty level to start your review session
-          </p>
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 flex items-center">
+              <GraduationCap className="h-8 w-8 text-primary mr-3" />
+              Review Session Setup
+            </h1>
+            <p className="mt-2 text-gray-600">
+              Select notes and difficulty level to start your review session
+            </p>
+          </div>
+          <button
+            onClick={() => setCurrentStep('history')}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <History className="h-4 w-4 mr-2" />
+            View History
+          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -522,6 +759,13 @@ const ReviewPage: React.FC = () => {
                 <RefreshCw className="h-5 w-5 mr-2" />
                 Start New Session
               </button>
+              <button
+                onClick={() => setCurrentStep('history')}
+                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              >
+                <History className="h-5 w-5 mr-2" />
+                View History
+              </button>
               <Link
                 to="/notes"
                 className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
@@ -545,6 +789,11 @@ const ReviewPage: React.FC = () => {
             </h1>
             <p className="mt-2 text-gray-600">
               Question {currentQuestionIndex + 1} of {currentQuestions.length}
+              {currentSessionId && (
+                <span className="ml-2 text-sm text-gray-500">
+                  Session ID: {currentSessionId.slice(0, 8)}
+                </span>
+              )}
             </p>
           </div>
           <button
