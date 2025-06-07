@@ -1,0 +1,88 @@
+import { Concept } from '../types';
+
+export const demoConcepts: Concept[] = [
+  {
+    id: '1',
+    name: 'Neural Networks',
+    description: 'A computational model inspired by the human brain that consists of interconnected nodes (neurons) organized in layers.',
+    noteIds: ['1'],
+    relatedConceptIds: ['2', '4'],
+  },
+  {
+    id: '2',
+    name: 'Machine Learning',
+    description: 'A field of study that gives computers the ability to learn without being explicitly programmed.',
+    noteIds: ['1'],
+    relatedConceptIds: ['1', '3'],
+  },
+  {
+    id: '3',
+    name: 'Artificial Intelligence',
+    description: 'The simulation of human intelligence processes by machines, especially computer systems.',
+    noteIds: ['1'],
+    relatedConceptIds: ['2'],
+  },
+  {
+    id: '4',
+    name: 'Activation Functions',
+    description: 'Mathematical equations that determine the output of a neural network node.',
+    noteIds: ['1'],
+    relatedConceptIds: ['1'],
+  },
+  {
+    id: '5',
+    name: 'Cell Membrane',
+    description: 'A biological membrane that separates the interior of a cell from the outside environment.',
+    noteIds: ['2'],
+    relatedConceptIds: ['6', '7'],
+  },
+  {
+    id: '6',
+    name: 'Organelles',
+    description: 'Specialized structures within a cell that perform specific functions.',
+    noteIds: ['2'],
+    relatedConceptIds: ['5', '7', '8'],
+  },
+  {
+    id: '7',
+    name: 'Mitochondria',
+    description: 'Organelles responsible for producing energy through cellular respiration.',
+    noteIds: ['2'],
+    relatedConceptIds: ['6', '8'],
+  },
+  {
+    id: '8',
+    name: 'Cell Division',
+    description: 'The process by which a parent cell divides into two or more daughter cells.',
+    noteIds: ['2'],
+    relatedConceptIds: ['6', '7'],
+  },
+  {
+    id: '9',
+    name: 'Calculus',
+    description: 'A branch of mathematics that deals with the finding and properties of derivatives and integrals of functions.',
+    noteIds: ['3'],
+    relatedConceptIds: ['10', '11', '12'],
+  },
+  {
+    id: '10',
+    name: 'Limits',
+    description: 'The value that a function approaches as the input approaches some value.',
+    noteIds: ['3'],
+    relatedConceptIds: ['9', '11'],
+  },
+  {
+    id: '11',
+    name: 'Derivatives',
+    description: 'A way to show the rate of change of a function with respect to one of its variables.',
+    noteIds: ['3'],
+    relatedConceptIds: ['9', '10', '12'],
+  },
+  {
+    id: '12',
+    name: 'Integrals',
+    description: 'A mathematical object that can be interpreted as an area or a generalization of area.',
+    noteIds: ['3'],
+    relatedConceptIds: ['9', '11'],
+  },
+];

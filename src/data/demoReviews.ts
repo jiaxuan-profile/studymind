@@ -1,0 +1,58 @@
+import { ReviewItem } from '../types';
+
+export const demoReviews: ReviewItem[] = [
+  {
+    id: '1',
+    question: 'What are the key components of a neural network?',
+    answer: 'The key components of a neural network are neurons, layers (input, hidden, output), and activation functions.',
+    noteId: '1',
+    lastReviewed: new Date('2023-05-18'),
+    nextReviewDate: new Date('2023-05-22'),
+    difficulty: 'medium',
+  },
+  {
+    id: '2',
+    question: 'Describe the training process for neural networks.',
+    answer: '1. Forward Propagation: Data flows through the network\n2. Loss Calculation: Measure how far the prediction is from the target\n3. Backpropagation: Adjusts weights to minimize loss\n4. Optimization: Updates weights using algorithms like Gradient Descent',
+    noteId: '1',
+    lastReviewed: null,
+    nextReviewDate: new Date('2023-05-16'),
+    difficulty: 'hard',
+  },
+  {
+    id: '3',
+    question: 'What is the cell membrane and what is its function?',
+    answer: 'The cell membrane is a phospholipid bilayer with embedded proteins that controls what enters and exits the cell and maintains cell integrity.',
+    noteId: '2',
+    lastReviewed: new Date('2023-05-22'),
+    nextReviewDate: new Date('2023-05-26'),
+    difficulty: 'easy',
+  },
+  {
+    id: '4',
+    question: 'What are mitochondria and what is their function?',
+    answer: 'Mitochondria are the powerhouse of the cell. They produce ATP through cellular respiration and have their own DNA (mitochondrial DNA).',
+    noteId: '2',
+    lastReviewed: null,
+    nextReviewDate: new Date('2023-05-21'),
+    difficulty: 'medium',
+  },
+  {
+    id: '5',
+    question: 'What is the derivative of x^n?',
+    answer: 'The derivative of x^n is nx^(n-1) (Power Rule).',
+    noteId: '3',
+    lastReviewed: new Date('2023-06-03'),
+    nextReviewDate: new Date('2023-06-07'),
+    difficulty: 'easy',
+  },
+  {
+    id: '6',
+    question: 'State the Fundamental Theorem of Calculus.',
+    answer: 'The Fundamental Theorem of Calculus states that ∫[a,b] f(x) dx = F(b) - F(a), where F\'(x) = f(x).',
+    noteId: '3',
+    lastReviewed: null,
+    nextReviewDate: new Date('2023-06-02'),
+    difficulty: 'hard',
+  },
+];
