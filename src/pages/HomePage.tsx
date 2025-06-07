@@ -1,15 +1,14 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { PlusCircle, Clock, BookOpen, BrainCircuit, Search, GraduationCap } from 'lucide-react';
+import { PlusCircle, Clock, BookOpen, BrainCircuit, GraduationCap } from 'lucide-react';
 
 const HomePage: React.FC = () => {
-  const { notes, concepts, reviews, isLoading, error, loadReviews } = useStore();
+  const { notes, concepts, isLoading, error } = useStore();
   const navigate = useNavigate();
   
   useEffect(() => {
     useStore.getState().loadConcepts();
-    useStore.getState().loadReviews();
   }, []);
 
   if (isLoading) {
@@ -41,11 +40,6 @@ const HomePage: React.FC = () => {
   const recentNotes = [...notes]
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     .slice(0, 3);
-  
-  // Get due reviews
-  const dueReviews = reviews.filter(
-    (review) => review.nextReviewDate <= new Date()
-  );
 
   const handleCreateNote = async () => {
     try {
@@ -112,21 +106,7 @@ const HomePage: React.FC = () => {
           </div>
           <span className="text-gray-800 font-medium">Explore Concepts</span>
         </Link>
-        
-        <Link
-          to="/review"
-          className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow"
-        >
-          <div className="h-12 w-12 bg-success/10 rounded-full flex items-center justify-center mb-3">
-            <GraduationCap className="h-6 w-6 text-success" />
-          </div>
-          <span className="text-gray-800 font-medium">Study Review</span>
-          {dueReviews.length > 0 && (
-            <span className="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-              {dueReviews.length} due
-            </span>
-          )}
-        </Link>
+              
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -178,67 +158,8 @@ const HomePage: React.FC = () => {
               </Link>
             </div>
           )}
-        </div>
-        
-        {/* Review Cards */}
-        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Due for Review</h2>
-            <Link to="/review" className="text-primary hover:text-primary-dark text-sm font-medium">
-              Review All
-            </Link>
-          </div>
-          
-          {dueReviews.length > 0 ? (
-            <div className="space-y-3">
-              {dueReviews.slice(0, 3).map((review) => (
-                <div key={review.id} className="p-3 rounded-lg bg-gray-50 border border-gray-100">
-                  <p className="font-medium text-gray-800 text-sm line-clamp-2">{review.question}</p>
-                  <div className="mt-2 flex justify-between items-center">
-                    <span className="text-xs text-gray-500">
-                      From: {notes.find(n => n.id === review.noteId)?.title}
-                    </span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      review.difficulty === 'easy' 
-                        ? 'bg-green-100 text-green-800' 
-                        : review.difficulty === 'medium'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {review.difficulty}
-                    </span>
-                  </div>
-                  {review.connects && review.connects.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {review.connects.slice(0, 2).map((concept, i) => (
-                        <span
-                          key={i}
-                          className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary"
-                        >
-                          {concept}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-              
-              <Link
-                to="/review"
-                className="mt-4 w-full inline-flex justify-center items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-              >
-                Start Review Session
-              </Link>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No reviews due.</p>
-              <p className="text-sm text-gray-400 mt-1">
-                Reviews are automatically generated from your notes.
-              </p>
-            </div>
-          )}
-        </div>
+        </div>        
+
       </div>
       
       {/* Concepts and Statistics */}
@@ -260,16 +181,7 @@ const HomePage: React.FC = () => {
             <p className="text-2xl font-bold text-secondary">{concepts.length}</p>
             <p className="text-gray-600">Concepts</p>
           </div>
-          
-          <div className="p-4 rounded-lg bg-gray-50 border border-gray-100 text-center">
-            <p className="text-2xl font-bold text-accent">{reviews.length}</p>
-            <p className="text-gray-600">Review Items</p>
-          </div>
 
-          <div className="p-4 rounded-lg bg-gray-50 border border-gray-100 text-center">
-            <p className="text-2xl font-bold text-success">{dueReviews.length}</p>
-            <p className="text-gray-600">Due Today</p>
-          </div>
         </div>
         
         <div className="mt-4">
