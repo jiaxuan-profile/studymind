@@ -1,6 +1,6 @@
 # StudyMind - AI-Powered Study Assistant
 
-StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, and vector similarity search for related content.
+StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, and integrated focus time management.
 
 ## Learning Approach
 
@@ -18,6 +18,50 @@ StudyMind supports both formative and summative assessment strategies:
 - **Knowledge Synthesis**: Connect concepts across different topics
 - **Mock Tests**: Generate exam-style questions to assess overall understanding
 - **Performance Analytics**: Track your readiness for final assessments
+
+## Key Features
+
+### 📝 Smart Note Taking
+- Markdown support with live preview
+- Automatic tag suggestions
+- AI-powered concept extraction
+- Multi-format document import (PDF, DOCX, MD, TXT)
+
+### 🧠 AI-Powered Analysis
+- Automatic content summarization
+- Key concept identification and definition
+- Vector similarity search for related content
+- Intelligent question generation
+
+### 📊 Knowledge Graph
+- Visual concept mapping and relationships
+- Interactive exploration of connections
+- Relationship discovery between ideas
+
+### 🎓 Advanced Review System
+- **Session-Based Learning**: Track progress across multiple study sessions
+- **Wizard-Style Setup**: Easy note and difficulty selection with question type options
+- **Multiple Question Types**: Short answer, multiple choice (coming soon), and open-ended questions (coming soon)
+- **Answer Persistence**: All responses saved with session context
+- **Self-Assessment**: Rate your understanding for each question
+- **Progress Analytics**: View completion rates and difficulty distributions
+- **Review History**: Access past sessions and track improvement over time
+
+### ⏰ Pomodoro Focus Timer
+- **Integrated Focus Sessions**: Built-in Pomodoro timer to enhance study productivity
+- **Customizable Intervals**: Adjust work periods (1-120 minutes), short breaks (1-30 minutes), and long breaks (1-60 minutes)
+- **Cycle Management**: Configure cycles before long breaks (2-10 cycles)
+- **Session Tracking**: Monitor completed pomodoros, total focus time, and current streak
+- **Smart Notifications**: Audio alerts and browser notifications for session transitions
+- **Minimizable Widget**: Compact view that doesn't interfere with your workflow
+- **Session Statistics**: Track your daily productivity and focus patterns
+
+### 📈 Learning Analytics
+- Session completion tracking
+- Difficulty rating analysis
+- Progress monitoring over time
+- Performance insights and trends
+- Focus time analytics and productivity metrics
 
 ## Database Setup
 
@@ -42,12 +86,23 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - Automatic statistics calculation
    - Session progress monitoring
 
+5. **Session Duration Tracking** (`20250608194500_sturdy_vine.sql`)
+   - Duration tracking for review sessions
+
 ## Recent Updates
 
-### ✅ Session-Based Review Tracking (Latest)
+### ✅ Integrated Pomodoro Focus Timer (Latest)
+- **Productivity Enhancement**: Built-in focus timer to complement study sessions
+- **Customizable Settings**: Personalize work/break intervals and notification preferences
+- **Progress Tracking**: Monitor focus time alongside learning progress
+- **Seamless Integration**: Timer widget that works alongside all study features
+- **Session Persistence**: Settings and statistics saved across browser sessions
+
+### ✅ Session-Based Review Tracking
 - **Wizard-Style Review Flow**: Step-by-step review session setup
 - **Note Selection**: Choose specific notes to review
 - **Difficulty Filtering**: Filter questions by easy/medium/hard difficulty
+- **Question Type Selection**: Choose between different question formats (short answer available, MCQ and open-ended coming soon)
 - **Session Management**: Each review session gets a unique ID for tracking
 - **Answer Storage**: All answers are saved with session context
 - **Progress Tracking**: Real-time session statistics and completion tracking
@@ -96,39 +151,6 @@ Start the development server:
 ```bash
 npm run dev
 ```
-
-## Features
-
-### 📝 Smart Note Taking
-- Markdown support with live preview
-- Automatic tag suggestions
-- AI-powered concept extraction
-- Multi-format document import (PDF, DOCX, MD, TXT)
-
-### 🧠 AI-Powered Analysis
-- Automatic content summarization
-- Key concept identification and definition
-- Vector similarity search for related content
-- Intelligent question generation
-
-### 📊 Knowledge Graph
-- Visual concept mapping and relationships
-- Interactive exploration of connections
-- Relationship discovery between ideas
-
-### 🎓 Advanced Review System
-- **Session-Based Learning**: Track progress across multiple study sessions
-- **Wizard-Style Setup**: Easy note and difficulty selection
-- **Answer Persistence**: All responses saved with session context
-- **Self-Assessment**: Rate your understanding for each question
-- **Progress Analytics**: View completion rates and difficulty distributions
-- **Review History**: Access past sessions and track improvement over time
-
-### 📈 Learning Analytics
-- Session completion tracking
-- Difficulty rating analysis
-- Progress monitoring over time
-- Performance insights and trends
 
 ## Architecture
 

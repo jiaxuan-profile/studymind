@@ -6,7 +6,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { 
   GraduationCap, Lightbulb, CheckCircle, XCircle, HelpCircle, ArrowRight, ArrowLeft,
   RefreshCw, Brain, Target, BookOpen, Zap, TrendingUp, Award, Play, FileText, Save,
-  Edit3, History, Clock
+  Edit3, History, Clock, List, MessageSquare, FileQuestion
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
@@ -33,11 +33,14 @@ interface UserAnswer {
   difficulty_rating?: 'easy' | 'medium' | 'hard';
 }
 
+type QuestionType = 'short' | 'mcq' | 'open';
+
 const ReviewPage: React.FC = () => {
   const { notes } = useStore();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
+  const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>('short');
   const [notesWithQuestions, setNotesWithQuestions] = useState<NoteWithQuestions[]>([]);
   const [currentQuestions, setCurrentQuestions] = useState<(Question & { noteId: string; noteTitle: string })[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -275,6 +278,7 @@ const ReviewPage: React.FC = () => {
     setCurrentStep('select');
     setSelectedNotes([]);
     setSelectedDifficulty('all');
+    setSelectedQuestionType('short');
     setCurrentQuestions([]);
     setCurrentQuestionIndex(0);
     setShowHint(false);
@@ -305,6 +309,24 @@ const ReviewPage: React.FC = () => {
     }
   };
 
+  const getQuestionTypeIcon = (type: QuestionType) => {
+    switch (type) {
+      case 'short': return <MessageSquare className="h-4 w-4" />;
+      case 'mcq': return <List className="h-4 w-4" />;
+      case 'open': return <FileQuestion className="h-4 w-4" />;
+      default: return <MessageSquare className="h-4 w-4" />;
+    }
+  };
+
+  const getQuestionTypeColor = (type: QuestionType) => {
+    switch (type) {
+      case 'short': return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'mcq': return 'text-purple-600 bg-purple-50 border-purple-200';
+      case 'open': return 'text-indigo-600 bg-indigo-50 border-indigo-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
+  };
+
   const currentQuestion = currentQuestions[currentQuestionIndex];
 
   // RENDER SELECT STEP
@@ -314,7 +336,7 @@ const ReviewPage: React.FC = () => {
         <div className="mb-6 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center"><GraduationCap className="h-8 w-8 text-primary mr-3" />Review Session Setup</h1>
-            <p className="mt-2 text-gray-600">Select notes and difficulty level to start your review session</p>
+            <p className="mt-2 text-gray-600">Select notes, difficulty level, and question type to start your review session</p>
           </div>
           <Link to="/history" className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             <History className="h-4 w-4 mr-2" /> View History
@@ -472,6 +494,62 @@ const ReviewPage: React.FC = () => {
             </div>
 
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+              <div className="bg-gradient-to-r from-secondary/10 to-primary/10 px-6 py-4 border-b border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900 flex items-center">
+                  <span className="bg-secondary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">3</span>
+                  Question Type
+                </h2>
+              </div>
+
+              <div className="p-6 space-y-4">
+                {(['short', 'mcq', 'open'] as const).map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedQuestionType(type)}
+                    disabled={type !== 'short'}
+                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                      selectedQuestionType === type
+                        ? 'border-primary bg-primary/5'
+                        : type === 'short'
+                        ? 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-60'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center">
+                        {getQuestionTypeIcon(type)}
+                        <span className="font-medium ml-2 capitalize">
+                          {type === 'short' && 'Short Answer'}
+                          {type === 'mcq' && 'Multiple Choice'}
+                          {type === 'open' && 'Open Ended'}
+                        </span>
+                        {type !== 'short' && (
+                          <span className="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                            Coming Soon
+                          </span>
+                        )}
+                      </div>
+                      <div className={`w-4 h-4 rounded-full border-2 ${
+                        selectedQuestionType === type
+                          ? 'border-primary bg-primary'
+                          : 'border-gray-300'
+                      }`}>
+                        {selectedQuestionType === type && (
+                          <div className="w-full h-full rounded-full bg-primary"></div>
+                        )}
+                      </div>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {type === 'short' && 'Written responses to test understanding'}
+                      {type === 'mcq' && 'Quick assessment with multiple options'}
+                      {type === 'open' && 'Extended responses for deep analysis'}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
               <div className="p-6">
                 <h3 className="font-semibold text-gray-900 mb-4 flex items-center">
                   <TrendingUp className="h-5 w-5 mr-2" />
@@ -493,14 +571,31 @@ const ReviewPage: React.FC = () => {
                       <div className="text-sm text-gray-600">Total Questions</div>
                     </div>
 
+                    <div className="text-center">
+                      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getQuestionTypeColor(selectedQuestionType)}`}>
+                        {getQuestionTypeIcon(selectedQuestionType)}
+                        <span className="ml-1 capitalize">
+                          {selectedQuestionType === 'short' && 'Short Answer'}
+                          {selectedQuestionType === 'mcq' && 'Multiple Choice'}
+                          {selectedQuestionType === 'open' && 'Open Ended'}
+                        </span>
+                      </div>
+                    </div>
+
                     <button
                       onClick={startReview}
-                      disabled={selectedNotes.length === 0}
+                      disabled={selectedNotes.length === 0 || selectedQuestionType !== 'short'}
                       className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     >
                       <Play className="h-5 w-5 mr-2" />
                       Start Review Session
                     </button>
+
+                    {selectedQuestionType !== 'short' && (
+                      <p className="text-xs text-gray-500 text-center">
+                        Only short answer questions are currently available
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4">
