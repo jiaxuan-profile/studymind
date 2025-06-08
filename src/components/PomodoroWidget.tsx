@@ -398,7 +398,7 @@ const PomodoroWidget: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-3xl">
         {isMinimized ? (
           /* Minimized View */
-          <div className="p-4 flex items-center space-x-3 cursor-pointer" onClick={() => setIsMinimized(false)}>
+          <div className="p-4 flex items-center space-x-3 cursor-pointer\" onClick={() => setIsMinimized(false)}>
             <div className={`p-2 rounded-full ${stateInfo.color}`}>
               <StateIcon className="h-5 w-5" />
             </div>
