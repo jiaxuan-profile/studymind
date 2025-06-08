@@ -5,9 +5,9 @@ import {
   getAllNotes, 
   updateNoteSummary, 
   deleteNoteFromDatabase,
-  getAllConcepts
 } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
+import { supabase } from '../services/supabase';
 
 interface PaginationState {
   currentPage: number;
@@ -16,9 +16,17 @@ interface PaginationState {
   totalNotes: number;
 }
 
+interface ConceptRelationship {
+  source_id: string;
+  target_id: string;
+  strength: number;
+}
+
 interface State {
   notes: Note[];
   concepts: Concept[];
+  relationships: ConceptRelationship[];
+  linkedConcepts: Concept[];
   currentNote: Note | null;
   user: User | null;
   theme: 'light' | 'dark';
@@ -48,6 +56,7 @@ interface State {
 export const useStore = create<State>((set, get) => ({
   notes: [],
   concepts: [],
+  relationships: [],
   currentNote: null,
   user: null,
   theme: 'light',
@@ -174,6 +183,8 @@ export const useStore = create<State>((set, get) => ({
   resetStore: () => set({
     notes: [],
     concepts: [],
+    relationships: [], 
+    linkedConcepts: [],
     currentNote: null,
     isLoading: false,
     error: null,
@@ -186,10 +197,35 @@ export const useStore = create<State>((set, get) => ({
   }),
 
   loadConcepts: async () => {
+    if (get().concepts.length > 0) return;
+
     set({ isLoading: true, error: null });
     try {
-      const { concepts } = await getAllConcepts(); // Destructure
-      set({ concepts, isLoading: false }); // Save array
+      const [conceptsResult, relationshipsResult] = await Promise.all([
+        supabase.from('concepts').select('*'),
+        supabase.from('concept_relationships').select('*')
+      ]);
+
+      if (conceptsResult.error) throw conceptsResult.error;
+      if (relationshipsResult.error) throw relationshipsResult.error;
+
+      const concepts: Concept[] = conceptsResult.data || [];
+      const relationships: ConceptRelationship[] = relationshipsResult.data || [];
+
+      const linkedConceptIds = new Set<string>();
+      relationships.forEach(rel => {
+        linkedConceptIds.add(rel.source_id);
+        linkedConceptIds.add(rel.target_id);
+      });
+
+      const linkedConcepts = concepts.filter(concept => linkedConceptIds.has(concept.id));
+      set({
+        concepts,          
+        relationships,     
+        linkedConcepts,    
+        isLoading: false
+      });
+
     } catch (error) {
       console.error('Store: Failed to load concepts:', error);
       set({
