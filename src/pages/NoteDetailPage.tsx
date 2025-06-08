@@ -10,7 +10,8 @@ import {
   X, 
   BrainCircuit, 
   Lightbulb,
-  HelpCircle
+  HelpCircle,
+  Clock
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
@@ -37,6 +38,7 @@ const NoteDetailPage: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
+  const [showPomodoroStart, setShowPomodoroStart] = useState(false);
 
   useEffect(() => {
     // Clear the location state after initial setup
@@ -208,6 +210,13 @@ I can help with:
       setAiLoading(false);
     }, 1500);
   };
+
+  const handleStartPomodoro = () => {
+    setShowPomodoroStart(true);
+    // The Pomodoro widget will handle the actual timer logic
+    // This is just a visual indication that a session was started for this note
+    setTimeout(() => setShowPomodoroStart(false), 3000);
+  };
   
   return (
     <div className="fade-in">
@@ -223,6 +232,18 @@ I can help with:
         <div className="flex space-x-2">
           {!editMode ? (
             <>
+              <button
+                onClick={handleStartPomodoro}
+                className={`flex items-center px-3 py-1.5 border rounded-md text-sm transition-all ${
+                  showPomodoroStart
+                    ? 'border-green-300 text-green-700 bg-green-50'
+                    : 'border-primary text-primary bg-primary/5 hover:bg-primary/10'
+                }`}
+                title="Start a Pomodoro session for this note"
+              >
+                <Clock className="h-4 w-4 mr-1" />
+                {showPomodoroStart ? 'Session Started!' : 'Start Pomodoro'}
+              </button>
               <button
                 onClick={() => setEditMode(true)}
                 className="flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50"
@@ -446,6 +467,24 @@ I can help with:
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <h3 className="text-sm font-medium text-gray-900 mb-2">Suggested Actions</h3>
             <div className="space-y-2">
+              <button 
+                onClick={handleStartPomodoro}
+                className={`w-full flex items-center p-2 rounded-md border text-sm transition-colors ${
+                  showPomodoroStart
+                    ? 'border-green-200 bg-green-50 text-green-700'
+                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <span className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center mr-3 ${
+                  showPomodoroStart ? 'bg-green-100' : 'bg-primary/10'
+                }`}>
+                  <Clock className={`h-4 w-4 ${showPomodoroStart ? 'text-green-600' : 'text-primary'}`} />
+                </span>
+                <span className="flex-1 text-left">
+                  {showPomodoroStart ? 'Pomodoro session started!' : 'Start focused study session'}
+                </span>
+              </button>
+              
               <button className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
                 <span className="flex-shrink-0 h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center mr-3">
                   <BrainCircuit className="h-4 w-4 text-primary" />

@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import PomodoroWidget from './PomodoroWidget';
 
 const Layout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -37,6 +38,9 @@ const Layout: React.FC = () => {
           <Outlet />
         </main>
       </div>
+      
+      {/* Pomodoro Widget */}
+      <PomodoroWidget />
     </div>
   );
 };
