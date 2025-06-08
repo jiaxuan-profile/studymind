@@ -49,7 +49,8 @@ const PomodoroWidget: React.FC = () => {
   const [currentState, setCurrentState] = useState<TimerState>('work');
   const [currentCycle, setCurrentCycle] = useState(1);
   const [completedCycles, setCompletedCycles] = useState(0);  
- 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   // Audio and notifications
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -60,6 +61,22 @@ const PomodoroWidget: React.FC = () => {
     totalFocusTime: 0,
     currentStreak: 0
   });
+
+  const resetStats = () => {
+    const newStats = {
+      completedPomodoros: 0,
+      totalFocusTime: 0,
+      currentStreak: 0
+    };
+    saveStats(newStats);
+    setShowResetConfirm(false);
+  };
+  
+  const resetAll = () => {
+    resetTimer();
+    resetStats();
+    setShowResetConfirm(false);
+  };
 
   // Load stats from localStorage on mount
   useEffect(() => {
@@ -396,6 +413,59 @@ const PomodoroWidget: React.FC = () => {
         </div>
       )}
 
+      {showResetConfirm && (
+        <div className="absolute bottom-full right-0 mb-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-10">
+          <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Reset Confirmation</h3>
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            <div className="mb-4">
+              <h4 className="font-medium text-gray-800 mb-2">Current Stats:</h4>
+              <div className="grid grid-cols-3 gap-2 text-center bg-gray-50 rounded-lg p-2">
+                <div>
+                  <div className="text-sm font-medium text-primary">{stats.completedPomodoros}</div>
+                  <div className="text-xs text-gray-600">Pomodoros</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-secondary">{stats.totalFocusTime}</div>
+                  <div className="text-xs text-gray-600">Focus mins</div>
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-accent">{stats.currentStreak}</div>
+                  <div className="text-xs text-gray-600">Streak</div>
+                </div>
+              </div>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-4">Are you sure you want to reset? This cannot be undone.</p>
+            
+            <div className="flex space-x-3">
+              <button
+                onClick={resetAll}
+                className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+              >
+                Reset All
+              </button>
+              <button
+                onClick={resetStats}
+                className="flex-1 py-2 bg-primary hover:bg-primary-dark text-white rounded-lg transition-colors"
+              >
+                Reset Stats Only
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Widget */}
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-3xl">
         {isMinimized ? (
@@ -530,7 +600,7 @@ const PomodoroWidget: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={resetTimer}
+                  onClick={() => setShowResetConfirm(true)}
                   className="px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors flex items-center space-x-2"
                 >
                   <RotateCcw className="h-5 w-5" />

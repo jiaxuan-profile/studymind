@@ -7,6 +7,7 @@ import NotesPage from './pages/NotesPage';
 import NoteDetailPage from './pages/NoteDetailPage';
 import ConceptsPage from './pages/ConceptsPage';
 import ReviewPage from './pages/ReviewPage';
+import ReviewHistoryPage from './pages/ReviewHistoryPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
@@ -58,6 +59,7 @@ function AppRoutes() {
         <Route path="notes/:id" element={<NoteDetailPage />} />
         <Route path="concepts" element={<ConceptsPage />} />
         <Route path="review" element={<ReviewPage />} />
+        <Route path="history" element={<ReviewHistoryPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>

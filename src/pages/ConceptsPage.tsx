@@ -39,7 +39,8 @@ const ConceptsPage: React.FC = () => {
   const [labelsEnabled, setLabelsEnabled] = useState(true);
   const graphRef = useRef<any>(null);
 
-  // Zoom thresholds for showing labels
+  const hasCenteredRef = useRef(false);
+
   const NODE_LABEL_ZOOM_THRESHOLD = 1.5;
   const LINK_LABEL_ZOOM_THRESHOLD = 2.0;
 
@@ -48,6 +49,9 @@ const ConceptsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Reset the centered flag whenever the data is reloaded
+    hasCenteredRef.current = false;
+
     const loadConceptData = async () => {
       try {
         setLoading(true);
@@ -71,33 +75,41 @@ const ConceptsPage: React.FC = () => {
         const colors = generateCategoryColors(categories);
         setCategories(categories);
         setCategoryColors(colors);
+        
+        const linkedConceptIds = new Set<string>();
+        relationships.forEach(rel => {
+          linkedConceptIds.add(rel.source_id);
+          linkedConceptIds.add(rel.target_id);
+        });
 
-        const nodes: GraphNode[] = concepts.map(concept => {
-          const conceptNotes = noteConcepts
-            .filter(nc => nc.concept_id === concept.id)
-            .map(nc => nc.note_id);
-          
-          const noteCategories = conceptNotes
-            .map(noteId => {
-              const note = notes.find(n => n.id === noteId);
-              return note?.tags[0] || '';
-            })
-            .filter(Boolean);
+        const nodes: GraphNode[] = concepts
+          .filter(concept => linkedConceptIds.has(concept.id)) 
+          .map(concept => {
+            const conceptNotes = noteConcepts
+              .filter(nc => nc.concept_id === concept.id)
+              .map(nc => nc.note_id);
+            
+            const noteCategories = conceptNotes
+              .map(noteId => {
+                const note = notes.find(n => n.id === noteId);
+                return note?.tags[0] || '';
+              })
+              .filter(Boolean);
 
-          if (!concept) {
-            console.error("Error: concept is undefined or null");
-            return null;
-          }
+            if (!concept) {
+              console.error("Error: concept is undefined or null");
+              return null;
+            }
 
-          const topCategory = getMostCommonCategory(noteCategories);
-          const node: GraphNode = {
-            id: concept.id,
-            name: concept.name,
-            val: 1 + conceptNotes.length * 0.5,
-            color: colors[topCategory] || '#94A3B8',
-          };
-          return node;
-        }).filter(Boolean);
+            const topCategory = getMostCommonCategory(noteCategories);
+            const node: GraphNode = {
+              id: concept.id,
+              name: concept.name,
+              val: 1 + conceptNotes.length * 0.5,
+              color: colors[topCategory] || '#94A3B8',
+            };
+            return node;
+          }).filter((node): node is GraphNode => node !== null);
 
         const links: EnhancedGraphLink[] = relationships.map(rel => ({
           source: rel.source_id,
@@ -116,7 +128,7 @@ const ConceptsPage: React.FC = () => {
     };
 
     loadConceptData();
-  }, []);
+  }, [notes]); 
 
   const generateCategoryColors = (categories: string[]): CategoryColors => {
     const baseColors = {
@@ -179,7 +191,6 @@ const ConceptsPage: React.FC = () => {
         relatedConceptIds: relationships?.map(r => r.target_id) || []
       });
 
-      // Highlight connected nodes and links
       const connectedNodeIds = new Set([
         node.id,
         ...(relationships?.map(r => r.target_id) || [])
@@ -228,7 +239,6 @@ const ConceptsPage: React.FC = () => {
     }
   };
 
-  // Custom node label function based on zoom level
   const getNodeLabel = (node: any) => {
     const n = node as GraphNode;
     if (labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
@@ -237,7 +247,6 @@ const ConceptsPage: React.FC = () => {
     return '';
   };
 
-  // Custom link label function based on zoom level
   const getLinkLabel = (link: any) => {
     const l = link as EnhancedGraphLink;
     if (labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) {
@@ -245,8 +254,7 @@ const ConceptsPage: React.FC = () => {
     }
     return '';
   };
-
-  // Custom tooltip for nodes
+  
   const getNodeTooltip = (node: any) => {
     const n = node as GraphNode;
     if (hoveredNode && hoveredNode.id === n.id && selectedConcept && selectedConcept.id === n.id) {
@@ -306,6 +314,7 @@ const ConceptsPage: React.FC = () => {
 
   return (
     <div className="fade-in">
+      {/* ...Header and controls... */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Concept Graph</h1>
         <p className="mt-2 text-gray-600">
@@ -338,11 +347,10 @@ const ConceptsPage: React.FC = () => {
           </div>
         </div>
       </div>
-
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Main graph area */}
         <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-4 border-b border-gray-200">
+            {/* ...Search and Reset buttons... */}
             <div className="flex items-center space-x-3">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -381,7 +389,6 @@ const ConceptsPage: React.FC = () => {
               </div>
             </div>
           </div>
-
           <div className="w-full h-[600px]">
             {graphData.nodes.length > 0 ? (
               <ForceGraph2D
@@ -398,14 +405,10 @@ const ConceptsPage: React.FC = () => {
                   const label = getNodeLabel(n);
                   const fontSize = 12 / globalScale;
                   const nodeRadius = Math.sqrt(Math.max(0, n.val || 1)) * 4;
-
-                  // Draw node
                   ctx.beginPath();
                   ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
                   ctx.fillStyle = (selectedConcept && selectedConcept.id === n.id) ? '#6366F1' : (n.color || '#94A3B8');
                   ctx.fill();
-
-                  // Draw label if zoom level is sufficient
                   if (label && labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
                     ctx.font = `${fontSize * 1.2}px Sans-Serif`;
                     ctx.textAlign = 'center';
@@ -417,7 +420,7 @@ const ConceptsPage: React.FC = () => {
                 nodeCanvasObjectMode={() => 'replace'}
                 linkWidth={(link) => {
                   const l = link as GraphLink;
-                  const id = `${l.source}-${l.target}`;
+                  const id = `${link.source}-${link.target}`;
                   return highlightLinks.size === 0 || highlightLinks.has(id)
                     ? 2 * (l.value || 1)
                     : 0.5;
@@ -433,16 +436,13 @@ const ConceptsPage: React.FC = () => {
                 linkCanvasObject={(link, ctx, globalScale) => {
                   const l = link as EnhancedGraphLink;
                   const label = getLinkLabel(l);
-                  
                   if (label && labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) {
                     const fontSize = 10 / globalScale;
                     const source = typeof l.source === 'object' ? l.source : graphData.nodes.find(n => n.id === l.source);
                     const target = typeof l.target === 'object' ? l.target : graphData.nodes.find(n => n.id === l.target);
-                    
                     if (source && target) {
                       const midX = (source.x! + target.x!) / 2;
                       const midY = (source.y! + target.y!) / 2;
-                      
                       ctx.font = `${fontSize}px Sans-Serif`;
                       ctx.textAlign = 'center';
                       ctx.textBaseline = 'middle';
@@ -458,20 +458,17 @@ const ConceptsPage: React.FC = () => {
                 onNodeClick={handleNodeClick}
                 onNodeHover={handleNodeHover}
                 onZoom={handleZoom}
-                cooldownTicks={100}
-                onEngineStop={() => graphRef.current?.zoomToFit(100, 20)}
+                cooldownTicks={100}                
               />
             ) : (
               <div className="flex items-center justify-center h-full">
-                <p className="text-gray-500">No concepts found</p>
+                <p className="text-gray-500">No connected concepts found in your notes.</p>
               </div>
             )}
           </div>
         </div>
-
-        {/* Concept details and legend */}
         <div className="space-y-6">
-          {/* Concept details */}
+          {/* ...Concept details panel... */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-4 bg-primary/5 border-b border-gray-200">
               <div className="flex items-center">
@@ -479,12 +476,10 @@ const ConceptsPage: React.FC = () => {
                 <h2 className="text-lg font-semibold text-gray-900">Concept Details</h2>
               </div>
             </div>
-
             {selectedConcept ? (
               <div className="p-4">
                 <h3 className="text-xl font-bold text-gray-900 mb-2">{selectedConcept.name}</h3>
                 <p className="text-gray-600 mb-4">{selectedConcept.definition}</p>
-
                 <div className="mb-4">
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Found in Notes:</h4>
                   <ul className="space-y-2">
@@ -513,7 +508,6 @@ const ConceptsPage: React.FC = () => {
                     })}
                   </ul>
                 </div>
-
                 <div>
                   <h4 className="text-sm font-semibold text-gray-700 mb-2">Related Concepts:</h4>
                   <div className="flex flex-wrap gap-2">
