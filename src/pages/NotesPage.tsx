@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText, List, Grid } from 'lucide-react';
 import DocumentUploader from '../components/DocumentUploader';
@@ -8,6 +8,7 @@ import { deleteNoteFromDatabase } from '../services/databaseServiceClient';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { 
     notes, 
     addNote, 
@@ -19,10 +20,27 @@ const NotesPage: React.FC = () => {
     error 
   } = useStore();
   
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showPdfUploader, setShowPdfUploader] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // Update search term when URL search param changes
+  useEffect(() => {
+    const urlSearch = searchParams.get('search');
+    if (urlSearch && urlSearch !== searchTerm) {
+      setSearchTerm(urlSearch);
+    }
+  }, [searchParams]);
+
+  // Update URL when search term changes
+  useEffect(() => {
+    if (searchTerm) {
+      setSearchParams({ search: searchTerm });
+    } else {
+      setSearchParams({});
+    }
+  }, [searchTerm, setSearchParams]);
   
   // Get all unique tags from notes
   const allTags = Array.from(
@@ -86,6 +104,11 @@ const NotesPage: React.FC = () => {
         alert(`Failed to delete note: ${(error as Error).message}`);
       }
     }
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+    setSearchParams({});
   };
 
   const renderNoteCard = (note: any) => (
@@ -190,6 +213,17 @@ const NotesPage: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                <span className="sr-only">Clear search</span>
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
           </div>
           
           <div className="flex gap-2">
@@ -270,8 +304,23 @@ const NotesPage: React.FC = () => {
         </div>
         
         {/* Selected filters */}
-        {selectedTags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-2">
+        {(selectedTags.length > 0 || searchTerm) && (
+          <div className="mt-2 flex flex-wrap gap-2 items-center">
+            {searchTerm && (
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                Search: "{searchTerm}"
+                <button
+                  type="button"
+                  className="flex-shrink-0 ml-1.5 h-4 w-4 rounded-full inline-flex items-center justify-center text-blue-400 hover:bg-blue-200 hover:text-blue-500 focus:outline-none focus:bg-blue-500 focus:text-white"
+                  onClick={clearSearch}
+                >
+                  <span className="sr-only">Remove search</span>
+                  <svg className="h-2 w-2" stroke="currentColor" fill="none" viewBox="0 0 8 8">
+                    <path strokeLinecap="round" strokeWidth="1.5" d="M1 1l6 6m0-6L1 7" />
+                  </svg>
+                </button>
+              </span>
+            )}
             {selectedTags.map((tag) => (
               <span
                 key={tag}
@@ -291,7 +340,10 @@ const NotesPage: React.FC = () => {
               </span>
             ))}
             <button
-              onClick={() => setSelectedTags([])}
+              onClick={() => {
+                setSelectedTags([]);
+                clearSearch();
+              }}
               className="text-xs text-gray-500 hover:text-gray-700"
             >
               Clear all
