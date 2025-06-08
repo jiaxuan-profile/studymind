@@ -66,17 +66,9 @@ function AppRoutes() {
 
 function App() {
   return (
-    // Remove BrowserRouter from here
-    // <BrowserRouter
-    //   future={{
-    //     v7_startTransition: true,
-    //     v7_relativeSplatPath: true,
-    //   }}
-    // >
-      <AuthProvider>
-        <AppRoutes />
-      </AuthProvider>
-    // </BrowserRouter>
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }
 
