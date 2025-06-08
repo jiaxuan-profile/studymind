@@ -103,9 +103,10 @@ const PomodoroWidget: React.FC = () => {
 
   // Create audio context for notification sound
   useEffect(() => {
-    // Create a simple beep sound using Web Audio API
+    let audioContext: AudioContext;
+
     const createBeepSound = () => {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
       
@@ -122,11 +123,11 @@ const PomodoroWidget: React.FC = () => {
       oscillator.stop(audioContext.currentTime + 0.5);
     };
 
-    if (!audioRef.current) {
-      audioRef.current = {
-        play: createBeepSound
-      } as any;
-    }
+    return () => {
+      if (audioContext) {
+        audioContext.close();
+      }
+    };
   }, []);
 
   const playNotificationSound = () => {
