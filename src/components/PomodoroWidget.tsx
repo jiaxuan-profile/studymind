@@ -35,13 +35,6 @@ const PomodoroWidget: React.FC = () => {
   const [isMinimized, setIsMinimized] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
   
-  // Timer state
-  const [isRunning, setIsRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
-  const [currentState, setCurrentState] = useState<TimerState>('work');
-  const [currentCycle, setCurrentCycle] = useState(1);
-  const [completedCycles, setCompletedCycles] = useState(0);
-  
   // Settings
   const [settings, setSettings] = useState<PomodoroSettings>({
     workDuration: 25,
@@ -50,6 +43,13 @@ const PomodoroWidget: React.FC = () => {
     cyclesBeforeLongBreak: 4
   });
   
+  // Timer state
+  const [isRunning, setIsRunning] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(settings.workDuration * 60);
+  const [currentState, setCurrentState] = useState<TimerState>('work');
+  const [currentCycle, setCurrentCycle] = useState(1);
+  const [completedCycles, setCompletedCycles] = useState(0);  
+ 
   // Audio and notifications
   const [soundEnabled, setSoundEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -70,7 +70,9 @@ const PomodoroWidget: React.FC = () => {
     
     const savedSettings = localStorage.getItem('pomodoroSettings');
     if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
+      const loadedSettings = JSON.parse(savedSettings);
+      setSettings(loadedSettings);
+      setTimeLeft(loadedSettings.workDuration * 60);
     }
   }, []);
 
