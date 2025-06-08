@@ -145,9 +145,9 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
             onClick={toggleTheme}
           >
             {theme === 'dark' ? (
-              <Sun className="h-6 w-6" aria-hidden="true" />
+              <Sun className="h-6 w-6\" aria-hidden="true" />
             ) : (
-              <Moon className="h-6 w-6" aria-hidden="true" />
+              <Moon className="h-6 w-6\" aria-hidden="true" />
             )}
           </button>
           
