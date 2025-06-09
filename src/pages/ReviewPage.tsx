@@ -135,9 +135,12 @@ const ReviewPage: React.FC = () => {
         return total + (note?.questions.filter(q => selectedDifficulty === 'all' || q.difficulty === selectedDifficulty).length || 0);
       }, 0);
 
+      const now = new Date();
+      const sessionName = `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
       const { data: session, error } = await supabase.from('review_sessions').insert({
         user_id: user.id,
-        session_name: `Review Session - ${new Date().toLocaleDateString()}`,
+        session_name: sessionName,
         selected_notes: selectedNotes,
         selected_difficulty: selectedDifficulty,
         total_questions: totalQuestions,
