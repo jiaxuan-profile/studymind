@@ -114,13 +114,14 @@ const ReviewHistoryPage: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {reviewSessions.map((session) => (
-                <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  onClick={() => navigate(`/session/${session.id}`)}
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">
                         {session.session_name || `Session ${session.id.slice(0, 8)}`}
                       </h3>
-                      {/* 3. UPDATE JSX TO DISPLAY THE DURATION */}
                       <div className="mt-2 flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                         <span>
                           {session.questions_answered}/{session.total_questions} answered
