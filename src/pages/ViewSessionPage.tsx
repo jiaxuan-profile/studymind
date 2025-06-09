@@ -5,7 +5,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, CheckCircle, XCircle, HelpCircle, 
   BookOpen, History, Clock, Lightbulb, GraduationCap, 
-  Award, TrendingUp, FileText
+  Award, TrendingUp
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
@@ -247,9 +247,9 @@ const ViewSessionPage: React.FC = () => {
                   <div className="flex items-center">
                     <BookOpen className="h-5 w-5 text-gray-400 mr-2" />
                     <span className="text-sm text-gray-600">From note:</span>
-                    <span className="ml-2 text-sm font-medium text-primary">
-                        {noteTitle}
-                    </span>
+                    <Link to={`/notes/${currentAnswer?.note_id}`} className="ml-2 text-sm font-medium text-primary hover:underline">
+                      {noteTitle}
+                    </Link>
                   </div>
                   {currentAnswer?.connects && currentAnswer.connects.length > 0 && (
                     <div className="flex flex-wrap gap-1">
