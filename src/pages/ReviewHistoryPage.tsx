@@ -3,9 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { History, ArrowLeft, Play, Clock } from 'lucide-react'; // 1. IMPORT Clock ICON
+import { History, ArrowLeft, Play, Clock, ChevronLeft, ChevronRight } from 'lucide-react';
 
-// This interface defines the shape of a single session object
 interface ReviewSession {
   id: string;
   session_name?: string;
@@ -26,18 +25,20 @@ interface ReviewSession {
 const ReviewHistoryPage: React.FC = () => {
   const [reviewSessions, setReviewSessions] = useState<ReviewSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const sessionsPerPage = 5;
   const navigate = useNavigate();
 
   useEffect(() => {
     loadReviewSessions();
-  }, []);
+  }, [currentPage]);
 
   const formatDuration = (seconds: number) => {
     if (!seconds || seconds <= 0) return null;
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     return [
       hours > 0 ? `${hours}h` : '',
       minutes > 0 ? `${minutes}m` : '',
@@ -51,12 +52,15 @@ const ReviewHistoryPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
+      const from = (currentPage - 1) * sessionsPerPage;
+      const to = from + sessionsPerPage - 1;
+
       const { data: sessions, error } = await supabase
         .from('review_sessions')
         .select('*')
         .eq('user_id', user.id)
         .order('started_at', { ascending: false })
-        .limit(20);
+        .range(from, to);
 
       if (error) throw error;
       setReviewSessions((sessions as ReviewSession[]) || []);
@@ -66,6 +70,8 @@ const ReviewHistoryPage: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const totalPages = Math.ceil(reviewSessions.length / sessionsPerPage);
 
   return (
     <div className="fade-in">
@@ -92,8 +98,8 @@ const ReviewHistoryPage: React.FC = () => {
         <div className="p-6">
           {loading ? (
             <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading history...</p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading history...</p>
             </div>
           ) : reviewSessions.length === 0 ? (
             <div className="text-center py-12">
@@ -158,7 +164,7 @@ const ReviewHistoryPage: React.FC = () => {
                     </div>
                     <div className="text-right flex-shrink-0 ml-4">
                       <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        session.session_status === 'completed' 
+                        session.session_status === 'completed'
                           ? 'bg-green-100 text-green-800'
                           : session.session_status === 'in_progress'
                           ? 'bg-blue-100 text-blue-800'
@@ -173,6 +179,29 @@ const ReviewHistoryPage: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+          {reviewSessions.length > 0 && (
+            <div className="flex justify-center mt-6">
+              <nav className="inline-flex rounded-md shadow">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <span className="px-4 py-1 border-t border-b border-gray-300 bg-white text-sm font-medium text-gray-700">
+                  Page {currentPage}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                  disabled={reviewSessions.length < sessionsPerPage}
+                  className="px-3 py-1 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
+              </nav>
             </div>
           )}
         </div>
