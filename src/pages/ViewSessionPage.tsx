@@ -38,7 +38,7 @@ interface ReviewAnswer {
   connects?: string[];
   hint?: string;
   mastery_context?: string;
-  question_difficulty?: string;
+  original_difficulty?: string;
 }
 
 const ViewSessionPage: React.FC = () => {
@@ -218,6 +218,12 @@ const ViewSessionPage: React.FC = () => {
             <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-4 border-b border-gray-200">
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center space-x-4">
+                  {currentAnswer?.original_difficulty && (
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(currentAnswer.original_difficulty)}`}>
+                      {getDifficultyIcon(currentAnswer.original_difficulty)}
+                      <span className="ml-1 capitalize">Question: {currentAnswer.original_difficulty}</span>
+                    </div>
+                  )}
                   <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(currentAnswer?.difficulty_rating || 'medium')}`}>
                     {getDifficultyIcon(currentAnswer?.difficulty_rating || 'medium')}
                     <span className="ml-1 capitalize">{currentAnswer?.difficulty_rating || 'unrated'}</span>
