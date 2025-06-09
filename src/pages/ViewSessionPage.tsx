@@ -5,7 +5,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, CheckCircle, XCircle, HelpCircle, 
   BookOpen, History, Clock, Lightbulb, GraduationCap, 
-  Award, TrendingUp
+  Award, TrendingUp, Brain, Target, Zap
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
@@ -141,7 +141,7 @@ const ViewSessionPage: React.FC = () => {
     }
   };
 
-  if (loading || !session) {
+  if (loading) {
     return (
       <div className="text-center py-12">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
@@ -195,13 +195,12 @@ const ViewSessionPage: React.FC = () => {
         </div>
 
         <div className="flex items-center space-x-4">
-          {session.duration_seconds && (
+          {(session.duration_seconds ?? 0) > 0 && (
             <div className="bg-primary/10 text-primary px-3 py-1 rounded-lg font-medium flex items-center">
               <Clock className="h-4 w-4 mr-2" />
-              {formatDuration(session.duration_seconds)}
+              {formatDuration(session.duration_seconds ?? 0)}
             </div>
-          )}
-          
+          )}          
           <button
             onClick={() => navigate('/history')}
             className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
@@ -219,15 +218,19 @@ const ViewSessionPage: React.FC = () => {
               <div className="flex justify-between items-center mb-3">
                 <div className="flex items-center space-x-4">
                   {currentAnswer?.original_difficulty && (
-                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(currentAnswer.original_difficulty)}`}>
-                      {getDifficultyIcon(currentAnswer.original_difficulty)}
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(currentAnswer.original_difficulty)}`}>                     
+                      {currentAnswer.original_difficulty === 'easy' && <Target className="h-4 w-4" />}
+                      {currentAnswer.original_difficulty === 'medium' && <Zap className="h-4 w-4" />}
+                      {currentAnswer.original_difficulty === 'hard' && <Brain className="h-4 w-4" />}
                       <span className="ml-1 capitalize">Question: {currentAnswer.original_difficulty}</span>
                     </div>
                   )}
-                  <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(currentAnswer?.difficulty_rating || 'medium')}`}>
-                    {getDifficultyIcon(currentAnswer?.difficulty_rating || 'medium')}
-                    <span className="ml-1 capitalize">{currentAnswer?.difficulty_rating || 'unrated'}</span>
-                  </div>
+                  {currentAnswer?.difficulty_rating && (
+                    <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getDifficultyColor(currentAnswer.difficulty_rating)}`}>
+                      {getDifficultyIcon(currentAnswer.difficulty_rating)}
+                      <span className="ml-1 capitalize">You rated: {currentAnswer.difficulty_rating}</span>                    
+                    </div>
+                  )}
                 </div>
                 <span className="text-sm text-gray-500">
                   Question {currentQuestionIndex + 1} of {answers.length}
@@ -388,22 +391,22 @@ const ViewSessionPage: React.FC = () => {
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-green-600 flex items-center">
-                    <CheckCircle className="h-4 w-4 mr-1" />
-                    Easy
+                    {getDifficultyIcon('easy')}
+                    <span className="ml-1">Easy</span>
                   </span>
                   <span className="font-medium">{calculatedStats.easy}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-yellow-600 flex items-center">
-                    <HelpCircle className="h-4 w-4 mr-1" />
-                    Medium
+                    {getDifficultyIcon('medium')}
+                    <span className="ml-1">Medium</span>
                   </span>
                   <span className="font-medium">{calculatedStats.medium}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-red-600 flex items-center">
-                    <XCircle className="h-4 w-4 mr-1" />
-                    Hard
+                    {getDifficultyIcon('hard')}
+                    <span className="ml-1">Hard</span>
                   </span>
                   <span className="font-medium">{calculatedStats.hard}</span>
                 </div>

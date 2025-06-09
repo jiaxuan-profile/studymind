@@ -111,35 +111,46 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // Use AI to analyze content if enabled
       if (useAI) {
         try {
-          console.log("Analyzing document content with AI...");
+          // 1. Analyze the note to get summary, tags, and key concepts
+          console.log("1. Analyzing document content with AI...");
           const analysis = await analyzeNote(content, title, id);
-          console.log("AI analysis result:", analysis);
+
           tags = [...new Set([...tags, ...analysis.suggestedTags])];
           summary = analysis.summary;
 
-          console.log("Generating practice questions...");
-          const questions = await generateQuestionsForNote(id, content, title);
-          console.log("Generated questions:", questions);
-
-          console.log("Analyzing knowledge gaps...");
-          const gaps = await analyzeGapsForNote(id, content, title);
-          console.log("Identified gaps:", gaps);
-
-          // Update the note with AI-generated data, questions, and gaps
-          const updatedNoteData = {
+          await saveNoteToDatabase({
             ...noteData,
-            tags,
             summary,
+            tags,
             knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships },
-            note_questions: questions,
-            note_gaps: gaps
+            analysis_status: 'analyzing_gaps'
+          });
+          console.log("Note updated with initial analysis.");
+
+          // 2. Analyze for knowledge gaps using the concepts from the previous step.
+          console.log("2. Analyzing knowledge gaps...");
+          await analyzeGapsForNote(id, content, title);
+          console.log("Knowledge gaps analysis complete.");
+
+          // 3. Generate questions. This function can now fetch the saved gaps.
+          console.log("3. Generating practice questions...");
+          await generateQuestionsForNote(id);
+          console.log("Practice questions generated and saved.");
+
+          // 4. Final update to the note to mark completion
+          const finalNoteData = {
+            ...noteData,
+            summary,
+            tags,
+            knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships },
+            analysis_status: 'completed'
           };
-          await saveNoteToDatabase(updatedNoteData);
-          console.log("Note updated with AI analysis results");
+          await saveNoteToDatabase(finalNoteData);
+          console.log("Note analysis process complete.");
 
         } catch (aiError) {
           console.error('AI analysis failed:', aiError);
-          // Continue without AI analysis
+          await saveNoteToDatabase({ ...noteData, analysis_status: 'failed' });
         }
       }
 

@@ -45,13 +45,6 @@ Example:
 
 
 const handler: Handler = async (event) => {
-  console.log("-------------------- SERVERLESS analyze-concepts START --------------------");
-  console.log(`SERVERLESS: /api/analyze-concepts invoked at ${new Date().toISOString()}`);
-  console.log("SERVERLESS: Request method:", event.httpMethod);
-  console.log("SERVERLESS: Request headers:", JSON.stringify(event.headers, null, 2));
-  console.log("SERVERLESS: Request body:", event.body); //Log raw body
-
-
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
@@ -59,7 +52,7 @@ const handler: Handler = async (event) => {
   };
 
   if (event.httpMethod === 'OPTIONS') {
-    console.log("SERVERLESS: OPTIONS request received. Responding with 204.");
+    console.warn("SERVERLESS: OPTIONS request received. Responding with 204.");
     return { statusCode: 204, headers };
   }
 
@@ -81,8 +74,6 @@ const handler: Handler = async (event) => {
       console.error('SERVERLESS: CRITICAL - GEMINI_API_KEY is NOT SET in environment variables.');
       return { statusCode: 500, headers, body: JSON.stringify({ error: 'Server configuration error: GEMINI_API_KEY is not configured.' }) };
     }
-    console.log('SERVERLESS: GEMINI_API_KEY is present.');
-
 
     let requestBody: { text: string; title: string; includeRelationships?: boolean };
     try {
@@ -96,7 +87,6 @@ const handler: Handler = async (event) => {
         };
     }
 
-    console.log('SERVERLESS: Parsed body:', requestBody);
     const { text, title } = requestBody;
 
     // Input validation
@@ -111,7 +101,6 @@ const handler: Handler = async (event) => {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const modelName = 'gemini-1.5-flash-latest';
-    console.log(`SERVERLESS: Using Gemini model: ${modelName}`);
 
     const model = genAI.getGenerativeModel({
       model: modelName,
@@ -123,13 +112,10 @@ const handler: Handler = async (event) => {
     });
 
     const userPrompt = `Title: ${title}\n\nContent: ${text}`;
-    console.log("SERVERLESS: Sending prompt to Gemini...");
 
     const result = await model.generateContent(userPrompt);
     const response = result.response;
     const analysisText = response.text();
-
-    console.log("SERVERLESS: Raw JSON response from Gemini:", analysisText);
 
     const analysis: AnalysisResult = JSON.parse(analysisText);
     console.log("Netlify Function (analyze-concepts): Final analysis object:", analysis);

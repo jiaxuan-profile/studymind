@@ -6,6 +6,12 @@
 [functions]
   node_bundler = "esbuild"
 
+[functions."*"]
+  timeout = 60 
+
+[functions."api/analyze-gaps"]
+  timeout = 90
+
 [[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"

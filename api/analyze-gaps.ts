@@ -102,7 +102,6 @@ const handler: Handler = async (event) => {
         content,
         summary,
         embedding,
-        knowledge_graph,
         user_id
       `)
       .eq('id', noteId)
@@ -155,24 +154,26 @@ const handler: Handler = async (event) => {
       console.error("Error fetching user concepts:", userConceptsError);
     }
 
-    // 4. Extract current note concepts
     let currentNoteConcepts: { name: string; definition?: string }[] = [];
     
-    if (noteData.knowledge_graph?.concepts) {
-      currentNoteConcepts = noteData.knowledge_graph.concepts;
-    } else if (noteConcepts && noteConcepts.length > 0) {
+    if (noteConcepts && noteConcepts.length > 0) {
       currentNoteConcepts = noteConcepts
         .map((nc: NoteConcept) => nc.concepts)
-        .filter(c => c);
+        .filter(c => c && c.name);
     } else {
-      // Fallback: create a general concept
+      // Fallback remains the same
       currentNoteConcepts = [{ 
         name: "General Knowledge", 
         definition: "Core concepts from the note" 
       }];
     }
+    
+    if (currentNoteConcepts.length === 0) {
+      currentNoteConcepts.push({ name: "General Knowledge", definition: "Core concepts from the note" });
+      console.warn(`No specific concepts found for note ${noteId}. Using fallback.`);
+    }
 
-    // 5. Categorize user concepts by mastery level
+    // 4. Categorize user concepts by mastery level
     const strugglingConcepts = userConcepts?.filter(uc => uc.mastery_level < 0.3) || [];
     const developingConcepts = userConcepts?.filter(uc => uc.mastery_level >= 0.3 && uc.mastery_level < 0.7) || [];
     const masteredConcepts = userConcepts?.filter(uc => uc.mastery_level >= 0.7) || [];

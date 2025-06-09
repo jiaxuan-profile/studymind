@@ -24,7 +24,6 @@ CREATE TABLE IF NOT EXISTS notes (
     embedding VECTOR(768),
     summary TEXT,
     content_hash TEXT,
-    knowledge_graph JSONB,
     analysis_status TEXT DEFAULT 'pending'
 );
 
