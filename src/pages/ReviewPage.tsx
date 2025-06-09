@@ -12,7 +12,7 @@ import { supabase } from '../services/supabase';
 
 // Interfaces specific to the review process
 interface Question {
-  id: string; // Corresponds to the ID from the new 'questions' table
+  id: string;
   question: string;
   hint?: string;
   connects?: string[];
@@ -161,62 +161,24 @@ const ReviewPage: React.FC = () => {
       setLoading(false);
     }
   };
-
-  const createReviewSession = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const totalQuestions = selectedNotes.reduce((total, noteId) => {
-        const note = notesWithQuestions.find(n => n.id === noteId);
-        return total + (note?.questions.filter(q => selectedDifficulty === 'all' || q.difficulty === selectedDifficulty).length || 0);
-      }, 0);
-
-      const now = new Date();
-      const sessionName = `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-
-      const { data: session, error } = await supabase.from('review_sessions').insert({
-        user_id: user.id,
-        session_name: sessionName,
-        selected_notes: selectedNotes,
-        selected_difficulty: selectedDifficulty,
-        total_questions: totalQuestions,
-        session_status: 'in_progress',
-        questions_answered: 0,
-        questions_rated: 0,
-        easy_ratings: 0,
-        medium_ratings: 0,
-        hard_ratings: 0,
-      }).select().single();
-      if (error) throw error;
-      setCurrentSessionId(session.id);
-    } catch (error) {
-      console.error('Error creating review session:', error); throw error;
-    }
-  };
   
   const finishReviewSession = async () => {
     if (!currentSessionId) return;
-
-    let finalAnswerCount = userAnswers.length;
-    const needsAutosave = userAnswer.trim() && !isAnswerSaved;
-    
-    const isNewUnsavedAnswer = !userAnswers.some(a => a.questionIndex === currentQuestionIndex);
-
-    if (needsAutosave && isNewUnsavedAnswer) {
-      finalAnswerCount++;
-    }
-
-    if (needsAutosave) {
+  
+    // If the current answer is typed but not saved, save it before finishing.
+    const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+    const isUnsaved = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
+    if (isUnsaved) {
       await saveAnswer();
     }
-
+  
     try {
       const { error } = await supabase.from('review_sessions').update({
         session_status: 'completed',
         completed_at: new Date().toISOString(),
         duration_seconds: sessionDuration,
-        questions_answered: finalAnswerCount,
+        // The number of answered questions is now the count of non-empty answers
+        questions_answered: userAnswers.filter(a => a.answer.trim() !== '').length, 
         questions_rated: reviewedCount,
         easy_ratings: sessionStats.easy,
         medium_ratings: sessionStats.medium,
@@ -238,6 +200,10 @@ const ReviewPage: React.FC = () => {
 
   const startReview = async () => {
     try {
+      setLoading(true); // Show a loading state during this setup
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
       const questions = selectedNotes.flatMap(noteId => {
         const note = notesWithQuestions.find(n => n.id === noteId);
         if (!note) return [];
@@ -245,22 +211,68 @@ const ReviewPage: React.FC = () => {
           .filter(q => selectedDifficulty === 'all' || q.difficulty === selectedDifficulty)
           .map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
       });
+      
       const shuffledQuestions = questions.sort(() => Math.random() - 0.5);
-      if (shuffledQuestions.length === 0) { alert("No questions found for the selected criteria."); return; }
+      if (shuffledQuestions.length === 0) { 
+        alert("No questions found for the selected criteria."); 
+        setLoading(false);
+        return; 
+      }
 
-      await createReviewSession();
+      // 1. Create the review session record
+      const now = new Date();
+      
+      // --- FIX: RE-INTEGRATE SESSION NAME GENERATION ---
+      const sessionName = `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
+      const { data: session, error: sessionError } = await supabase.from('review_sessions').insert({
+        user_id: user.id,
+        session_name: sessionName, // <-- ADDED THIS LINE BACK
+        selected_notes: selectedNotes,
+        selected_difficulty: selectedDifficulty,
+        total_questions: shuffledQuestions.length,
+        session_status: 'in_progress',
+      }).select().single();
+
+      if (sessionError) throw sessionError;
+      const newSessionId = session.id;
+
+      // 2. Pre-populate the review_answers table with placeholder answers
+      const placeholderAnswers = shuffledQuestions.map((q, index) => ({
+        session_id: newSessionId,
+        question_index: index,
+        user_id: user.id,
+        note_id: q.noteId,
+        question_text: q.question,
+        answer_text: '', 
+        note_title: q.noteTitle,
+      }));
+
+      const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
+
+      if (answersInsertError) {
+        // Provide a more detailed error to the console
+        console.error("Supabase insert error details:", answersInsertError);
+        throw answersInsertError;
+      }
+
+      // 3. Set all state and start the timer
+      setCurrentSessionId(newSessionId);
       setSessionStartTime(new Date());
       setCurrentQuestions(shuffledQuestions);
       setCurrentQuestionIndex(0);
       setReviewedCount(0);
       setSessionStats({ easy: 0, medium: 0, hard: 0 });
-      setUserAnswers([]);
+      setUserAnswers([]); 
       setIsReviewComplete(false);
       setCurrentStep('review');
+
     } catch (error) {
       setSessionStartTime(null);
       console.error('Error starting review:', error);
       alert('Failed to start review session. Please try again.');
+    } finally {
+      setLoading(false); // Hide loading state
     }
   };
 
@@ -268,32 +280,27 @@ const ReviewPage: React.FC = () => {
     if (!userAnswer.trim() || !currentSessionId) return;
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-      const currentQuestion = currentQuestions[currentQuestionIndex];
-      const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
+      // Logic has changed from `insert` to `update` because records now pre-exist.
+      const { error } = await supabase
+        .from('review_answers')
+        .update({ answer_text: userAnswer.trim() })
+        .eq('session_id', currentSessionId)
+        .eq('question_index', currentQuestionIndex);
 
+      if (error) throw error;
+      
+      // Update local state to reflect the saved answer
+      const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
       if (answerExists) {
-        const { error } = await supabase.from('review_answers').update({ answer_text: userAnswer.trim() }).eq('session_id', currentSessionId).eq('question_index', currentQuestionIndex);
-        if (error) throw error;
         setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim() } : a));
       } else {
-        const { error } = await supabase.from('review_answers').insert({
-          session_id: currentSessionId,
-          question_index: currentQuestionIndex,
-          user_id: user.id,
-          note_id: currentQuestion.noteId,
-          question_text: currentQuestion.question,
-          answer_text: userAnswer.trim(),
-          original_difficulty: currentQuestion.difficulty,
-          note_title: currentQuestion.noteTitle
-        });
-        if (error) throw error;
         setUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
       }
+
       setIsAnswerSaved(true);
     } catch (error) {
-      console.error('Error saving answer:', error); alert('Failed to save answer.');
+      console.error('Error saving answer:', error); 
+      alert('Failed to save answer.');
     } finally {
       setIsSaving(false);
     }
