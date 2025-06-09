@@ -15,10 +15,15 @@ Retrieves questions based on the selected note and difficulty level.
 curl.exe -X GET "http://localhost:3000/.netlify/functions/generate-questions?noteId=lms15jned&difficulty=easy"
 ```
 
-### 2. Submit Review Answers
-Sends learner answers for review.
+### 2. Submit Review Answer
+Sends answer for review.
 
 ```powershell
 curl -X POST "http://localhost:3000/.netlify/functions/review-answers" -H "Content-Type: application/json" --data @review_answers_body.json
 ```
 
+### 3. Generate Knowledge Gaps
+
+```powershell
+curl -X POST "http://localhost:3000/.netlify/functions/analyze-gaps" -H "Content-Type: application/json" --data @analyze_gaps_body.json
+```
