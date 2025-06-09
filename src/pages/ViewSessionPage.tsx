@@ -187,7 +187,7 @@ const ViewSessionPage: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
             <GraduationCap className="h-8 w-8 text-primary mr-3" />
-            {session.session_name || `Session ${session.id.slice(0, 8)}`}
+            {session.session_name || `Session ${new Date(session.started_at).toLocaleDateString()} ${new Date(session.started_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
           </h1>
           <p className="mt-2 text-gray-600">
             Reviewing your past session - {new Date(session.started_at).toLocaleDateString()}
