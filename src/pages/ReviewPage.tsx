@@ -242,8 +242,14 @@ const ReviewPage: React.FC = () => {
         setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim() } : a));
       } else {
         const { error } = await supabase.from('review_answers').insert({
-          session_id: currentSessionId, question_index: currentQuestionIndex, user_id: user.id,
-          note_id: currentQuestion.noteId, question_text: currentQuestion.question, answer_text: userAnswer.trim()
+          session_id: currentSessionId,
+          question_index: currentQuestionIndex,
+          user_id: user.id,
+          note_id: currentQuestion.noteId,
+          question_text: currentQuestion.question,
+          answer_text: userAnswer.trim(),
+          original_difficulty: currentQuestion.difficulty,
+          note_title: currentQuestion.noteTitle
         });
         if (error) throw error;
         setUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
