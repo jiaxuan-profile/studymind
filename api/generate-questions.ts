@@ -13,7 +13,6 @@ interface NoteData {
   content: string;
   summary: string;
   embedding: string;
-  knowledge_graph?: { concepts: Array<{ name: string; definition: string }> };
   note_concepts: NoteConcept[];
   user_id: string;
 }
@@ -29,6 +28,16 @@ interface Question {
   connects?: string[];
   difficulty?: 'easy' | 'medium' | 'hard';
   mastery_context?: string;
+}
+
+interface KnowledgeGap {
+  type: string;
+  concept: string;
+  resources: string[];
+  connections: string[];
+  user_mastery: number;
+  missing_prerequisite: string;
+  reinforcement_strategy: string;
 }
 
 function extractJSONFromMarkdown(text: string): string {
@@ -47,6 +56,8 @@ const handler: Handler = async (event) => {
 
   try {
     const noteId = event.queryStringParameters?.noteId;
+    const difficulty = event.queryStringParameters?.difficulty;
+
     if (!noteId) {
       return {
         statusCode: 400,
@@ -58,25 +69,15 @@ const handler: Handler = async (event) => {
     const supabase: Client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-    console.log(`Fetching note with ID: ${noteId}`);
-
+    // Fetch note data
     const { data: note, error: noteError } = await supabase
       .from('notes')
-      .select('id, title, content, summary, knowledge_graph, note_concepts(concepts(name, definition), mastery_level), user_id')
+      .select('id, title, content, summary, note_concepts(concepts(name, definition), mastery_level), user_id')
       .eq('id', noteId)
       .single();
 
-    if (noteError) {
+    if (noteError || !note) {
       console.error("Supabase error fetching note:", noteError);
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: `Database error: ${noteError.message}` }),
-      };
-    }
-
-    if (!note) {
-      console.error(`Note with ID '${noteId}' not found in the database.`);
       return {
         statusCode: 404,
         headers,
@@ -84,11 +85,10 @@ const handler: Handler = async (event) => {
       };
     }
 
-    console.log("Note found:", note);
-
     const noteData: NoteData = note;
 
-    const { data: allUserConcepts, error: userConceptsError } = await supabase
+    // Fetch user's concept mastery profile
+    const { data: userConcepts, error: userConceptsError } = await supabase
       .from('note_concepts')
       .select('concepts!inner(name, definition), mastery_level')
       .eq('user_id', noteData.user_id);
@@ -97,13 +97,30 @@ const handler: Handler = async (event) => {
       console.error("Could not fetch user's overall concept mastery, proceeding without it.", userConceptsError);
     }
 
-    const strugglingConcepts = allUserConcepts?.filter(uc => uc.mastery_level < 0.3).map(uc => uc.concepts) ?? [];
-    const developingConcepts = allUserConcepts?.filter(uc => uc.mastery_level >= 0.3 && uc.mastery_level < 0.7).map(uc => uc.concepts) ?? [];
-    const masteredConcepts = allUserConcepts?.filter(uc => uc.mastery_level >= 0.7).map(uc => uc.concepts) ?? [];
+    // Fetch knowledge gaps for the note
+    const { data: noteGaps, error: noteGapsError } = await supabase
+      .from('note_gaps')
+      .select('gaps')
+      .eq('note_id', noteId)
+      .single();
+
+    if (noteGapsError) {
+      console.error("Could not fetch knowledge gaps, proceeding without it.", noteGapsError);
+    } else {
+      console.log("Fetched knowledge gaps:", noteGaps);
+    }
+
+    const gaps: KnowledgeGap[] = noteGaps?.gaps || [];
+
+    // Categorize concepts based on mastery levels
+    const strugglingConcepts = userConcepts?.filter(uc => uc.mastery_level < 0.3).map(uc => uc.concepts) || [];
+    const developingConcepts = userConcepts?.filter(uc => uc.mastery_level >= 0.3 && uc.mastery_level < 0.7).map(uc => uc.concepts) || [];
+    const masteredConcepts = userConcepts?.filter(uc => uc.mastery_level >= 0.7).map(uc => uc.concepts) || [];
 
     console.log(`User concept breakdown: Struggling(${strugglingConcepts.length}), Developing(${developingConcepts.length}), Mastered(${masteredConcepts.length})`);
 
-    const currentNoteConcepts = noteData.knowledge_graph?.concepts ?? noteData.note_concepts.flatMap(nc => nc.concepts ?? []);
+    // Extract current note concepts
+    const currentNoteConcepts = noteData.note_concepts.flatMap(nc => nc.concepts || []);
 
     const currentNoteConceptNames = new Set(currentNoteConcepts.map(c => c.name));
     const strugglingWithCurrentNote = strugglingConcepts.filter(c => currentNoteConceptNames.has(c.name));
@@ -113,6 +130,8 @@ const handler: Handler = async (event) => {
     }
 
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+
+    // Generate questions based on gaps, user's concept mastery, and optional difficulty
     const prompt = `
       You are an expert tutor generating practice questions based on a student's notes and their learning profile.
 
@@ -129,6 +148,7 @@ const handler: Handler = async (event) => {
       - Concepts the student is STRUGGLING with (<30% mastery): ${strugglingConcepts.map(c => c.name).join(', ') || 'None'}
       - Concepts the student is DEVELOPING (30-70% mastery): ${developingConcepts.map(c => c.name).join(', ') || 'None'}
       - Concepts the student has MASTERED (>=70% mastery): ${masteredConcepts.map(c => c.name).join(', ') || 'None'}
+      - Knowledge gaps identified: ${gaps.map(gap => gap.concept).join(', ') || 'None'}
 
       YOUR TASK:
       Generate 5-7 practice questions following these rules precisely.
@@ -139,6 +159,8 @@ const handler: Handler = async (event) => {
           - For "STRUGGLING" concepts, create 'easy' questions that test basic definitions and identification. If concepts from this note are on the struggling list, prioritize them.
           - For "DEVELOPING" or new concepts from this note, create 'medium' questions that require explanation, comparison, or application.
           - For "MASTERED" concepts, create 'hard' questions that connect them with new concepts from the note, requiring synthesis or analysis.
+          - For "Knowledge gaps", create questions that address the missing prerequisites and reinforce weak areas.
+          ${difficulty ? `- Generate questions with difficulty level: ${difficulty}.` : ''}
       3. FORMAT: Return ONLY a valid JSON array of objects, with no markdown code blocks or other text.
       4. HINTS: Provide a useful hint for each question that guides the student without giving away the answer.
 
@@ -167,7 +189,8 @@ const handler: Handler = async (event) => {
         ...currentNoteConcepts.map(c => c.name),
         ...strugglingConcepts.map(c => c.name),
         ...developingConcepts.map(c => c.name),
-        ...masteredConcepts.map(c => c.name)
+        ...masteredConcepts.map(c => c.name),
+        ...gaps.map(gap => gap.concept)
       ]);
 
       const validatedQuestions = questions
