@@ -32,7 +32,6 @@ const ReviewHistoryPage: React.FC = () => {
     loadReviewSessions();
   }, []);
 
-  // 2. ADD THE formatDuration HELPER FUNCTION
   const formatDuration = (seconds: number) => {
     if (!seconds || seconds <= 0) return null;
     const hours = Math.floor(seconds / 3600);
@@ -114,13 +113,14 @@ const ReviewHistoryPage: React.FC = () => {
           ) : (
             <div className="space-y-4">
               {reviewSessions.map((session) => (
-                <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                  onClick={() => navigate(`/session/${session.id}`)}
+                >
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <h3 className="font-medium text-gray-900">
-                        {session.session_name || `Session ${session.id.slice(0, 8)}`}
+                        {session.session_name || `Session ${new Date(session.started_at).toLocaleDateString()} ${new Date(session.started_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
                       </h3>
-                      {/* 3. UPDATE JSX TO DISPLAY THE DURATION */}
                       <div className="mt-2 flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
                         <span>
                           {session.questions_answered}/{session.total_questions} answered

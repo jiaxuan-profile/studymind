@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { PlusCircle, Clock, BookOpen, BrainCircuit, GraduationCap } from 'lucide-react';
+import { PlusCircle, Clock, BookOpen, BrainCircuit } from 'lucide-react';
 
 const HomePage: React.FC = () => {
   const { notes, concepts, isLoading, error } = useStore();

@@ -135,9 +135,12 @@ const ReviewPage: React.FC = () => {
         return total + (note?.questions.filter(q => selectedDifficulty === 'all' || q.difficulty === selectedDifficulty).length || 0);
       }, 0);
 
+      const now = new Date();
+      const sessionName = `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+
       const { data: session, error } = await supabase.from('review_sessions').insert({
         user_id: user.id,
-        session_name: `Review Session - ${new Date().toLocaleDateString()}`,
+        session_name: sessionName,
         selected_notes: selectedNotes,
         selected_difficulty: selectedDifficulty,
         total_questions: totalQuestions,
@@ -239,8 +242,14 @@ const ReviewPage: React.FC = () => {
         setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim() } : a));
       } else {
         const { error } = await supabase.from('review_answers').insert({
-          session_id: currentSessionId, question_index: currentQuestionIndex, user_id: user.id,
-          note_id: currentQuestion.noteId, question_text: currentQuestion.question, answer_text: userAnswer.trim()
+          session_id: currentSessionId,
+          question_index: currentQuestionIndex,
+          user_id: user.id,
+          note_id: currentQuestion.noteId,
+          question_text: currentQuestion.question,
+          answer_text: userAnswer.trim(),
+          original_difficulty: currentQuestion.difficulty,
+          note_title: currentQuestion.noteTitle
         });
         if (error) throw error;
         setUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
