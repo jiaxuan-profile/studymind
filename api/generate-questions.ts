@@ -48,6 +48,10 @@ function extractJSONFromMarkdown(text: string): string {
   return text.trim();
 }
 
+function generateQuestionId(): string {
+  return 'q_' + Math.random().toString(36).substr(2, 12);
+}
+
 const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -221,15 +225,50 @@ const handler: Handler = async (event) => {
         question: `Explain the concept of "${concept.name}" as described in your notes and provide an example.`,
         hint: `Review the definition: ${concept.definition}`,
         connects: [concept.name],
-        difficulty: index === 0 ? 'easy' : 'medium',
+        difficulty: index === 0 ? 'easy' : 'medium' as 'easy' | 'medium',
         mastery_context: `Tests your foundational understanding of ${concept.name}.`
       }));
     }
 
+    // Insert questions into the new questions table
+    const questionsToInsert = questions.slice(0, 5).map(q => ({
+      id: generateQuestionId(),
+      note_id: noteId,
+      question: q.question,
+      hint: q.hint,
+      connects: q.connects,
+      difficulty: q.difficulty,
+      mastery_context: q.mastery_context,
+      user_id: noteData.user_id
+    }));
+
+    const { data: insertedQuestions, error: insertError } = await supabase
+      .from('questions')
+      .insert(questionsToInsert)
+      .select();
+
+    if (insertError) {
+      console.error("Error inserting questions:", insertError);
+      // Still return the questions even if insertion fails
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          questions: questions.slice(0, 5),
+          warning: "Questions generated but not saved to database"
+        }),
+      };
+    }
+
+    console.log(`Successfully inserted ${insertedQuestions?.length || 0} questions`);
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(questions.slice(0, 5)),
+      body: JSON.stringify({
+        questions: insertedQuestions || questions.slice(0, 5),
+        message: `Generated and saved ${insertedQuestions?.length || 0} questions`
+      }),
     };
   } catch (error: any) {
     console.error("Critical error in generate-questions handler:", error);
