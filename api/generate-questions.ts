@@ -1,3 +1,5 @@
+// api/generate-questions.ts 
+
 import { createClient, Client } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Handler } from '@netlify/functions';
@@ -31,13 +33,17 @@ interface Question {
 }
 
 interface KnowledgeGap {
-  type: string;
+  id: string;
+  note_id: string;
   concept: string;
+  gap_type: string;
+  missing_prerequisite?: string;
+  user_mastery?: number;
   resources: string[];
-  connections: string[];
-  user_mastery: number;
-  missing_prerequisite: string;
   reinforcement_strategy: string;
+  priority_score?: number;
+  status: string;
+  user_id: string;
 }
 
 function extractJSONFromMarkdown(text: string): string {
@@ -103,10 +109,9 @@ const handler: Handler = async (event) => {
 
     // Fetch knowledge gaps for the note
     const { data: noteGaps, error: noteGapsError } = await supabase
-      .from('note_gaps')
-      .select('gaps')
-      .eq('note_id', noteId)
-      .single();
+      .from('knowledge_gaps')
+      .select('*')
+      .eq('note_id', noteId);
 
     if (noteGapsError) {
       console.error("Could not fetch knowledge gaps, proceeding without it.", noteGapsError);
@@ -114,7 +119,7 @@ const handler: Handler = async (event) => {
       console.log("Fetched knowledge gaps:", noteGaps);
     }
 
-    const gaps: KnowledgeGap[] = noteGaps?.gaps || [];
+    const gaps: KnowledgeGap[] = noteGaps || [];
 
     // Categorize concepts based on mastery levels
     const strugglingConcepts = userConcepts?.filter(uc => uc.mastery_level < 0.3).map(uc => uc.concepts) || [];
@@ -206,8 +211,7 @@ const handler: Handler = async (event) => {
           mastery_context: q.mastery_context || 'Tests concepts from your notes.',
         }))
         .filter(q => {
-          if (!q.question || q.question.length < 15) return false;
-          return q.connects && q.connects.some(concept => allRelevantConcepts.has(concept));
+          return q.question && q.question.length > 15;
         });
 
       if (validatedQuestions.length === 0) {
