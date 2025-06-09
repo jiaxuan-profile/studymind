@@ -12,6 +12,7 @@ import { supabase } from '../services/supabase';
 
 // Interfaces specific to the review process
 interface Question {
+  id: string; // Corresponds to the ID from the new 'questions' table
   question: string;
   hint?: string;
   connects?: string[];
@@ -84,7 +85,7 @@ const ReviewPage: React.FC = () => {
 
   useEffect(() => {
     loadNotesWithQuestions();
-  }, []);
+  }, [notes]); // Re-run if notes from the store change
 
   useEffect(() => {
     if (currentQuestions.length > 0) {
@@ -109,14 +110,50 @@ const ReviewPage: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-      const { data: noteQuestions, error } = await supabase.from('note_questions').select('note_id, questions').eq('user_id', user.id);
+      
+      const { data: allQuestions, error } = await supabase
+        .from('questions')
+        .select('id, note_id, question, hint, connects, difficulty, mastery_context')
+        .eq('user_id', user.id);
+
       if (error) throw error;
-      const notesWithQuestionsData: NoteWithQuestions[] = (noteQuestions || [])
-        .map(nq => {
-          const note = notes.find(n => n.id === nq.note_id);
-          return note && nq.questions && Array.isArray(nq.questions) ? { id: note.id, title: note.title, tags: note.tags, questions: nq.questions as Question[] } : null;
+      if (!allQuestions) {
+        setNotesWithQuestions([]);
+        setLoading(false);
+        return;
+      }
+
+      const questionsByNoteId = allQuestions.reduce<Record<string, Question[]>>((acc, q) => {
+        if (!q.note_id) return acc;
+        if (!acc[q.note_id]) {
+          acc[q.note_id] = [];
+        }
+        acc[q.note_id].push({
+          id: q.id,
+          question: q.question,
+          hint: q.hint,
+          connects: q.connects,
+          difficulty: q.difficulty,
+          mastery_context: q.mastery_context
+        });
+        return acc;
+      }, {});
+
+      const notesWithQuestionsData: NoteWithQuestions[] = notes
+        .map(note => {
+          const questionsForNote = questionsByNoteId[note.id];
+          if (questionsForNote && questionsForNote.length > 0) {
+            return {
+              id: note.id,
+              title: note.title,
+              tags: note.tags,
+              questions: questionsForNote,
+            };
+          }
+          return null;
         })
         .filter((n): n is NoteWithQuestions => n !== null);
+
       setNotesWithQuestions(notesWithQuestionsData);
     } catch (error) {
       console.error('Error loading notes with questions:', error);
@@ -686,14 +723,14 @@ const ReviewPage: React.FC = () => {
                       <span className="ml-1 capitalize">{currentQuestion.difficulty}</span>
                     </div>
                   </div>
-                  <span className="text-sm text-gray-500">
-                    {userAnswers.length} of {currentQuestions.length} answered
+                  <span className="text-sm font-medium text-gray-600">
+                    Question {currentQuestionIndex + 1} / {currentQuestions.length}
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3">
                   <div 
                     className="bg-gradient-to-r from-primary to-secondary h-3 rounded-full transition-all duration-500 ease-out" 
-                    style={{ width: `${(userAnswers.length / currentQuestions.length) * 100}%` }}
+                    style={{ width: `${((currentQuestionIndex + 1) / currentQuestions.length) * 100}%` }}
                   ></div>
                 </div>
               </div>
@@ -704,9 +741,11 @@ const ReviewPage: React.FC = () => {
                     <div className="flex items-center">
                       <BookOpen className="h-5 w-5 text-gray-400 mr-2" />
                       <span className="text-sm text-gray-600">From note:</span>
-                      <span className="ml-2 text-sm font-medium text-primary">
+                      {/* --- FIX START --- */}
+                      <Link to={`/notes/${currentQuestion.noteId}`} className="ml-2 text-sm font-medium text-primary hover:underline">
                         {currentQuestion.noteTitle}
-                      </span>
+                      </Link>
+                      {/* --- FIX END --- */}
                     </div>
                     {currentQuestion.connects && currentQuestion.connects.length > 0 && (
                       <div className="flex flex-wrap gap-1">
