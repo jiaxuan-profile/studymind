@@ -12,6 +12,10 @@ StudyMind supports both formative and summative assessment strategies:
 - **Immediate Feedback**: Get instant AI-powered explanations and concept clarifications
 - **Self-Assessment**: Generate practice questions to test your knowledge
 - **Adaptive Learning**: Focus more on challenging concepts based on your performance
+- **Mastery-Based Learning**:
+- - Tier 1 (Mastered ≥70%): Questions connect new concepts to existing expertise
+- - Tier 2 (Developing 30-70%): Targeted practice to strengthen partial understanding
+- - Tier 3 (Struggling <30%): Foundational reinforcement for weak areas
 
 ### Summative Assessment
 - **Exam Preparation**: Comprehensive review of all covered material
@@ -63,6 +67,15 @@ StudyMind supports both formative and summative assessment strategies:
 - Performance insights and trends
 - Focus time analytics and productivity metrics
 
+### 🎯 Concept Mastery System
+- **3-Tier Mastery Classification**:
+  - 🟢 Mastered (≥70%): Used as foundation for new questions
+  - 🟡 Developing (30-70%): Targeted with focused practice
+  - 🔴 Struggling (<30%): Flagged for remedial attention
+- **Adaptive Question Weights**:
+  - Higher frequency of developing concept questions
+  - Gradual reintroduction of struggling concepts
+  
 ## Database Setup
 
 All database migrations are located in the `supabase/migrations/` folder. Execute them in order to set up the complete database schema:
@@ -111,7 +124,10 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
 
 ### ✅ AI-Powered Question Generation
 - **Automatic Question Creation**: Generate review questions from uploaded documents
-- **Mastery-Aware Questions**: Questions that build on existing knowledge
+- **Mastery-Aware Questions**:
+- - Personalize difficulty based on concept mastery tiers
+- - Connect new concepts to mastered/developing knowledge
+- - Exclude questions relying on struggling concepts (<30%)
 - **Difficulty Levels**: Easy, medium, and hard questions based on concept complexity
 - **Contextual Hints**: AI-generated hints to guide learning
 
