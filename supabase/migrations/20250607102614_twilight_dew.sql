@@ -1,3 +1,12 @@
+-- Create default subjects for existing users who don't have one
+INSERT INTO subjects (name, description, user_id)
+SELECT 'General', 'General subject for all notes', u.id
+FROM auth.users u
+WHERE NOT EXISTS (
+    SELECT 1 FROM subjects s 
+    WHERE s.user_id = u.id AND s.name = 'General'
+);
+
 -- Create review_answers table to store user answers to review questions
 CREATE TABLE IF NOT EXISTS review_answers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
