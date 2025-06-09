@@ -2,10 +2,6 @@ import { GoogleGenerativeAI, TaskType, Content } from "@google/generative-ai";
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async (event, context) => {
-  console.log("------------------------------------------------------");
-  console.log(`SERVERLESS: /api/generate-embedding invoked at ${new Date().toISOString()}`);
-  console.log("SERVERLESS: Request method:", event.httpMethod);
-  console.log("SERVERLESS: Request headers:", JSON.stringify(event.headers, null, 2));
 
   if (event.httpMethod !== 'POST') {
     console.warn("SERVERLESS: Method not allowed. Responding with 405.");
@@ -20,7 +16,6 @@ export const handler: Handler = async (event, context) => {
   }
 
   try {
-    console.log("SERVERLESS: Attempting to read GEMINI_API_KEY from process.env.");
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
@@ -32,11 +27,8 @@ export const handler: Handler = async (event, context) => {
         })
       };
     }
-    console.log("SERVERLESS: GEMINI_API_KEY is present (length > 0):", apiKey.length > 0);
 
-    console.log("SERVERLESS: Attempting to parse request body.");
     const requestBody = JSON.parse(event.body || '{}');
-    console.log("SERVERLESS: Raw request body:", JSON.stringify(requestBody, null, 2));
 
     const { text, title } = requestBody;
 
@@ -77,18 +69,13 @@ export const handler: Handler = async (event, context) => {
 
     console.log(`SERVERLESS: Successfully parsed 'text' (length: ${text.length}) and 'title' (length: ${title.length}) from body.`);
 
-    console.log("SERVERLESS: Initializing GoogleGenerativeAI SDK.");
     const genAI = new GoogleGenerativeAI(apiKey);
     const embeddingModel = "models/embedding-001";
-    console.log(`SERVERLESS: Using embedding model: ${embeddingModel}`);
 
     const contentRequest: Content = {
       parts: [{ text: text.trim() }], // Trim whitespace
       role: "user"
     };
-    console.log("SERVERLESS: Prepared contentRequest:", JSON.stringify(contentRequest, null, 2));
-
-    console.log(`SERVERLESS: Calling genAI.embedContent with taskType: RETRIEVAL_DOCUMENT and title: "${title}"`);
     
     const result = await genAI.getGenerativeModel({ model: embeddingModel }).embedContent({
       content: contentRequest,
@@ -96,8 +83,6 @@ export const handler: Handler = async (event, context) => {
       title: title.trim()
     });
     
-    console.log("SERVERLESS: genAI.embedContent call completed.");
-
     if (!result || !result.embedding || !result.embedding.values || result.embedding.values.length === 0) {
       console.error('SERVERLESS: Embedding, embedding.values, or values array is undefined or empty in the API result.');
       console.error('SERVERLESS: Full API result object:', JSON.stringify(result, null, 2));
