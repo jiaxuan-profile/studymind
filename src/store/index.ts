@@ -55,6 +55,7 @@ interface State {
 
 export const useStore = create<State>((set, get) => ({
   notes: [],
+  linkedConcepts: [],
   concepts: [],
   relationships: [],
   currentNote: null,
@@ -74,7 +75,7 @@ export const useStore = create<State>((set, get) => ({
 
     try {
       const { data, count } = await getAllNotes(page, pageSize);
-      const totalPages = Math.ceil(count / pageSize);
+      const totalPages = Math.ceil((count ?? 0) / pageSize);
       
       set({ 
         notes: data.map(note => ({
@@ -89,7 +90,7 @@ export const useStore = create<State>((set, get) => ({
           currentPage: page,
           totalPages,
           pageSize,
-          totalNotes: count
+          totalNotes: count ?? 0
         }
       });
     } catch (error) {

@@ -3,9 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { History, ArrowLeft, Play, Clock } from 'lucide-react'; // 1. IMPORT Clock ICON
+import { History, ArrowLeft, Play, Clock } from 'lucide-react';
+import Pagination from '../components/Pagination';
 
-// This interface defines the shape of a single session object
 interface ReviewSession {
   id: string;
   session_name?: string;
@@ -26,18 +26,27 @@ interface ReviewSession {
 const ReviewHistoryPage: React.FC = () => {
   const [reviewSessions, setReviewSessions] = useState<ReviewSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState({
+    currentPage: 1,
+    pageSize: 12,
+    totalPages: 1,
+    totalSessions: 0,
+  });
   const navigate = useNavigate();
 
   useEffect(() => {
-    loadReviewSessions();
-  }, []);
+    const fetchData = async () => {
+      await loadReviewSessions();
+    };
+    fetchData();
+  }, [pagination.currentPage, pagination.pageSize]);
 
-  const formatDuration = (seconds: number) => {
-    if (!seconds || seconds <= 0) return null;
+  const formatDuration = (seconds: number | undefined) => {
+    if (seconds === undefined || seconds <= 0) return null;
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     return [
       hours > 0 ? `${hours}h` : '',
       minutes > 0 ? `${minutes}m` : '',
@@ -51,20 +60,38 @@ const ReviewHistoryPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
-      const { data: sessions, error } = await supabase
+      const from = (pagination.currentPage - 1) * pagination.pageSize;
+      const to = from + pagination.pageSize - 1;
+
+      const { data: sessions, error, count } = await supabase
         .from('review_sessions')
-        .select('*')
+        .select('*', { count: 'exact' })
         .eq('user_id', user.id)
         .order('started_at', { ascending: false })
-        .limit(20);
+        .range(from, to);
 
       if (error) throw error;
-      setReviewSessions((sessions as ReviewSession[]) || []);
+
+      setReviewSessions(sessions as ReviewSession[] || []);
+      setPagination(prev => ({
+        ...prev,
+        totalSessions: count || 0,
+        totalPages: Math.ceil((count || 0) / prev.pageSize),
+      }));
     } catch (error) {
       console.error('Error loading review sessions:', error);
+      setReviewSessions([]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const setPage = (page: number) => {
+    setPagination(prev => ({ ...prev, currentPage: page }));
+  };
+
+  const setPageSize = (size: number) => {
+    setPagination(prev => ({ ...prev, pageSize: size, currentPage: 1 }));
   };
 
   return (
@@ -92,88 +119,108 @@ const ReviewHistoryPage: React.FC = () => {
         <div className="p-6">
           {loading ? (
             <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading history...</p>
-            </div>
-          ) : reviewSessions.length === 0 ? (
-            <div className="text-center py-12">
-              <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Review Sessions Yet</h3>
-              <p className="text-gray-600 mb-4">
-                Start your first review session to see your progress here.
-              </p>
-              <Link
-                to="/review"
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Start Review Session
-              </Link>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading history...</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {reviewSessions.map((session) => (
-                <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
-                  onClick={() => navigate(`/session/${session.id}`)}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900">
-                        {session.session_name || `Session ${new Date(session.started_at).toLocaleDateString()} ${new Date(session.started_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
-                      </h3>
-                      <div className="mt-2 flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
-                        <span>
-                          {session.questions_answered}/{session.total_questions} answered
-                        </span>
-                        <span>
-                          {session.questions_rated} rated
-                        </span>
-                        {session.duration_seconds && (
-                          <span className="flex items-center">
-                            <Clock className="h-4 w-4 mr-1.5 text-gray-500" />
-                            {formatDuration(session.duration_seconds)}
-                          </span>
-                        )}
-                        <span className="capitalize">
-                          {session.selected_difficulty} difficulty
-                        </span>
-                      </div>
-                      <div className="mt-2 flex items-center space-x-2">
-                        {session.easy_ratings > 0 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
-                            {session.easy_ratings} easy
-                          </span>
-                        )}
-                        {session.medium_ratings > 0 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                            {session.medium_ratings} medium
-                          </span>
-                        )}
-                        {session.hard_ratings > 0 && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
-                            {session.hard_ratings} hard
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0 ml-4">
-                      <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                        session.session_status === 'completed' 
-                          ? 'bg-green-100 text-green-800'
-                          : session.session_status === 'in_progress'
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
-                        {session.session_status.replace('_', ' ')}
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {new Date(session.started_at).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
+            <>
+              {reviewSessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Review Sessions Yet</h3>
+                  <p className="text-gray-600 mb-4">
+                    Start your first review session to see your progress here.
+                  </p>
+                  <Link
+                    to="/review"
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
+                  >
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Review Session
+                  </Link>
                 </div>
-              ))}
-            </div>
+              ) : (
+                <>
+                  <div className="space-y-4">
+                    {reviewSessions.map((session) => (
+                      <div key={session.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition-colors"
+                        onClick={() => navigate(`/session/${session.id}`)}
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900">
+                              {session.session_name || `Session ${new Date(session.started_at).toLocaleDateString()} ${new Date(session.started_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
+                            </h3>
+                            <div className="mt-2 flex items-center flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600">
+                              <span>
+                                {session.questions_answered}/{session.total_questions} answered
+                              </span>
+                              <span>
+                                {session.questions_rated} rated
+                              </span>
+                              {session.duration_seconds !== undefined && (
+                                <span className="flex items-center">
+                                  <Clock className="h-4 w-4 mr-1.5 text-gray-500" />
+                                  {formatDuration(session.duration_seconds)}
+                                </span>
+                              )}
+                              <span className="capitalize">
+                                {session.selected_difficulty} difficulty
+                              </span>
+                            </div>
+                            <div className="mt-2 flex items-center space-x-2">
+                              {session.easy_ratings > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  {session.easy_ratings} easy
+                                </span>
+                              )}
+                              {session.medium_ratings > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                  {session.medium_ratings} medium
+                                </span>
+                              )}
+                              {session.hard_ratings > 0 && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                  {session.hard_ratings} hard
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-4">
+                            <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              session.session_status === 'completed'
+                                ? 'bg-green-100 text-green-800'
+                                : session.session_status === 'in_progress'
+                                ? 'bg-blue-100 text-blue-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {session.session_status.replace('_', ' ')}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              {new Date(session.started_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination */}
+                  <div className="mt-8">
+                    <Pagination
+                      currentPage={pagination.currentPage}
+                      totalPages={pagination.totalPages}
+                      onPageChange={setPage}
+                    />
+                    <p className="text-center mt-4 text-sm text-gray-500">
+                      Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}
+                      {Math.min(pagination.currentPage * pagination.pageSize, pagination.totalSessions)} of{' '}
+                      {pagination.totalSessions} sessions
+                    </p>
+                  </div>
+                </>
+              )}
+            </>
           )}
         </div>
       </div>
