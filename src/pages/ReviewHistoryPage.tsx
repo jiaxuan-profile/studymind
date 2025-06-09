@@ -32,7 +32,6 @@ const ReviewHistoryPage: React.FC = () => {
     loadReviewSessions();
   }, []);
 
-  // 2. ADD THE formatDuration HELPER FUNCTION
   const formatDuration = (seconds: number) => {
     if (!seconds || seconds <= 0) return null;
     const hours = Math.floor(seconds / 3600);
