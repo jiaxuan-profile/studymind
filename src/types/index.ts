@@ -8,6 +8,10 @@ export interface Note {
   createdAt: Date;
   updatedAt: Date;
   embedding?: number[];
+  // PDF storage fields
+  pdfStoragePath?: string;
+  pdfPublicUrl?: string;
+  originalFilename?: string;
 }
 
 export interface Concept {

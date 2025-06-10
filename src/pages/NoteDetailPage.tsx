@@ -10,11 +10,16 @@ import {
   X, 
   BrainCircuit, 
   Lightbulb,
-  HelpCircle
+  HelpCircle,
+  FileText,
+  Eye,
+  ToggleLeft,
+  ToggleRight
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase } from '../services/databaseServiceClient'; 
+import { saveNoteToDatabase } from '../services/databaseServiceClient';
+import PDFViewer from '../components/PDFViewer';
 
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -37,6 +42,13 @@ const NoteDetailPage: React.FC = () => {
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
+  
+  // PDF viewing state
+  const [viewMode, setViewMode] = useState<'text' | 'pdf'>('text');
+  const [pdfInfo, setPdfInfo] = useState<{
+    publicUrl: string;
+    fileName: string;
+  } | null>(null);
 
   useEffect(() => {
     // Clear the location state after initial setup
@@ -59,13 +71,47 @@ const NoteDetailPage: React.FC = () => {
         content: foundNote.content,
         tags: foundNote.tags.join(', '),
       });
+
+      // Check if this note has PDF storage info
+      if (foundNote.pdfPublicUrl && foundNote.originalFilename) {
+        setPdfInfo({
+          publicUrl: foundNote.pdfPublicUrl,
+          fileName: foundNote.originalFilename
+        });
+      } else {
+        // Try to fetch PDF info from database if not in store
+        fetchPdfInfo(foundNote.id);
+      }
     }
   }, [id, notes, navigate]);
+
+  const fetchPdfInfo = async (noteId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .select('pdf_public_url, original_filename')
+        .eq('id', noteId)
+        .single();
+
+      if (error) throw error;
+
+      if (data?.pdf_public_url && data?.original_filename) {
+        setPdfInfo({
+          publicUrl: data.pdf_public_url,
+          fileName: data.original_filename
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching PDF info:', error);
+    }
+  };
   
   if (!note) {
     console.log("NoteDetailPage: Note is not yet available or not found, rendering null.");
     return null;
   }
+
+  const isPdfNote = note.tags.includes('PDF') || pdfInfo;
   
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
@@ -108,7 +154,7 @@ const NoteDetailPage: React.FC = () => {
 
       const noteToSave = { 
         id: note.id,
-        user_id: user.id, // Add user_id to the note data
+        user_id: user.id,
         title: updatedTitle,
         content: updatedContent,
         tags: updatedTags,
@@ -151,17 +197,6 @@ const NoteDetailPage: React.FC = () => {
     setAiResponse(null); 
     
     // TODO: Replace this with an actual API call to a serverless function
-    // This serverless function would:
-    // 1. Take the note content (or its embedding) and the aiQuestion.
-    // 2. Use the Gemini API (or another LLM) to generate a response.
-    //    - For summarization/explanation based on current note: pass note.content + aiQuestion
-    //    - For finding related notes:
-    //        - Generate embedding for aiQuestion (using `generateEmbeddingOnClient` or a dedicated query embedding function)
-    //        - Call another serverless function that performs a vector similarity search in Supabase
-    //          using the query embedding against the stored note embeddings.
-    //        - That function returns IDs/content of related notes.
-    //        - Format the response.
-
     console.log(`Simulating AI call with question: "${aiQuestion}" for note: "${note.title}"`);
 
     // Simulating AI response with a delay
@@ -208,6 +243,10 @@ I can help with:
       setAiLoading(false);
     }, 1500);
   };
+
+  const toggleViewMode = () => {
+    setViewMode(prev => prev === 'text' ? 'pdf' : 'text');
+  };
  
   return (
     <div className="fade-in">
@@ -221,6 +260,31 @@ I can help with:
         </button>
         
         <div className="flex space-x-2">
+          {/* PDF/Text Toggle for PDF notes */}
+          {isPdfNote && pdfInfo && !editMode && (
+            <button
+              onClick={toggleViewMode}
+              className="flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            >
+              {viewMode === 'text' ? (
+                <>
+                  <Eye className="h-4 w-4 mr-1" />
+                  View PDF
+                </>
+              ) : (
+                <>
+                  <FileText className="h-4 w-4 mr-1" />
+                  View Text
+                </>
+              )}
+              {viewMode === 'text' ? (
+                <ToggleLeft className="h-4 w-4 ml-1" />
+              ) : (
+                <ToggleRight className="h-4 w-4 ml-1" />
+              )}
+            </button>
+          )}
+
           {!editMode ? (
             <>
               <button
@@ -265,7 +329,22 @@ I can help with:
         <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {!editMode ? (
             <div className="p-6">
-              <h1 className="text-3xl font-bold text-gray-900 mb-4">{note.title}</h1>
+              <div className="flex items-center justify-between mb-4">
+                <h1 className="text-3xl font-bold text-gray-900">{note.title}</h1>
+                {isPdfNote && (
+                  <div className="flex items-center space-x-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <FileText className="h-3 w-3 mr-1" />
+                      PDF Document
+                    </span>
+                    {pdfInfo && (
+                      <span className="text-xs text-gray-500">
+                        Viewing: {viewMode === 'text' ? 'Extracted Text' : 'Original PDF'}
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
               
               <div className="flex flex-wrap gap-2 mb-6">
                 {note.tags.map((tag, i) => (
@@ -278,13 +357,27 @@ I can help with:
                 ))}
               </div>
               
-              <div className="prose prose-indigo max-w-none note-content">
-                <ReactMarkdown>{note.content}</ReactMarkdown>
-              </div>
+              {/* Content Display - Toggle between text and PDF */}
+              {viewMode === 'text' || !pdfInfo ? (
+                <div className="prose prose-indigo max-w-none note-content">
+                  <ReactMarkdown>{note.content}</ReactMarkdown>
+                </div>
+              ) : (
+                <PDFViewer 
+                  pdfUrl={pdfInfo.publicUrl}
+                  fileName={pdfInfo.fileName}
+                />
+              )}
               
               <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500">
                 <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
                 <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
+                {isPdfNote && (
+                  <p className="flex items-center mt-1">
+                    <FileText className="h-4 w-4 mr-1" />
+                    Original PDF stored and available for viewing
+                  </p>
+                )}
               </div>
             </div>
           ) : (
@@ -327,6 +420,20 @@ I can help with:
                   onChange={(e) => setEditedNote({ ...editedNote, tags: e.target.value })}
                 />
               </div>
+
+              {isPdfNote && pdfInfo && (
+                <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 text-blue-600 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-900">PDF Document Attached</p>
+                      <p className="text-xs text-blue-700">
+                        Original file: {pdfInfo.fileName} - The PDF will remain available after editing
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -438,6 +545,11 @@ I can help with:
                   <p className="text-gray-600">
                     Ask me anything about this note. I can summarize, explain concepts, or help you study effectively.
                   </p>
+                  {isPdfNote && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      I can analyze both the extracted text and help you understand the PDF content.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

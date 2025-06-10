@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
+import { uploadPDFToStorage } from '../services/pdfStorageService';
 import { supabase } from '../services/supabase';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.mjs';
@@ -55,6 +56,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
 
       let content = '';
       const fileType = file.name.split('.').pop()?.toLowerCase();
+      let pdfStorageInfo = null;
 
       switch (fileType) {
         case 'pdf':
@@ -85,6 +87,19 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       let tags = [fileType.toUpperCase(), 'Imported'];
       let summary = '';
 
+      // For PDF files, upload to storage
+      if (fileType === 'pdf') {
+        try {
+          console.log("Uploading PDF to storage...");
+          pdfStorageInfo = await uploadPDFToStorage(file, id);
+          console.log("PDF uploaded to storage successfully:", pdfStorageInfo);
+          tags.push('PDF');
+        } catch (storageError) {
+          console.warn("Failed to upload PDF to storage:", storageError);
+          // Continue without storage - we still have the extracted text
+        }
+      }
+
       // Generate embedding
       console.log("Generating embedding for uploaded document...");
       const embedding = await generateEmbeddingOnClient(content, title);
@@ -93,7 +108,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // Save to database first
       const noteData = {
         id,
-        user_id: user.id, // Add user_id to the note data
+        user_id: user.id,
         title,
         content,
         tags,
@@ -101,7 +116,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         embedding,
         analysis_status: 'pending',
         updatedAt: now.toISOString(),
-        createdAt: now.toISOString()
+        createdAt: now.toISOString(),
+        // Add PDF storage information if available
+        ...(pdfStorageInfo && {
+          pdf_storage_path: pdfStorageInfo.path,
+          pdf_public_url: pdfStorageInfo.publicUrl,
+          original_filename: pdfStorageInfo.fileName
+        })
       };
 
       console.log("Saving document to database...");
@@ -163,7 +184,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         summary,
         embedding,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
+        // Add PDF info to store as well
+        ...(pdfStorageInfo && {
+          pdfStoragePath: pdfStorageInfo.path,
+          pdfPublicUrl: pdfStorageInfo.publicUrl,
+          originalFilename: pdfStorageInfo.fileName
+        })
       });
 
       if (onClose) onClose();
@@ -293,6 +320,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
                   Supported formats: PDF, DOCX, MD, TXT
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  PDF files will be stored for viewing alongside extracted text
                 </p>
               </>
             )}

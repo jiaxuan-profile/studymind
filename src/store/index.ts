@@ -83,7 +83,11 @@ export const useStore = create<State>((set, get) => ({
           createdAt: new Date(note.created_at),
           updatedAt: new Date(note.updated_at),
           tags: note.tags || [],
-          summary: note.summary
+          summary: note.summary,
+          // Map PDF storage fields
+          pdfStoragePath: note.pdf_storage_path,
+          pdfPublicUrl: note.pdf_public_url,
+          originalFilename: note.original_filename
         })),
         isLoading: false,
         pagination: {
