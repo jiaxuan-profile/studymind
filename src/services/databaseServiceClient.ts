@@ -3,7 +3,7 @@ import { createHash } from 'crypto';
 
 interface NotePayload {
   id: string;
-  user_id: string; // Added user_id field
+  user_id: string;
   title: string;
   content: string;
   summary?: string;
@@ -12,6 +12,10 @@ interface NotePayload {
   updatedAt: string;
   createdAt?: string;
   contentHash?: string;
+  // PDF storage fields
+  pdf_storage_path?: string;
+  pdf_public_url?: string;
+  original_filename?: string;
 }
 
 function generateContentHash(content: string): string {
@@ -52,7 +56,8 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       title: noteData.title,
       tags: noteData.tags,
       hasSummary: !!noteData.summary,
-      hasEmbedding: !!noteData.embedding
+      hasEmbedding: !!noteData.embedding,
+      hasPdfStorage: !!noteData.pdf_storage_path
     });
 
     // Generate content hash if not provided
@@ -70,7 +75,11 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         embedding: noteData.embedding,
         updated_at: noteData.updatedAt,
         created_at: noteData.createdAt || noteData.updatedAt,
-        content_hash: contentHash
+        content_hash: contentHash,
+        // PDF storage fields
+        pdf_storage_path: noteData.pdf_storage_path,
+        pdf_public_url: noteData.pdf_public_url,
+        original_filename: noteData.original_filename
       })
       .select();
 
