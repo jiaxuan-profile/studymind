@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { createHash } from 'crypto';
+import { deletePDFFromStorage } from './pdfStorageService';
 
 interface NotePayload {
   id: string;
@@ -162,15 +163,43 @@ export async function deleteNoteFromDatabase(id: string): Promise<void> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
 
-    const { error } = await supabase
+    // First, fetch the note to check if it has an associated PDF file
+    const { data: noteData, error: fetchError } = await supabase
+      .from('notes')
+      .select('pdf_storage_path, original_filename')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error("Database Service: Error fetching note for deletion:", fetchError);
+      throw new Error(`Failed to fetch note for deletion: ${fetchError.message}`);
+    }
+
+    // If the note has a PDF file, try to delete it from storage
+    if (noteData?.pdf_storage_path) {
+      try {
+        console.log("Database Service: Deleting associated PDF file:", noteData.pdf_storage_path);
+        await deletePDFFromStorage(noteData.pdf_storage_path);
+        console.log("Database Service: PDF file deleted successfully");
+      } catch (storageError) {
+        // Log the error but don't fail the entire deletion process
+        console.error("Database Service: Failed to delete PDF file (continuing with note deletion):", storageError);
+        // We continue with deleting the note record even if PDF deletion fails
+        // to prevent orphaned database entries
+      }
+    }
+
+    // Delete the note record from the database
+    const { error: deleteError } = await supabase
       .from('notes')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);
 
-    if (error) {
-      console.error("Database Service: Supabase error:", error);
-      throw new Error(`Failed to delete note: ${error.message}`);
+    if (deleteError) {
+      console.error("Database Service: Supabase error:", deleteError);
+      throw new Error(`Failed to delete note: ${deleteError.message}`);
     }
 
     console.log("Database Service: Note deleted successfully");
