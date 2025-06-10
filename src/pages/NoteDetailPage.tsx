@@ -18,13 +18,38 @@ import {
   Sparkles,
   AlertTriangle,
   CheckCircle,
-  ExternalLink
+  ExternalLink,
+  Target,
+  BookOpen,
+  Zap,
+  RefreshCw,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
+import { uploadPDFToStorage } from '../services/pdfStorageService';
 import PDFViewer from '../components/PDFViewer';
+
+interface KnowledgeGap {
+  id: string;
+  concept: string;
+  gap_type: 'prerequisite' | 'reinforcement' | 'connection' | 'general';
+  missing_prerequisite?: string;
+  user_mastery?: number;
+  resources: string[];
+  reinforcement_strategy: string;
+  priority_score?: number;
+  status: 'identified' | 'in_progress' | 'resolved';
+}
+
+interface Concept {
+  id: string;
+  name: string;
+  definition: string;
+}
 
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -61,6 +86,11 @@ const NoteDetailPage: React.FC = () => {
   const [conceptsLoading, setConceptsLoading] = useState(true);
   const [gapsLoading, setGapsLoading] = useState(true);
   const [aiProcessing, setAiProcessing] = useState(false);
+
+  // New state for actual data
+  const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
+  const [relatedConcepts, setRelatedConcepts] = useState<Concept[]>([]);
+  const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Clear the location state after initial setup
@@ -126,31 +156,42 @@ const NoteDetailPage: React.FC = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Check for concepts
+      // Check for concepts and fetch them
       setConceptsLoading(true);
-      const { data: concepts, error: conceptsError } = await supabase
+      const { data: conceptsData, error: conceptsError } = await supabase
         .from('note_concepts')
-        .select('concept_id')
+        .select(`
+          concepts:concepts(
+            id,
+            name,
+            definition
+          )
+        `)
         .eq('note_id', noteId)
-        .eq('user_id', user.id)
-        .limit(1);
+        .eq('user_id', user.id);
 
-      if (!conceptsError) {
-        setConceptsExist((concepts?.length || 0) > 0);
+      if (!conceptsError && conceptsData) {
+        const concepts = conceptsData
+          .map(item => item.concepts)
+          .filter(concept => concept !== null) as Concept[];
+        
+        setRelatedConcepts(concepts);
+        setConceptsExist(concepts.length > 0);
       }
       setConceptsLoading(false);
 
-      // Check for knowledge gaps
+      // Check for knowledge gaps and fetch them
       setGapsLoading(true);
-      const { data: gaps, error: gapsError } = await supabase
+      const { data: gapsData, error: gapsError } = await supabase
         .from('knowledge_gaps')
-        .select('id')
+        .select('*')
         .eq('note_id', noteId)
         .eq('user_id', user.id)
-        .limit(1);
+        .order('priority_score', { ascending: false });
 
-      if (!gapsError) {
-        setGapsExist((gaps?.length || 0) > 0);
+      if (!gapsError && gapsData) {
+        setKnowledgeGaps(gapsData as KnowledgeGap[]);
+        setGapsExist(gapsData.length > 0);
       }
       setGapsLoading(false);
 
@@ -195,6 +236,38 @@ const NoteDetailPage: React.FC = () => {
       alert('Failed to generate AI analysis. Please try again.');
     } finally {
       setAiProcessing(false);
+    }
+  };
+
+  const toggleGapExpansion = (gapId: string) => {
+    setExpandedGaps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(gapId)) {
+        newSet.delete(gapId);
+      } else {
+        newSet.add(gapId);
+      }
+      return newSet;
+    });
+  };
+
+  const getGapTypeIcon = (gapType: string) => {
+    switch (gapType) {
+      case 'prerequisite': return <AlertTriangle className="h-4 w-4 text-red-500" />;
+      case 'reinforcement': return <RefreshCw className="h-4 w-4 text-yellow-500" />;
+      case 'connection': return <BrainCircuit className="h-4 w-4 text-blue-500" />;
+      case 'general': return <BookOpen className="h-4 w-4 text-gray-500" />;
+      default: return <HelpCircle className="h-4 w-4 text-gray-500" />;
+    }
+  };
+
+  const getGapTypeColor = (gapType: string) => {
+    switch (gapType) {
+      case 'prerequisite': return 'bg-red-50 text-red-700 border-red-200';
+      case 'reinforcement': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+      case 'connection': return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'general': return 'bg-gray-50 text-gray-700 border-gray-200';
+      default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
   
@@ -556,8 +629,8 @@ I can help with:
                 className="text-gray-500 hover:text-gray-700"
               >
                 {showAiPanel ? (
-                  <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
-                    <path fillRule="evenodd\" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -677,10 +750,10 @@ I can help with:
                   ) : conceptsExist ? (
                     <button 
                       onClick={() => navigate('/concepts')}
-                      className="text-left hover:text-primary transition-colors"
+                      className="text-left hover:text-primary transition-colors w-full"
                     >
                       <div className="flex items-center justify-between w-full">
-                        <span>View related concepts</span>
+                        <span>View related concepts ({relatedConcepts.length})</span>
                         <div className="flex items-center">
                           <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
                           <ExternalLink className="h-3 w-3" />
@@ -699,6 +772,26 @@ I can help with:
                 </div>
               </div>
 
+              {/* Related Concepts List */}
+              {conceptsExist && relatedConcepts.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-md p-3">
+                  <h4 className="text-xs font-medium text-gray-700 mb-2">Related Concepts:</h4>
+                  <div className="space-y-2">
+                    {relatedConcepts.slice(0, 3).map((concept) => (
+                      <div key={concept.id} className="text-xs">
+                        <div className="font-medium text-gray-900">{concept.name}</div>
+                        <div className="text-gray-600 truncate">{concept.definition}</div>
+                      </div>
+                    ))}
+                    {relatedConcepts.length > 3 && (
+                      <div className="text-xs text-gray-500">
+                        +{relatedConcepts.length - 3} more concepts
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Knowledge Gaps */}
               <div className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 transition-colors">
                 <span className="flex-shrink-0 h-8 w-8 bg-accent/10 rounded-full flex items-center justify-center mr-3">
@@ -713,7 +806,7 @@ I can help with:
                   ) : gapsExist ? (
                     <div>
                       <div className="flex items-center justify-between">
-                        <span>Knowledge gaps identified</span>
+                        <span>Knowledge gaps identified ({knowledgeGaps.length})</span>
                         <CheckCircle className="h-4 w-4 text-green-500" />
                       </div>
                       <p className="text-xs text-gray-500 mt-1">Review recommendations available</p>
@@ -729,6 +822,89 @@ I can help with:
                   )}
                 </div>
               </div>
+
+              {/* Knowledge Gaps Details */}
+              {gapsExist && knowledgeGaps.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-md p-3">
+                  <h4 className="text-xs font-medium text-gray-700 mb-2">Knowledge Gaps:</h4>
+                  <div className="space-y-2">
+                    {knowledgeGaps.slice(0, 3).map((gap) => (
+                      <div key={gap.id} className="border border-gray-100 rounded-md">
+                        <button
+                          onClick={() => toggleGapExpansion(gap.id)}
+                          className="w-full p-2 text-left hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-2">
+                              {getGapTypeIcon(gap.gap_type)}
+                              <span className="text-xs font-medium text-gray-900">{gap.concept}</span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium border ${getGapTypeColor(gap.gap_type)}`}>
+                                {gap.gap_type}
+                              </span>
+                              {expandedGaps.has(gap.id) ? (
+                                <ChevronDown className="h-3 w-3 text-gray-400" />
+                              ) : (
+                                <ChevronRight className="h-3 w-3 text-gray-400" />
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                        
+                        {expandedGaps.has(gap.id) && (
+                          <div className="px-2 pb-2 border-t border-gray-100">
+                            <div className="pt-2 space-y-2">
+                              {gap.missing_prerequisite && (
+                                <div>
+                                  <div className="text-xs font-medium text-gray-700">Missing Prerequisite:</div>
+                                  <div className="text-xs text-gray-600">{gap.missing_prerequisite}</div>
+                                </div>
+                              )}
+                              
+                              {gap.user_mastery !== undefined && (
+                                <div>
+                                  <div className="text-xs font-medium text-gray-700">Current Mastery:</div>
+                                  <div className="flex items-center space-x-2">
+                                    <div className="flex-1 bg-gray-200 rounded-full h-1.5">
+                                      <div 
+                                        className="bg-primary h-1.5 rounded-full" 
+                                        style={{ width: `${gap.user_mastery * 100}%` }}
+                                      ></div>
+                                    </div>
+                                    <span className="text-xs text-gray-600">{Math.round(gap.user_mastery * 100)}%</span>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              <div>
+                                <div className="text-xs font-medium text-gray-700">Strategy:</div>
+                                <div className="text-xs text-gray-600">{gap.reinforcement_strategy}</div>
+                              </div>
+                              
+                              {gap.resources && gap.resources.length > 0 && (
+                                <div>
+                                  <div className="text-xs font-medium text-gray-700">Resources:</div>
+                                  <ul className="text-xs text-gray-600 list-disc list-inside">
+                                    {gap.resources.slice(0, 2).map((resource, index) => (
+                                      <li key={index}>{resource}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                    {knowledgeGaps.length > 3 && (
+                      <div className="text-xs text-gray-500">
+                        +{knowledgeGaps.length - 3} more gaps identified
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* AI Summary */}
               <div className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 transition-colors">
@@ -772,7 +948,7 @@ I can help with:
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
                       Generate AI Analysis
-                    </>
+                    </button>
                   )}
                 </button>
               )}
