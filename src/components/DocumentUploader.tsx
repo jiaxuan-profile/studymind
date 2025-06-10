@@ -19,7 +19,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [useAI, setUseAI] = useState(true);
+  const [useAI, setUseAI] = useState(false);
   const { addNote } = useStore();
 
   // Check Supabase configuration on component mount
@@ -55,12 +55,14 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       setError(null);
 
       let content = '';
+      let pdfContent = '';
       const fileType = file.name.split('.').pop()?.toLowerCase();
       let pdfStorageInfo = null;
 
       switch (fileType) {
         case 'pdf':
-          content = await extractPdfContent(file);
+          pdfContent = await extractPdfContent(file);
+          content = convertToMarkdown(pdfContent);
           break;
         case 'docx':
           content = await extractDocxContent(file);
@@ -93,7 +95,6 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           console.log("Uploading PDF to storage...");
           pdfStorageInfo = await uploadPDFToStorage(file, id);
           console.log("PDF uploaded to storage successfully:", pdfStorageInfo);
-          tags.push('PDF');
         } catch (storageError) {
           console.warn("Failed to upload PDF to storage:", storageError);
           // Continue without storage - we still have the extracted text
@@ -136,8 +137,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           console.log("1. Analyzing document content with AI...");
           const analysis = await analyzeNote(content, title, id);
 
-          tags = [...new Set([...tags, ...analysis.suggestedTags])];
-          summary = analysis.summary;
+          tags = [...new Set([...tags, ...(analysis?.suggestedTags || [])])];
+          summary = analysis?.summary || '';
 
           await saveNoteToDatabase({
             ...noteData,
@@ -150,7 +151,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
 
           // 2. Analyze for knowledge gaps using the concepts from the previous step.
           console.log("2. Analyzing knowledge gaps...");
-          await analyzeGapsForNote(id, content, title);
+          await analyzeGapsForNote(id);
           console.log("Knowledge gaps analysis complete.");
 
           // 3. Generate questions. This function can now fetch the saved gaps.
@@ -266,6 +267,59 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
     return await file.text();
   };
 
+  const convertToMarkdown = (text: string): string => {
+    const lines = text.split('\n');
+    let markdown = '';
+    
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines
+      if (trimmedLine === '') {
+        markdown += '\n';
+        continue;
+      }
+      
+      // Check for numbered sections (1., 2., 3., etc.) - make them bold and italic
+      if (trimmedLine.match(/^\d+\.\s+/)) {
+        const sectionTitle = trimmedLine.replace(/^\d+\.\s+/, '');
+        markdown += `\n***${sectionTitle}***\n\n`;
+        continue;
+      }
+      
+      // Check for bullet points (-, *, •) - keep as bullet points
+      if (trimmedLine.match(/^[-*•]\s+/)) {
+        markdown += `${trimmedLine}\n`;
+        continue;
+      }
+      
+      // Check for lines with colons (key-value pairs) - make key bold
+      if (trimmedLine.includes(':') && !trimmedLine.endsWith(':')) {
+        const colonIndex = trimmedLine.indexOf(':');
+        const key = trimmedLine.substring(0, colonIndex).trim();
+        const value = trimmedLine.substring(colonIndex + 1).trim();
+        markdown += `**${key}**: ${value}\n`;
+        continue;
+      }
+      
+      // Check for lines ending with colon - make them bold and underlined
+      if (trimmedLine.endsWith(':')) {
+        markdown += `\n***__${trimmedLine}__***\n\n`;
+        continue;
+      }
+      
+      // Regular text - if it ends with period, add extra line break for spacing
+      if (trimmedLine.endsWith('.')) {
+        markdown += `${trimmedLine}\n\n`;
+      } else {
+        markdown += `${trimmedLine}\n`;
+      }
+    }
+    
+    // Clean up excessive newlines (more than 2 consecutive)
+    return markdown.replace(/\n{3,}/g, '\n\n').trim() + '\n';
+  };
+  
   return (
     <div className="w-full">
       <div className="mb-4 flex items-center justify-between">
