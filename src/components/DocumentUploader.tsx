@@ -8,7 +8,7 @@ import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseSer
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
 import { supabase } from '../services/supabase';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.mjs';
 
 interface DocumentUploaderProps {
   onClose?: () => void;
