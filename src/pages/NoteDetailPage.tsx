@@ -14,11 +14,16 @@ import {
   FileText,
   Eye,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  Sparkles,
+  AlertTriangle,
+  CheckCircle,
+  ExternalLink
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase } from '../services/databaseServiceClient';
+import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
 import PDFViewer from '../components/PDFViewer';
 
 const NoteDetailPage: React.FC = () => {
@@ -49,6 +54,13 @@ const NoteDetailPage: React.FC = () => {
     publicUrl: string;
     fileName: string;
   } | null>(null);
+
+  // Database state for concepts and gaps
+  const [conceptsExist, setConceptsExist] = useState(false);
+  const [gapsExist, setGapsExist] = useState(false);
+  const [conceptsLoading, setConceptsLoading] = useState(true);
+  const [gapsLoading, setGapsLoading] = useState(true);
+  const [aiProcessing, setAiProcessing] = useState(false);
 
   useEffect(() => {
     // Clear the location state after initial setup
@@ -82,6 +94,9 @@ const NoteDetailPage: React.FC = () => {
         // Try to fetch PDF info from database if not in store
         fetchPdfInfo(foundNote.id);
       }
+
+      // Check for existing concepts and gaps
+      checkExistingData(foundNote.id);
     }
   }, [id, notes, navigate]);
 
@@ -105,6 +120,83 @@ const NoteDetailPage: React.FC = () => {
       console.error('Error fetching PDF info:', error);
     }
   };
+
+  const checkExistingData = async (noteId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Check for concepts
+      setConceptsLoading(true);
+      const { data: concepts, error: conceptsError } = await supabase
+        .from('note_concepts')
+        .select('concept_id')
+        .eq('note_id', noteId)
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (!conceptsError) {
+        setConceptsExist((concepts?.length || 0) > 0);
+      }
+      setConceptsLoading(false);
+
+      // Check for knowledge gaps
+      setGapsLoading(true);
+      const { data: gaps, error: gapsError } = await supabase
+        .from('knowledge_gaps')
+        .select('id')
+        .eq('note_id', noteId)
+        .eq('user_id', user.id)
+        .limit(1);
+
+      if (!gapsError) {
+        setGapsExist((gaps?.length || 0) > 0);
+      }
+      setGapsLoading(false);
+
+    } catch (error) {
+      console.error('Error checking existing data:', error);
+      setConceptsLoading(false);
+      setGapsLoading(false);
+    }
+  };
+
+  const handleGenerateAIData = async () => {
+    if (!note) return;
+    
+    setAiProcessing(true);
+    try {
+      console.log("Generating AI analysis for note:", note.id);
+      
+      // 1. Analyze the note to get concepts and relationships
+      const analysis = await analyzeNote(note.content, note.title, note.id);
+      
+      if (analysis) {
+        // 2. Analyze for knowledge gaps
+        await analyzeGapsForNote(note.id);
+        
+        // 3. Generate questions
+        await generateQuestionsForNote(note.id);
+        
+        // 4. Update the note with summary if we got one
+        if (analysis.summary) {
+          const updatedNote = { ...note, summary: analysis.summary };
+          setNote(updatedNote);
+          updateNote(note.id, { summary: analysis.summary });
+        }
+        
+        // Refresh the data checks
+        await checkExistingData(note.id);
+        
+        console.log("AI analysis completed successfully");
+      }
+    } catch (error) {
+      console.error('Error generating AI data:', error);
+      alert('Failed to generate AI analysis. Please try again.');
+    } finally {
+      setAiProcessing(false);
+    }
+  };
   
   if (!note) {
     console.log("NoteDetailPage: Note is not yet available or not found, rendering null.");
@@ -116,7 +208,6 @@ const NoteDetailPage: React.FC = () => {
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
       deleteNote(note.id);
-      // TODO: Delete from Supabase (via an API call to a serverless function)
       navigate('/notes');
     }
   };
@@ -196,7 +287,6 @@ const NoteDetailPage: React.FC = () => {
     setAiLoading(true);
     setAiResponse(null); 
     
-    // TODO: Replace this with an actual API call to a serverless function
     console.log(`Simulating AI call with question: "${aiQuestion}" for note: "${note.title}"`);
 
     // Simulating AI response with a delay
@@ -356,6 +446,21 @@ I can help with:
                   </span>
                 ))}
               </div>
+
+              {/* AI Summary Display */}
+              {note.summary && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                  <div className="flex items-start">
+                    <Sparkles className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-blue-900 mb-2">AI-Generated Summary</h4>
+                      <div className="text-sm text-blue-800 prose prose-sm max-w-none">
+                        <ReactMarkdown>{note.summary}</ReactMarkdown>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* Content Display - Toggle between text and PDF */}
               {viewMode === 'text' || !pdfInfo ? (
@@ -451,8 +556,8 @@ I can help with:
                 className="text-gray-500 hover:text-gray-700"
               >
                 {showAiPanel ? (
-                  <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
-                    <path fillRule="evenodd\" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -558,26 +663,119 @@ I can help with:
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <h3 className="text-sm font-medium text-gray-900 mb-2">Suggested Actions</h3>
             <div className="space-y-2">
-              <button className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+              {/* View Related Concepts */}
+              <div className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 transition-colors">
                 <span className="flex-shrink-0 h-8 w-8 bg-primary/10 rounded-full flex items-center justify-center mr-3">
                   <BrainCircuit className="h-4 w-4 text-primary" />
                 </span>
-                <span className="flex-1 text-left">View related concepts</span>
-              </button>
-              
-              <button className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-                <span className="flex-shrink-0 h-8 w-8 bg-secondary/10 rounded-full flex items-center justify-center mr-3">
-                  <HelpCircle className="h-4 w-4 text-secondary" />
-                </span>
-                <span className="flex-1 text-left">Generate practice questions</span>
-              </button>
-              
-              <button className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                <div className="flex-1">
+                  {conceptsLoading ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                      <span>Checking concepts...</span>
+                    </div>
+                  ) : conceptsExist ? (
+                    <button 
+                      onClick={() => navigate('/concepts')}
+                      className="text-left hover:text-primary transition-colors"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <span>View related concepts</span>
+                        <div className="flex items-center">
+                          <CheckCircle className="h-4 w-4 text-green-500 mr-1" />
+                          <ExternalLink className="h-3 w-3" />
+                        </div>
+                      </div>
+                    </button>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">No concepts found</span>
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">AI analysis needed</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Knowledge Gaps */}
+              <div className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 transition-colors">
                 <span className="flex-shrink-0 h-8 w-8 bg-accent/10 rounded-full flex items-center justify-center mr-3">
                   <Lightbulb className="h-4 w-4 text-accent" />
                 </span>
-                <span className="flex-1 text-left">Find knowledge gaps</span>
-              </button>
+                <div className="flex-1">
+                  {gapsLoading ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                      <span>Checking gaps...</span>
+                    </div>
+                  ) : gapsExist ? (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span>Knowledge gaps identified</span>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Review recommendations available</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">No gaps analyzed</span>
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">AI analysis needed</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* AI Summary */}
+              <div className="w-full flex items-center p-2 rounded-md bg-white border border-gray-200 text-sm text-gray-700 transition-colors">
+                <span className="flex-shrink-0 h-8 w-8 bg-secondary/10 rounded-full flex items-center justify-center mr-3">
+                  <Sparkles className="h-4 w-4 text-secondary" />
+                </span>
+                <div className="flex-1">
+                  {note.summary ? (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span>AI summary available</span>
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Displayed above content</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500">No AI summary</span>
+                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">AI analysis needed</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Generate AI Data Button */}
+              {(!conceptsExist || !gapsExist || !note.summary) && (
+                <button
+                  onClick={handleGenerateAIData}
+                  disabled={aiProcessing}
+                  className="w-full mt-3 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {aiProcessing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating AI Analysis...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Generate AI Analysis
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
