@@ -629,8 +629,8 @@ I can help with:
                 className="text-gray-500 hover:text-gray-700"
               >
                 {showAiPanel ? (
-                  <svg xmlns="http://www.w3.org/2000/svg\" className="h-5 w-5\" viewBox="0 0 20 20\" fill="currentColor">
-                    <path fillRule="evenodd\" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z\" clipRule="evenodd" />
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -828,7 +828,7 @@ I can help with:
                 <div className="bg-white border border-gray-200 rounded-md p-3">
                   <h4 className="text-xs font-medium text-gray-700 mb-2">Knowledge Gaps:</h4>
                   <div className="space-y-2">
-                    {knowledgeGaps.slice(0, 3).map((gap) => (
+                    {knowledgeGaps.map((gap) => (
                       <div key={gap.id} className="border border-gray-100 rounded-md">
                         <button
                           onClick={() => toggleGapExpansion(gap.id)}
@@ -885,10 +885,43 @@ I can help with:
                               {gap.resources && gap.resources.length > 0 && (
                                 <div>
                                   <div className="text-xs font-medium text-gray-700">Resources:</div>
-                                  <ul className="text-xs text-gray-600 list-disc list-inside">
-                                    {gap.resources.slice(0, 2).map((resource, index) => (
-                                      <li key={index}>{resource}</li>
-                                    ))}
+                                  <ul className="mt-1 space-y-1 text-xs text-gray-600">
+                                    {gap.resources.map((resource, index) => {
+                                      const urlIndex = resource.indexOf('http');
+
+                                      if (urlIndex === -1) {
+                                        // Handle non-link resources
+                                        return (
+                                          <li key={index} className="flex items-center">
+                                            <BookOpen className="mr-2 h-3 w-3 flex-shrink-0 text-gray-400" />
+                                            <span>{resource}</span>
+                                          </li>
+                                        );
+                                      }
+
+                                      let textPart = resource.substring(0, urlIndex).trim();
+                                      if (textPart.endsWith(':')) {
+                                        textPart = textPart.slice(0, -1).trim();
+                                      }
+                                      const urlPart = resource.substring(urlIndex).trim();
+
+                                      return (
+                                        <li key={index} className="flex items-center justify-between">
+                                          <span className="truncate pr-2" title={textPart}>
+                                            {textPart}
+                                          </span>
+                                          <a
+                                            href={urlPart}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex flex-shrink-0 items-center font-medium text-primary hover:underline"
+                                          >
+                                            <span>View</span>
+                                            <ExternalLink className="ml-1 h-3 w-3" />
+                                          </a>
+                                        </li>
+                                      );
+                                    })}
                                   </ul>
                                 </div>
                               )}
@@ -897,11 +930,6 @@ I can help with:
                         )}
                       </div>
                     ))}
-                    {knowledgeGaps.length > 3 && (
-                      <div className="text-xs text-gray-500">
-                        +{knowledgeGaps.length - 3} more gaps identified
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -948,7 +976,7 @@ I can help with:
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
                       Generate AI Analysis
-                    </button>
+                    </>
                   )}
                 </button>
               )}
