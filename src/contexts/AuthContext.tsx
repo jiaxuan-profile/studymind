@@ -1,3 +1,5 @@
+// src/contexts/AuthContext.tsx:
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, getCurrentUser, resetPassword, updatePassword, updateEmail } from '../services/supabase';
 import type { User } from '@supabase/supabase-js';

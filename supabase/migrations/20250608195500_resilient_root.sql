@@ -1,26 +1,5 @@
--- Add duration_seconds column to review_sessions
-ALTER TABLE review_sessions
-ADD COLUMN duration_seconds INTEGER DEFAULT 0;
-
--- Add original_difficulty and note title to review_answers
-ALTER TABLE review_answers
-ADD COLUMN original_difficulty VARCHAR(10) NOT NULL DEFAULT 'medium',
-ADD COLUMN note_title TEXT;
-
--- Backfill existing data (optional)
-UPDATE review_answers ra
-SET 
-  original_difficulty = (
-    SELECT q->>'difficulty'
-    FROM note_questions nq, jsonb_array_elements(nq.questions) q
-    WHERE nq.note_id = ra.note_id 
-    AND q->>'question' = ra.question_text
-    LIMIT 1
-  ),
-  note_title = (
-    SELECT title FROM notes WHERE id = ra.note_id LIMIT 1
-  )
-WHERE original_difficulty = 'medium';
+-- resilient_root.sql
+-- Create new questions and knowledge_gaps tables to replace the old JSONB-based approach
 
 -- Create the new questions table
 CREATE TABLE IF NOT EXISTS questions (
@@ -108,7 +87,3 @@ CREATE POLICY "Users can update their own knowledge gaps" ON knowledge_gaps
 
 CREATE POLICY "Users can delete their own knowledge gaps" ON knowledge_gaps
     FOR DELETE USING (auth.uid() = user_id);
-
--- Drop tables for questions and gaps
-DROP TABLE IF EXISTS note_questions;
-DROP TABLE IF EXISTS note_gaps;

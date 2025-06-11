@@ -1,3 +1,6 @@
+-- twilight_dew.sql
+-- Create default subjects for existing users and add review functionality
+
 -- Create default subjects for existing users who don't have one
 INSERT INTO subjects (name, description, user_id)
 SELECT 'General', 'General subject for all notes', u.id
@@ -17,6 +20,8 @@ CREATE TABLE IF NOT EXISTS review_answers (
   answer_text TEXT NOT NULL,
   session_id TEXT NOT NULL, -- Groups answers from the same review session
   difficulty_rating TEXT CHECK (difficulty_rating IN ('easy', 'medium', 'hard')),
+  original_difficulty VARCHAR(10) NOT NULL DEFAULT 'medium',
+  note_title TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );

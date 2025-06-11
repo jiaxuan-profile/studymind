@@ -1,3 +1,6 @@
+-- mute_cloud.sql
+-- Add PDF storage functionality to notes table
+
 -- Add PDF storage fields to notes table
 ALTER TABLE notes 
 ADD COLUMN IF NOT EXISTS pdf_storage_path TEXT,
@@ -14,24 +17,28 @@ VALUES ('pdfs', 'pdfs', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Set up storage policies for the PDFs bucket
+DROP POLICY IF EXISTS "Users can upload their own PDFs" ON storage.objects;
 CREATE POLICY "Users can upload their own PDFs" ON storage.objects
 FOR INSERT WITH CHECK (
   bucket_id = 'pdfs' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can view their own PDFs" ON storage.objects;
 CREATE POLICY "Users can view their own PDFs" ON storage.objects
 FOR SELECT USING (
   bucket_id = 'pdfs' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can update their own PDFs" ON storage.objects;
 CREATE POLICY "Users can update their own PDFs" ON storage.objects
 FOR UPDATE USING (
   bucket_id = 'pdfs' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
+DROP POLICY IF EXISTS "Users can delete their own PDFs" ON storage.objects;
 CREATE POLICY "Users can delete their own PDFs" ON storage.objects
 FOR DELETE USING (
   bucket_id = 'pdfs' AND 

@@ -1,3 +1,5 @@
+// src/services/databaseServiceClient.ts
+
 import { supabase } from './supabase';
 import { createHash } from 'crypto';
 import { deletePDFFromStorage } from './pdfStorageService';
@@ -13,6 +15,7 @@ interface NotePayload {
   updatedAt: string;
   createdAt?: string;
   contentHash?: string;
+  analysis_status?: string;
   // PDF storage fields
   pdf_storage_path?: string;
   pdf_public_url?: string;
@@ -21,6 +24,35 @@ interface NotePayload {
 
 function generateContentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
+}
+
+export async function getConceptsForNote(noteId: string) {
+  try {
+    console.log(`Database Service: Fetching concepts for note ID: ${noteId}`);
+
+    const { data, error } = await supabase
+      .from('note_concepts')
+      .select(`
+        relevance_score,
+        mastery_level,
+        concept:concepts (
+          id,
+          name,
+          definition
+        )
+      `)
+      .eq('note_id', noteId);
+
+    if (error) {
+      console.error("Database Service: Error fetching concepts for note:", error);
+      throw new Error(`Failed to fetch concepts for note ${noteId}: ${error.message}`);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Database Service: Error in getConceptsForNote:', error);
+    throw error;
+  }
 }
 
 export async function checkDocumentExists(content: string): Promise<boolean> {
@@ -56,6 +88,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       id: noteData.id,
       title: noteData.title,
       tags: noteData.tags,
+      analysisStatus: noteData.analysis_status, 
       hasSummary: !!noteData.summary,
       hasEmbedding: !!noteData.embedding,
       hasPdfStorage: !!noteData.pdf_storage_path
@@ -77,6 +110,7 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         updated_at: noteData.updatedAt,
         created_at: noteData.createdAt || noteData.updatedAt,
         content_hash: contentHash,
+        analysis_status: noteData.analysis_status, 
         // PDF storage fields
         pdf_storage_path: noteData.pdf_storage_path,
         pdf_public_url: noteData.pdf_public_url,
@@ -147,6 +181,7 @@ export async function getAllNotes(page = 1, pageSize = 12) {
       console.error("Database Service: Supabase error:", error);
       throw new Error(`Failed to fetch notes: ${error.message}`);
     }
+    console.log("Database Service: Returning counts", { count });
     return { data, count };
 
   } catch (error) {
@@ -169,24 +204,26 @@ export async function deleteNoteFromDatabase(id: string): Promise<void> {
       .select('pdf_storage_path, original_filename')
       .eq('id', id)
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
 
-    if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+    if (fetchError) {
       console.error("Database Service: Error fetching note for deletion:", fetchError);
       throw new Error(`Failed to fetch note for deletion: ${fetchError.message}`);
     }
 
-    // If the note has a PDF file, try to delete it from storage
-    if (noteData?.pdf_storage_path) {
+    if (!noteData) {
+      console.log(`Database Service: Note with ID ${id} already deleted. Exiting deletion process.`);
+      return;
+    }
+
+    // If the note exists and has a PDF file, try to delete it from storage
+    if (noteData.pdf_storage_path) {
       try {
         console.log("Database Service: Deleting associated PDF file:", noteData.pdf_storage_path);
         await deletePDFFromStorage(noteData.pdf_storage_path);
         console.log("Database Service: PDF file deleted successfully");
       } catch (storageError) {
-        // Log the error but don't fail the entire deletion process
         console.error("Database Service: Failed to delete PDF file (continuing with note deletion):", storageError);
-        // We continue with deleting the note record even if PDF deletion fails
-        // to prevent orphaned database entries
       }
     }
 
@@ -246,6 +283,7 @@ export async function getAllConcepts() {
   try {
     console.log("Database Service: Fetching all concepts");
     
+    // 'concepts' and 'concept_relationships' are global and publicly readable per 'global_concepts.sql'
     const { data: concepts, error: conceptsError } = await supabase
       .from('concepts')
       .select('*');
@@ -258,6 +296,8 @@ export async function getAllConcepts() {
 
     if (relError) throw relError;
 
+    // 'note_concepts' is protected by RLS based on the current user's notes.
+    // This query will correctly and safely return only the concepts linked to the user's notes.
     const { data: noteConcepts, error: ncError } = await supabase
       .from('note_concepts')
       .select('*');
@@ -297,25 +337,59 @@ export async function getConceptCategories() {
 }
 
 export const saveNoteQuestions = async (noteId: string, questions: any[]) => {
-  const response = await fetch('/api/save-note-questions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ noteId, questions }),
-  });
-  if (!response.ok) throw new Error('Failed to save questions');
-  return response.json();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated to save questions');
+
+  if (!questions || questions.length === 0) {
+    console.log("Database Service: No questions to save.");
+    return { data: [] };
+  }
+
+  const questionsToSave = questions.map(q => ({
+    ...q,
+    note_id: noteId,
+    user_id: user.id
+  }));
+
+  const { data, error } = await supabase
+    .from('questions')
+    .upsert(questionsToSave)
+    .select();
+
+  if (error) {
+    console.error("Database Service: Error saving questions:", error);
+    throw new Error(`Failed to save questions: ${error.message}`);
+  }
+
+  console.log("Database Service: Questions saved successfully");
+  return { data };
 };
 
 export const saveNoteGaps = async (noteId: string, gaps: any[]) => {
-  const response = await fetch('/api/save-note-gaps', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ noteId, gaps }),
-  });
-  if (!response.ok) throw new Error('Failed to save gaps');
-  return response.json();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated to save knowledge gaps');
+
+  if (!gaps || gaps.length === 0) {
+    console.log("Database Service: No knowledge gaps to save.");
+    return { data: [] };
+  }
+
+  const gapsToSave = gaps.map(g => ({
+    ...g,
+    note_id: noteId,
+    user_id: user.id
+  }));
+
+  const { data, error } = await supabase
+    .from('knowledge_gaps')
+    .upsert(gapsToSave)
+    .select();
+
+  if (error) {
+    console.error("Database Service: Error saving knowledge gaps:", error);
+    throw new Error(`Failed to save knowledge gaps: ${error.message}`);
+  }
+
+  console.log("Database Service: Knowledge gaps saved successfully");
+  return { data };
 };

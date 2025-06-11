@@ -1,3 +1,5 @@
+// src/components/DocumentUploader.tsx
+
 import React, { useState, useCallback, useEffect } from 'react';
 import { Upload, AlertCircle, Lightbulb } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -6,9 +8,10 @@ import { useStore } from '../store';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
-import { uploadPDFToStorage } from '../services/pdfStorageService';
+import { uploadPDFToStorage, PDFStorageInfo } from '../services/pdfStorageService'; // Assuming PDFStorageInfo is exported
 import { supabase } from '../services/supabase';
 
+// This is required for pdf.js to work in modern bundlers
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.mjs';
 
 interface DocumentUploaderProps {
@@ -22,11 +25,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [useAI, setUseAI] = useState(false);
   const { addNote } = useStore();
 
-  // Check Supabase configuration on component mount
   useEffect(() => {
     const checkSupabaseConfig = async () => {
       try {
-        // Test Supabase connection
         const { error } = await supabase.from('notes').select('id').limit(1);
         if (error) throw error;
       } catch (err) {
@@ -34,168 +35,147 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         console.error('Supabase connection error:', err);
       }
     };
-
     checkSupabaseConfig();
   }, []);
 
   const processFile = async (file: File) => {
-    try {
-      // Check if Supabase is properly configured before proceeding
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        throw new Error('Supabase configuration is missing. Please check your environment variables.');
-      }
+    setIsUploading(true);
+    setError(null);
 
-      // Get current user
+    try {
+      // 1. Authentication and validation
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error('You must be logged in to upload documents');
       }
 
-      setIsUploading(true);
-      setError(null);
-
-      let content = '';
-      let pdfContent = '';
       const fileType = file.name.split('.').pop()?.toLowerCase();
-      let pdfStorageInfo = null;
-
-      switch (fileType) {
-        case 'pdf':
-          pdfContent = await extractPdfContent(file);
-          content = convertToMarkdown(pdfContent);
-          break;
-        case 'docx':
-          content = await extractDocxContent(file);
-          break;
-        case 'md':
-        case 'txt':
-          content = await extractTextContent(file);
-          break;
-        default:
-          throw new Error('Unsupported file type');
+      if (!fileType || !['pdf', 'docx', 'md', 'txt'].includes(fileType)) {
+        throw new Error('Unsupported file type');
       }
 
-      // Check if document already exists
+      // 2. Extract content from the file
+      console.log(`Extracting content from ${fileType}...`);
+      const content = await extractContentFromFile(file, fileType);
+      if (!content) {
+        throw new Error('Could not extract any content from the file.');
+      }
+
+      // 3. Check for duplicates
       const exists = await checkDocumentExists(content);
       if (exists) {
         setError('This document has already been uploaded.');
+        setIsUploading(false); // Stop the process here
         return;
       }
 
-      // Create note data
-      const id = Math.random().toString(36).substring(2, 11);
-      const title = file.name.replace(`.${fileType}`, '');
-      const now = new Date();
-      let tags = [fileType.toUpperCase(), 'Imported'];
-      let summary = '';
+      // 4. Generate a unique ID and title for the new note
+      const noteId = Math.random().toString(36).substring(2, 11);
+      const title = file.name.replace(/\.[^/.]+$/, ""); // More robust extension removal
 
-      // For PDF files, upload to storage
+      // 5. Handle PDF-specific logic: upload to storage
+      let pdfStorageInfo: PDFStorageInfo | null = null;
       if (fileType === 'pdf') {
         try {
           console.log("Uploading PDF to storage...");
-          pdfStorageInfo = await uploadPDFToStorage(file, id);
+          pdfStorageInfo = await uploadPDFToStorage(file, noteId);
           console.log("PDF uploaded to storage successfully:", pdfStorageInfo);
         } catch (storageError) {
-          console.warn("Failed to upload PDF to storage:", storageError);
-          // Continue without storage - we still have the extracted text
+          console.warn("Failed to upload PDF to storage (continuing with text content):", storageError);
         }
       }
 
-      // Generate embedding
+      // 6. Generate embedding for the content
       console.log("Generating embedding for uploaded document...");
       const embedding = await generateEmbeddingOnClient(content, title);
       console.log("Embedding generated successfully");
 
-      // Save to database first
+      // 7. Prepare and save the note data
+      const now = new Date();
       const noteData = {
-        id,
+        id: noteId,
         user_id: user.id,
         title,
         content,
-        tags,
-        summary,
+        tags: [fileType.toUpperCase(), 'Imported'],
+        summary: '',
         embedding,
-        analysis_status: 'pending',
-        updatedAt: now.toISOString(),
-        createdAt: now.toISOString(),
-        // Add PDF storage information if available
-        ...(pdfStorageInfo && {
-          pdf_storage_path: pdfStorageInfo.path,
-          pdf_public_url: pdfStorageInfo.publicUrl,
-          original_filename: pdfStorageInfo.fileName
-        })
+        analysis_status: useAI ? 'pending_analysis' : 'completed', // 'completed' if no AI is used
+        updated_at: now.toISOString(),
+        created_at: now.toISOString(),
+        pdf_storage_path: pdfStorageInfo?.path ?? null,
+        pdf_public_url: pdfStorageInfo?.publicUrl ?? null,
+        original_filename: pdfStorageInfo?.fileName ?? file.name,
       };
-
+      
       console.log("Saving document to database...");
       await saveNoteToDatabase(noteData);
-      console.log("Document saved to database successfully");
+      console.log("Document saved to database successfully.");
 
-      // Use AI to analyze content if enabled
-      if (useAI) {
-        try {
-          // 1. Analyze the note to get summary, tags, and key concepts
-          console.log("1. Analyzing document content with AI...");
-          const analysis = await analyzeNote(content, title, id);
-
-          tags = [...new Set([...tags, ...(analysis?.suggestedTags || [])])];
-          summary = analysis?.summary || '';
-
-          await saveNoteToDatabase({
-            ...noteData,
-            summary,
-            tags,
-            knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships },
-            analysis_status: 'analyzing_gaps'
-          });
-          console.log("Note updated with initial analysis.");
-
-          // 2. Analyze for knowledge gaps using the concepts from the previous step.
-          console.log("2. Analyzing knowledge gaps...");
-          await analyzeGapsForNote(id);
-          console.log("Knowledge gaps analysis complete.");
-
-          // 3. Generate questions. This function can now fetch the saved gaps.
-          console.log("3. Generating practice questions...");
-          await generateQuestionsForNote(id);
-          console.log("Practice questions generated and saved.");
-
-          // 4. Final update to the note to mark completion
-          const finalNoteData = {
-            ...noteData,
-            summary,
-            tags,
-            knowledge_graph: { concepts: analysis.keyConcepts, relationships: analysis.conceptRelationships },
-            analysis_status: 'completed'
-          };
-          await saveNoteToDatabase(finalNoteData);
-          console.log("Note analysis process complete.");
-
-        } catch (aiError) {
-          console.error('AI analysis failed:', aiError);
-          await saveNoteToDatabase({ ...noteData, analysis_status: 'failed' });
-        }
+      // If AI is not used, add to store and finish
+      if (!useAI) {
+        addNote({
+          ...noteData,
+          createdAt: now,
+          updatedAt: now,
+          pdfStoragePath: noteData.pdf_storage_path,
+          pdfPublicUrl: noteData.pdf_public_url,
+          originalFilename: noteData.original_filename,
+        });
+        if (onClose) onClose();
+        setIsUploading(false);
+        return;
       }
 
-      // Add to store
-      await addNote({
-        id,
-        title,
-        content,
-        tags,
-        summary,
-        embedding,
-        createdAt: now,
-        updatedAt: now,
-        // Add PDF info to store as well
-        ...(pdfStorageInfo && {
-          pdfStoragePath: pdfStorageInfo.path,
-          pdfPublicUrl: pdfStorageInfo.publicUrl,
-          originalFilename: pdfStorageInfo.fileName
-        })
-      });
+      // --- AI Processing Pipeline ---
+      // This section now correctly handles the workflow without the schema-breaking `knowledge_graph` field.
+      try {
+        console.log("Starting AI analysis pipeline...");
+        
+        const analysis = await analyzeNote(content, title, noteId);
+        
+        const updatedNoteWithAnalysis = {
+          ...noteData,
+          summary: analysis?.summary || '',
+          tags: [...new Set([...noteData.tags, ...(analysis?.suggestedTags || [])])],
+          analysis_status: 'analyzing_gaps',
+        };
+        await saveNoteToDatabase(updatedNoteWithAnalysis);
+        console.log("Note updated with initial AI analysis.");
+        
+        await analyzeGapsForNote(noteId);
+        console.log("Knowledge gaps analysis complete.");
+        await generateQuestionsForNote(noteId);
+        console.log("Practice questions generated.");
+
+        await saveNoteToDatabase({ ...updatedNoteWithAnalysis, analysis_status: 'completed' });
+        console.log("AI analysis process complete.");
+
+        addNote({
+          ...updatedNoteWithAnalysis,
+          createdAt: now,
+          updatedAt: new Date(),
+          pdfStoragePath: updatedNoteWithAnalysis.pdf_storage_path,
+          pdfPublicUrl: updatedNoteWithAnalysis.pdf_public_url,
+          originalFilename: updatedNoteWithAnalysis.original_filename,
+        });
+
+      } catch (aiError) {
+        console.error('AI analysis failed:', aiError);
+        await saveNoteToDatabase({ ...noteData, analysis_status: 'failed' });
+        // Still add the base note to the store so the user has it
+        addNote({
+          ...noteData,
+          createdAt: now,
+          updatedAt: now,
+          pdfStoragePath: noteData.pdf_storage_path,
+          pdfPublicUrl: noteData.pdf_public_url,
+          originalFilename: noteData.original_filename,
+        });
+      }
 
       if (onClose) onClose();
-      
+
     } catch (err) {
       setError(`Failed to process file: ${err instanceof Error ? err.message : 'Unknown error'}`);
       console.error('File processing error:', err);
@@ -204,121 +184,90 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
     }
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      processFile(file);
+  // Helper function to centralize content extraction
+  const extractContentFromFile = async (file: File, fileType: string): Promise<string> => {
+    switch (fileType) {
+      case 'pdf': {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        let fullText = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          fullText += textContent.items.map((item: any) => item.str).join(' ') + '\n\n';
+        }
+        return convertToMarkdown(fullText);
+      }
+      case 'docx': {
+        const arrayBuffer = await file.arrayBuffer();
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        return result.value;
+      }
+      case 'md':
+      case 'txt':
+        return await file.text();
+      default:
+        return '';
     }
-    // Reset the input
-    event.target.value = '';
   };
 
-  const handleDragEnter = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  }, []);
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragging(false);
-
-    const file = e.dataTransfer.files[0];
-    if (file) {
-      processFile(file);
-    }
-  }, []);
-
-  const extractPdfContent = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    
-    let fullText = '';
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      fullText += pageText + '\n\n';
-    }
-    return fullText;
-  };
-
-  const extractDocxContent = async (file: File): Promise<string> => {
-    const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return result.value;
-  };
-
-  const extractTextContent = async (file: File): Promise<string> => {
-    return await file.text();
-  };
-
+  // This conversion utility is unchanged
   const convertToMarkdown = (text: string): string => {
     const lines = text.split('\n');
     let markdown = '';
-    
     for (const line of lines) {
       const trimmedLine = line.trim();
-      
-      // Skip empty lines
       if (trimmedLine === '') {
         markdown += '\n';
         continue;
       }
-      
-      // Check for numbered sections (1., 2., 3., etc.) - make them bold and italic
       if (trimmedLine.match(/^\d+\.\s+/)) {
-        const sectionTitle = trimmedLine.replace(/^\d+\.\s+/, '');
-        markdown += `\n***${sectionTitle}***\n\n`;
+        markdown += `\n***${trimmedLine.replace(/^\d+\.\s+/, '')}***\n\n`;
         continue;
       }
-      
-      // Check for bullet points (-, *, •) - keep as bullet points
       if (trimmedLine.match(/^[-*•]\s+/)) {
         markdown += `${trimmedLine}\n`;
         continue;
       }
-      
-      // Check for lines with colons (key-value pairs) - make key bold
       if (trimmedLine.includes(':') && !trimmedLine.endsWith(':')) {
-        const colonIndex = trimmedLine.indexOf(':');
-        const key = trimmedLine.substring(0, colonIndex).trim();
-        const value = trimmedLine.substring(colonIndex + 1).trim();
-        markdown += `**${key}**: ${value}\n`;
+        const [key, ...valueParts] = trimmedLine.split(':');
+        markdown += `**${key.trim()}**: ${valueParts.join(':').trim()}\n`;
         continue;
       }
-      
-      // Check for lines ending with colon - make them bold and underlined
       if (trimmedLine.endsWith(':')) {
         markdown += `\n***__${trimmedLine}__***\n\n`;
         continue;
       }
-      
-      // Regular text - if it ends with period, add extra line break for spacing
       if (trimmedLine.endsWith('.')) {
         markdown += `${trimmedLine}\n\n`;
       } else {
         markdown += `${trimmedLine}\n`;
       }
     }
-    
-    // Clean up excessive newlines (more than 2 consecutive)
     return markdown.replace(/\n{3,}/g, '\n\n').trim() + '\n';
   };
+  
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+    event.target.value = '';
+  };
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processFile(file);
+    }
+  }, [processFile]);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }, []);
+  const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }, []);
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); e.stopPropagation(); }, []);
   
   return (
     <div className="w-full">
@@ -364,7 +313,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
               <>
                 <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3"></div>
                 <p className="text-gray-600">Processing file...</p>
-                {useAI && <p className="text-sm text-gray-500">AI analysis and review generation in progress...</p>}
+                {useAI && <p className="text-sm text-gray-500">AI analysis in progress...</p>}
               </>
             ) : (
               <>

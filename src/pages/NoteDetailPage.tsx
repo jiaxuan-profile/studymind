@@ -1,37 +1,21 @@
+// src/pages/NoteDetailPage.tsx
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
 import ReactMarkdown from 'react-markdown';
 import { 
-  ArrowLeft, 
-  Edit, 
-  Trash, 
-  Save, 
-  X, 
-  BrainCircuit, 
-  Lightbulb,
-  HelpCircle,
-  FileText,
-  Eye,
-  ToggleLeft,
-  ToggleRight,
-  Sparkles,
-  AlertTriangle,
-  CheckCircle,
-  ExternalLink,
-  Target,
-  BookOpen,
-  Zap,
-  RefreshCw,
-  ChevronDown,
-  ChevronRight
+  ArrowLeft, Edit, Trash, Save, X, BrainCircuit, Lightbulb, HelpCircle,
+  FileText, Eye, ToggleLeft, ToggleRight, Sparkles, AlertTriangle, CheckCircle,
+  ExternalLink, Target, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase } from '../services/databaseServiceClient';
+// Import the delete function from the service client
+import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
-import { uploadPDFToStorage } from '../services/pdfStorageService';
 import PDFViewer from '../components/PDFViewer';
+
 
 interface KnowledgeGap {
   id: string;
@@ -55,11 +39,12 @@ const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { notes, updateNote, deleteNote } = useStore();
+  const { notes, updateNote, deleteNote: deleteNoteFromStore } = useStore(); // Renamed to avoid conflict
   
   const [note, setNote] = useState(notes.find((n) => n.id === id));
   const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [editedNote, setEditedNote] = useState(() => {
     const current = notes.find(n => n.id === id);
     return {
@@ -73,27 +58,20 @@ const NoteDetailPage: React.FC = () => {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
   
-  // PDF viewing state
   const [viewMode, setViewMode] = useState<'text' | 'pdf'>('text');
-  const [pdfInfo, setPdfInfo] = useState<{
-    publicUrl: string;
-    fileName: string;
-  } | null>(null);
+  const [pdfInfo, setPdfInfo] = useState<{ publicUrl: string; fileName: string; } | null>(null);
 
-  // Database state for concepts and gaps
   const [conceptsExist, setConceptsExist] = useState(false);
   const [gapsExist, setGapsExist] = useState(false);
   const [conceptsLoading, setConceptsLoading] = useState(true);
   const [gapsLoading, setGapsLoading] = useState(true);
   const [aiProcessing, setAiProcessing] = useState(false);
 
-  // New state for actual data
   const [knowledgeGaps, setKnowledgeGaps] = useState<KnowledgeGap[]>([]);
   const [relatedConcepts, setRelatedConcepts] = useState<Concept[]>([]);
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Clear the location state after initial setup
     if (location.state?.isNewNote) {
       navigate(location.pathname, { replace: true });
     }
@@ -113,19 +91,14 @@ const NoteDetailPage: React.FC = () => {
         content: foundNote.content,
         tags: foundNote.tags.join(', '),
       });
-
-      // Check if this note has PDF storage info
       if (foundNote.pdfPublicUrl && foundNote.originalFilename) {
         setPdfInfo({
           publicUrl: foundNote.pdfPublicUrl,
           fileName: foundNote.originalFilename
         });
       } else {
-        // Try to fetch PDF info from database if not in store
         fetchPdfInfo(foundNote.id);
       }
-
-      // Check for existing concepts and gaps
       checkExistingData(foundNote.id);
     }
   }, [id, notes, navigate]);
@@ -137,14 +110,9 @@ const NoteDetailPage: React.FC = () => {
         .select('pdf_public_url, original_filename')
         .eq('id', noteId)
         .single();
-
       if (error) throw error;
-
       if (data?.pdf_public_url && data?.original_filename) {
-        setPdfInfo({
-          publicUrl: data.pdf_public_url,
-          fileName: data.original_filename
-        });
+        setPdfInfo({ publicUrl: data.pdf_public_url, fileName: data.original_filename });
       }
     } catch (error) {
       console.error('Error fetching PDF info:', error);
@@ -152,12 +120,9 @@ const NoteDetailPage: React.FC = () => {
   };
 
   const checkExistingData = async (noteId: string) => {
+    setConceptsLoading(true);
+    setGapsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Check for concepts and fetch them
-      setConceptsLoading(true);
       const { data: conceptsData, error: conceptsError } = await supabase
         .from('note_concepts')
         .select(`
@@ -167,36 +132,31 @@ const NoteDetailPage: React.FC = () => {
             definition
           )
         `)
-        .eq('note_id', noteId)
-        .eq('user_id', user.id);
+        .eq('note_id', noteId); 
 
-      if (!conceptsError && conceptsData) {
-        const concepts = conceptsData
-          .map(item => item.concepts)
-          .filter(concept => concept !== null) as Concept[];
-        
-        setRelatedConcepts(concepts);
-        setConceptsExist(concepts.length > 0);
-      }
-      setConceptsLoading(false);
-
-      // Check for knowledge gaps and fetch them
-      setGapsLoading(true);
+      if (conceptsError) throw conceptsError;
+      
+      const concepts = (conceptsData ?? [])
+        .map(item => item.concepts)
+        .filter(concept => concept !== null) as Concept[];
+      
+      setRelatedConcepts(concepts);
+      setConceptsExist(concepts.length > 0);
+      
       const { data: gapsData, error: gapsError } = await supabase
         .from('knowledge_gaps')
         .select('*')
-        .eq('note_id', noteId)
-        .eq('user_id', user.id)
+        .eq('note_id', noteId) 
         .order('priority_score', { ascending: false });
 
-      if (!gapsError && gapsData) {
-        setKnowledgeGaps(gapsData as KnowledgeGap[]);
-        setGapsExist(gapsData.length > 0);
-      }
-      setGapsLoading(false);
+      if (gapsError) throw gapsError;
+
+      setKnowledgeGaps((gapsData ?? []) as KnowledgeGap[]);
+      setGapsExist((gapsData ?? []).length > 0);
 
     } catch (error) {
-      console.error('Error checking existing data:', error);
+      console.error('Error checking existing AI data:', error);
+    } finally {
       setConceptsLoading(false);
       setGapsLoading(false);
     }
@@ -204,31 +164,19 @@ const NoteDetailPage: React.FC = () => {
 
   const handleGenerateAIData = async () => {
     if (!note) return;
-    
     setAiProcessing(true);
     try {
       console.log("Generating AI analysis for note:", note.id);
-      
-      // 1. Analyze the note to get concepts and relationships
       const analysis = await analyzeNote(note.content, note.title, note.id);
-      
       if (analysis) {
-        // 2. Analyze for knowledge gaps
         await analyzeGapsForNote(note.id);
-        
-        // 3. Generate questions
         await generateQuestionsForNote(note.id);
-        
-        // 4. Update the note with summary if we got one
         if (analysis.summary) {
           const updatedNote = { ...note, summary: analysis.summary };
           setNote(updatedNote);
           updateNote(note.id, { summary: analysis.summary });
         }
-        
-        // Refresh the data checks
         await checkExistingData(note.id);
-        
         console.log("AI analysis completed successfully");
       }
     } catch (error) {
@@ -242,11 +190,8 @@ const NoteDetailPage: React.FC = () => {
   const toggleGapExpansion = (gapId: string) => {
     setExpandedGaps(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(gapId)) {
-        newSet.delete(gapId);
-      } else {
-        newSet.add(gapId);
-      }
+      if (newSet.has(gapId)) newSet.delete(gapId);
+      else newSet.add(gapId);
       return newSet;
     });
   };
@@ -256,8 +201,7 @@ const NoteDetailPage: React.FC = () => {
       case 'prerequisite': return <AlertTriangle className="h-4 w-4 text-red-500" />;
       case 'reinforcement': return <RefreshCw className="h-4 w-4 text-yellow-500" />;
       case 'connection': return <BrainCircuit className="h-4 w-4 text-blue-500" />;
-      case 'general': return <BookOpen className="h-4 w-4 text-gray-500" />;
-      default: return <HelpCircle className="h-4 w-4 text-gray-500" />;
+      default: return <BookOpen className="h-4 w-4 text-gray-500" />;
     }
   };
 
@@ -266,31 +210,44 @@ const NoteDetailPage: React.FC = () => {
       case 'prerequisite': return 'bg-red-50 text-red-700 border-red-200';
       case 'reinforcement': return 'bg-yellow-50 text-yellow-700 border-yellow-200';
       case 'connection': return 'bg-blue-50 text-blue-700 border-blue-200';
-      case 'general': return 'bg-gray-50 text-gray-700 border-gray-200';
       default: return 'bg-gray-50 text-gray-700 border-gray-200';
     }
   };
   
   if (!note) {
-    console.log("NoteDetailPage: Note is not yet available or not found, rendering null.");
     return null;
   }
 
   const isPdfNote = note.tags.includes('PDF') || pdfInfo;
-  
+  const isPdfAvailable = !!note.pdfPublicUrl;
+
   const handleDelete = async () => {
+    // Prevent double-clicks
+    if (isDeleting || !note) return;
+        
     if (window.confirm('Are you sure you want to delete this note?')) {
-      deleteNote(note.id);
-      navigate('/notes');
+      setIsDeleting(true);
+      try {
+        // The service function is now idempotent, but we await its completion.
+        await deleteNoteFromDatabase(note.id);
+        
+        // If the above line completes without error, the delete was successful.
+        console.log("Delete operation confirmed by service. Updating UI.");
+        deleteNoteFromStore(note.id);
+        navigate('/notes');
+
+      } catch (error) {
+        console.error("Failed to delete note:", error);
+        alert(`Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`);
+        setIsDeleting(false); 
+      }
     }
   };
   
   const handleSave = async () => {
     if (!note) return;
     setIsSaving(true);
-
     try {
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
@@ -298,25 +255,13 @@ const NoteDetailPage: React.FC = () => {
       const updatedContent = editedNote.content;
       const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
       const now = new Date();
-
       let newEmbedding: number[] | undefined = note.embedding;
 
-      const contentChanged = updatedTitle !== note.title || updatedContent !== note.content;
-
-      if (contentChanged) {
-        try {
-          console.log("Content changed, generating new embedding...");
-          newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
-          console.log("New embedding generated.");
-        } catch (embeddingError) {
-          console.warn("Failed to generate embedding:", embeddingError);
-          newEmbedding = note.embedding;
-        }
-      } else {
-        console.log("Content or title did not change significantly, keeping existing embedding.");
+      if (updatedTitle !== note.title || updatedContent !== note.content) {
+        newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
       }
 
-      const noteToSave = { 
+      await saveNoteToDatabase({ 
         id: note.id,
         user_id: user.id,
         title: updatedTitle,
@@ -325,28 +270,12 @@ const NoteDetailPage: React.FC = () => {
         embedding: newEmbedding,
         updatedAt: now.toISOString(),
         createdAt: note.createdAt.toISOString(),
-      };
+      });
 
-      await saveNoteToDatabase(noteToSave);
-      console.log("Note successfully saved to database via API.");
-
-      const noteUpdatesForStore = {
-        title: updatedTitle,
-        content: updatedContent,
-        tags: updatedTags,
-        updatedAt: now,
-        embedding: newEmbedding,
-      };
+      const noteUpdatesForStore = { title: updatedTitle, content: updatedContent, tags: updatedTags, updatedAt: now, embedding: newEmbedding };
       updateNote(note.id, noteUpdatesForStore);
-
-      setNote(prevNote => ({
-        ...prevNote!,
-        ...noteUpdatesForStore,
-        embedding: newEmbedding || prevNote!.embedding 
-      }));
-
+      setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
       setEditMode(false);
-
     } catch (error) {
       console.error("Failed to save note:", error);
       alert(`Error saving note: ${(error as Error).message}`);
@@ -459,10 +388,11 @@ I can help with:
               </button>
               <button
                 onClick={handleDelete}
+                disabled={isDeleting} 
                 className="flex items-center px-3 py-1.5 border border-red-300 rounded-md text-sm text-red-700 bg-white hover:bg-red-50"
               >
                 <Trash className="h-4 w-4 mr-1" />
-                Delete
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </>
           ) : (
@@ -494,11 +424,11 @@ I can help with:
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
                 <h1 className="text-3xl font-bold text-gray-900">{note.title}</h1>
-                {isPdfNote && (
+                {isPdfAvailable && (
                   <div className="flex items-center space-x-2">
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       <FileText className="h-3 w-3 mr-1" />
-                      PDF Document
+                      PDF Available
                     </span>
                     {pdfInfo && (
                       <span className="text-xs text-gray-500">
@@ -536,25 +466,34 @@ I can help with:
               )}
               
               {/* Content Display - Toggle between text and PDF */}
-              {viewMode === 'text' || !pdfInfo ? (
+              {viewMode === 'text' || !isPdfAvailable ? (
                 <div className="prose prose-indigo max-w-none note-content">
                   <ReactMarkdown>{note.content}</ReactMarkdown>
                 </div>
               ) : (
                 <PDFViewer 
-                  pdfUrl={pdfInfo.publicUrl}
-                  fileName={pdfInfo.fileName}
+                  pdfUrl={note.pdfPublicUrl!} 
+                  fileName={note.originalFilename || 'document.pdf'}
                 />
               )}
               
               <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500">
                 <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
                 <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
-                {isPdfNote && (
-                  <p className="flex items-center mt-1">
-                    <FileText className="h-4 w-4 mr-1" />
-                    Original PDF stored and available for viewing
-                  </p>
+                {note.tags.includes('PDF') && ( 
+                    <p className="flex items-center mt-1">
+                      {isPdfAvailable ? (
+                        <>
+                          <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                          <span>Original PDF stored and available for viewing.</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
+                          <span>PDF upload failed (e.g., file too large). Only text is available.</span>
+                        </>
+                      )}
+                    </p>
                 )}
               </div>
             </div>
@@ -599,14 +538,19 @@ I can help with:
                 />
               </div>
 
-              {isPdfNote && pdfInfo && (
+              {note.tags.includes('PDF') && (
                 <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center">
                     <FileText className="h-5 w-5 text-blue-600 mr-2" />
                     <div>
-                      <p className="text-sm font-medium text-blue-900">PDF Document Attached</p>
+                      <p className="text-sm font-medium text-blue-900">
+                        {isPdfAvailable ? "PDF Document Attached" : "PDF Upload Failed"}
+                      </p>
                       <p className="text-xs text-blue-700">
-                        Original file: {pdfInfo.fileName} - The PDF will remain available after editing
+                        {isPdfAvailable 
+                          ? `Original file: ${note.originalFilename} - The PDF will remain after editing.`
+                          : `Original file: ${note.originalFilename} - Only the extracted text was saved.`
+                        }
                       </p>
                     </div>
                   </div>

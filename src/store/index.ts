@@ -131,12 +131,15 @@ export const useStore = create<State>((set, get) => ({
   deleteNote: async (id) => {
     try {
       await deleteNoteFromDatabase(id);
-      set((state) => ({
-        notes: state.notes.filter((note) => note.id !== id),
-      }));
+
+      console.log("Store: Note deleted from DB. Reloading notes list.");
+      const { pagination } = get();
+      await get().loadNotes(pagination.currentPage, pagination.pageSize);
+
     } catch (error) {
-      console.error("Error deleting note:", error);
-      throw error;
+      console.error("Store: Error during deleteNote action:", error);
+      set({ error: error instanceof Error ? error.message : 'Failed to delete note' });
+      throw error; 
     }
   },
   

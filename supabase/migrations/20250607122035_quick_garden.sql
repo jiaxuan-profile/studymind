@@ -1,3 +1,6 @@
+-- quick_garden.sql
+-- Create review_sessions table and update review_answers to reference sessions
+
 -- Create review_sessions table to track review sessions
 CREATE TABLE IF NOT EXISTS review_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -9,28 +12,20 @@ CREATE TABLE IF NOT EXISTS review_sessions (
   questions_answered INTEGER DEFAULT 0,
   questions_rated INTEGER DEFAULT 0,
   session_status TEXT DEFAULT 'in_progress' CHECK (session_status IN ('in_progress', 'completed', 'abandoned')),
+  easy_ratings INTEGER DEFAULT 0,
+  medium_ratings INTEGER DEFAULT 0,
+  hard_ratings INTEGER DEFAULT 0,
+  duration_seconds INTEGER DEFAULT 0,
   started_at TIMESTAMPTZ DEFAULT NOW(),
   completed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Update review_answers table to reference review_sessions
-ALTER TABLE review_answers 
-DROP COLUMN IF EXISTS session_id,
-ADD COLUMN session_id UUID REFERENCES review_sessions(id) ON DELETE CASCADE;
-
--- Add session statistics columns to review_sessions
-ALTER TABLE review_sessions 
-ADD COLUMN IF NOT EXISTS easy_ratings INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS medium_ratings INTEGER DEFAULT 0,
-ADD COLUMN IF NOT EXISTS hard_ratings INTEGER DEFAULT 0;
-
 -- Add indexes for performance
 CREATE INDEX IF NOT EXISTS idx_review_sessions_user_id ON review_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_review_sessions_status ON review_sessions(session_status);
 CREATE INDEX IF NOT EXISTS idx_review_sessions_started_at ON review_sessions(started_at);
-CREATE INDEX IF NOT EXISTS idx_review_answers_session_id_new ON review_answers(session_id);
 
 -- Add trigger for updated_at on review_sessions
 CREATE OR REPLACE TRIGGER review_sessions_updated_at
@@ -53,6 +48,15 @@ CREATE POLICY "Users can update their own review sessions" ON review_sessions
 
 CREATE POLICY "Users can delete their own review sessions" ON review_sessions
     FOR DELETE USING (auth.uid() = user_id);
+
+-- Update review_answers table to reference review_sessions
+-- Drop the old string-based session_id column and add UUID-based session_id
+ALTER TABLE review_answers 
+DROP COLUMN session_id,
+ADD COLUMN session_id UUID REFERENCES review_sessions(id) ON DELETE CASCADE;
+
+-- Add new index for the updated session_id
+CREATE INDEX IF NOT EXISTS idx_review_answers_session_id_uuid ON review_answers(session_id);
 
 -- Function to update session statistics when answers are added/updated
 CREATE OR REPLACE FUNCTION update_session_stats()
