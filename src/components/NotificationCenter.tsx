@@ -1,16 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  Bell, 
-  Settings, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  Info,
-  Trash2,
-  MarkAsRead,
-  Clock
-} from 'lucide-react';
+import { X, Bell, Settings, CheckCircle, XCircle, AlertTriangle, Info, Trash2, BookMarked as MarkAsRead, Clock } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { Notification } from '../types/notification';
 import PomodoroSettingsPanel from './PomodoroSettingsPanel';
