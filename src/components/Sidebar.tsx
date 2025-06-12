@@ -36,6 +36,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
         <div className="flex items-center">
           <Book className="h-8 w-8 text-primary" />
           <span className="ml-2 text-xl font-bold text-gray-900">StudyMind</span>
+          <img 
+            src="/white_circle_360x360.png" 
+            alt="StudyMind Badge" 
+            className="w-8 h-8 ml-2 rounded-full border-2 border-primary/20" 
+          />
         </div>
       </div>
       
