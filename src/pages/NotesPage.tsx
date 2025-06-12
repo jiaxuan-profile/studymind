@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText, List, Grid } from 'lucide-react';
 import DocumentUploader from '../components/DocumentUploader';
@@ -8,7 +8,6 @@ import { useDebounce } from '../hooks/useDebounce';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { 
     notes, 
     addNote,
@@ -41,22 +40,26 @@ const NotesPage: React.FC = () => {
     loadAllTags();
   }, [loadAllTags]);
 
-  // This is now the SINGLE effect responsible for fetching data
+  // This is the SINGLE effect responsible for fetching data based on filter changes
   useEffect(() => {
-    // Skip the very first run to prevent a double load with App.tsx
+    // On the very first render, do nothing. The data loaded by App.tsx is already in the store.
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
 
-    // This effect runs whenever a filter changes
-    console.log("Filters changed, reloading notes from server.");
-    loadNotes(currentPage, pageSize, { 
-      searchTerm: debouncedSearchTerm, 
-      tags: selectedTags 
-    });
+    const handler = setTimeout(() => {
+      console.log('NotesPage: Filters changed, reloading notes from server.');
+      loadNotes(currentPage, pageSize, { 
+        searchTerm: debouncedSearchTerm, 
+        tags: selectedTags 
+      });
+    }, 500);
 
-  }, [debouncedSearchTerm, selectedTags, currentPage, pageSize, loadNotes]);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [debouncedSearchTerm, selectedTags, currentPage, pageSize]); 
 
   const handleTagToggle = (tag: string) => {
     const newTags = selectedTags.includes(tag)
@@ -68,7 +71,7 @@ const NotesPage: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to page 1 when search term changes
+    setCurrentPage(1); // Reset to page 1 when page size changes
   };
   
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -267,7 +270,7 @@ const NotesPage: React.FC = () => {
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md"
               placeholder="Search notes..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
             />
             {searchTerm && (
               <button
