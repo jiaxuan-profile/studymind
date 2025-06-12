@@ -37,10 +37,22 @@ StudyMind supports both formative and summative assessment strategies:
 - Vector similarity search for related content
 - Intelligent question generation
 
-### 📊 Knowledge Graph
-- Visual concept mapping and relationships
-- Interactive exploration of connections
-- Relationship discovery between ideas
+### 📊 Knowledge Graph & Mind Maps
+- **Global Concept Graph**: Shows connections between concepts across all your notes
+  - Interactive exploration of relationships between different topics
+  - Visual representation of your entire knowledge base
+  - Zoom functionality to see concept names and relationships
+  - Click on nodes to view detailed information and related notes
+- **Note-Specific Mind Maps**: Individual note visualization showing concept relationships within that specific document
+  - AI-powered concept extraction from note content
+  - Interactive visualization of how concepts relate within a single note
+  - Hover over concepts to see definitions
+  - Click concepts to highlight connections
+  - Helps with visualizing connections and relationships
+  - Improves comprehension and memory retention
+  - Identifies key concepts quickly
+  - Facilitates better recall during study sessions
+  - Personalizes the learning experience for each note
 
 ### 🎓 Advanced Review System
 - **Session-Based Learning**: Track progress across multiple study sessions

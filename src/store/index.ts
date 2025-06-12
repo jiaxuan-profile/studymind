@@ -79,7 +79,7 @@ export const useStore = create<State>((set, get) => ({
   allTags: [],
   currentNote: null,
   user: null,
-  theme: 'light',
+  theme: (typeof window !== 'undefined' && localStorage.getItem('studymind-theme') as 'light' | 'dark') || 'light',
   isLoading: false,
   error: null,
   pagination: {
@@ -223,7 +223,15 @@ export const useStore = create<State>((set, get) => ({
   })),
   
   setUser: (user) => set({ user }),
-  toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+  
+  toggleTheme: () => set((state) => {
+    const newTheme = state.theme === 'light' ? 'dark' : 'light';
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('studymind-theme', newTheme);
+    }
+    return { theme: newTheme };
+  }),
   
   resetStore: () => set({
     notes: [],

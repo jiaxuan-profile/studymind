@@ -17,7 +17,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
     .slice(0, 2);
 
   return (
-    <div className={`w-64 h-full bg-white border-r border-gray-200 flex flex-col ${mobile ? 'absolute inset-y-0 left-0' : ''}`}>
+    <div className={`w-64 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col ${mobile ? 'absolute inset-y-0 left-0' : ''}`}>
       {mobile && (
         <div className="absolute top-0 right-0 -mr-12 pt-2">
           <button
@@ -31,11 +31,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
         </div>
       )}
       
-      {/* Logo */}
+      {/* Logo with Badge */}
       <div className="flex items-center h-16 px-4">
         <div className="flex items-center">
           <Book className="h-8 w-8 text-primary" />
-          <span className="ml-2 text-xl font-bold text-gray-900">StudyMind</span>
+          <span className="ml-2 text-xl font-bold text-gray-900 dark:text-gray-100">StudyMind</span>
           <img 
             src="/white_circle_360x360.png" 
             alt="StudyMind Badge" 
@@ -51,7 +51,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           className={({ isActive }) => 
             isActive 
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
-              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
           end
         >
@@ -64,7 +64,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           className={({ isActive }) => 
             isActive 
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
-              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
         >
           <NotebookText className="mr-3 h-5 w-5" />
@@ -76,7 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           className={({ isActive }) => 
             isActive 
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
-              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
         >
           <BrainCircuit className="mr-3 h-5 w-5" />
@@ -88,7 +88,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           className={({ isActive }) => 
             isActive 
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
-              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
         >
           <GraduationCap className="mr-3 h-5 w-5" />
@@ -96,8 +96,8 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
         </NavLink>
         
         {recentNotes.length > 0 && (
-          <div className="pt-4 mt-4 border-t border-gray-200">
-            <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+            <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Recent Notes
             </h3>
             <div className="mt-2 space-y-1">
@@ -109,11 +109,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
                     `flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                       isActive
                         ? 'text-primary bg-primary/5'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
                     }`
                   }
                 >
-                  <Clock className="mr-3 h-4 w-4 text-gray-400" />
+                  <Clock className="mr-3 h-4 w-4 text-gray-400 dark:text-gray-500" />
                   <span className="truncate">{note.title}</span>
                 </NavLink>
               ))}
@@ -121,13 +121,13 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           </div>
         )}
         
-        <div className="pt-4 mt-4 border-t border-gray-200">
+        <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
           <NavLink 
             to="/help"
             className={({ isActive }) => 
               isActive 
                 ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
-                : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
             }
           >
             <HelpCircle className="mr-3 h-5 w-5" />
