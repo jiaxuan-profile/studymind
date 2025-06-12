@@ -37,6 +37,31 @@ async function getAuthenticatedUserId(): Promise<string> {
   return data.session.user.id;
 }
 
+// Helper function to call the analyze-concepts API
+async function callAnalyzeConceptsApi(content: string, title: string) {
+  const apiUrl = `${getApiBaseUrl()}/analyze-concepts`;
+  console.log('AI Service: API URL:', apiUrl);
+  
+  const conceptResponse = await fetch(apiUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: content, title, includeRelationships: true }),
+  });
+
+  if (!conceptResponse.ok) {
+    const errorText = await conceptResponse.text(); 
+    const errorData = errorText ? JSON.parse(errorText) : {error: `HTTP error ${conceptResponse.status}`}; 
+    console.error('AI Service: Failed to analyze concepts:', errorData);
+    console.error('AI Service: Concept response status:', conceptResponse.status);
+    console.error('AI Service: Concept response headers:', conceptResponse.headers);
+    throw new Error(errorData.error || `Failed to analyze concepts: HTTP ${conceptResponse.status}`);
+  }
+
+  const conceptData = await conceptResponse.json();
+  console.log('AI Service: Concept analysis response:', conceptData);
+  return conceptData;
+}
+
 async function storeConceptsAndRelationships(
   concepts: Array<{ name: string; definition: string }> = [],
   relationships: Array<{ source: string; target: string; type: string; strength: number }> = [],
@@ -177,26 +202,8 @@ async function storeConceptsAndRelationships(
 export async function analyzeNote(content: string, title: string, noteId: string): Promise<AIAnalysisResult | null> { 
   try {
     console.log('AI Service: Starting note analysis...');
-    const apiUrl = `${getApiBaseUrl()}/analyze-concepts`;
-    console.log('AI Service: API URL:', apiUrl);
     
-    const conceptResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: content, title, includeRelationships: true }),
-    });
-
-    if (!conceptResponse.ok) {
-      const errorText = await conceptResponse.text(); 
-      const errorData = errorText ? JSON.parse(errorText) : {error: `HTTP error ${conceptResponse.status}`}; 
-      console.error('AI Service: Failed to analyze concepts:', errorData);
-      console.error('AI Service: Concept response status:', conceptResponse.status);
-      console.error('AI Service: Concept response headers:', conceptResponse.headers);
-      throw new Error(errorData.error || `Failed to analyze concepts: HTTP ${conceptResponse.status}`);
-    }
-
-    const conceptData = await conceptResponse.json();
-    console.log('AI Service: Concept analysis response:', conceptData);
+    const conceptData = await callAnalyzeConceptsApi(content, title);
     console.log('AI Service: Concept analysis concepts property:', conceptData.concepts);
     console.log('AI Service: Type of concepts:', typeof conceptData.concepts);
 
@@ -232,6 +239,23 @@ export async function analyzeNote(content: string, title: string, noteId: string
     console.error('AI Service: Error analyzing note:', error);
     console.error('AI Service: Error stack:', error.stack); 
     return null;
+  }
+}
+
+// New function for mind map - gets concepts without storing them
+export async function getNoteConceptsForMindMap(content: string, title: string) {
+  try {
+    console.log('AI Service: Generating mind map concepts for note...');
+    
+    const conceptData = await callAnalyzeConceptsApi(content, title);
+    
+    return {
+      concepts: conceptData.concepts || [],
+      relationships: conceptData.relationships || []
+    };
+  } catch (error: any) {
+    console.error('AI Service: Error generating mind map concepts:', error);
+    throw error;
   }
 }
 

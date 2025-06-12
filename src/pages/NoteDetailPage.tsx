@@ -9,13 +9,15 @@ import ReactMarkdown from 'react-markdown';
 import { 
   ArrowLeft, Edit, Trash, Save, X, BrainCircuit, Lightbulb, HelpCircle,
   FileText, Eye, ToggleLeft, ToggleRight, Sparkles, AlertTriangle, CheckCircle,
-  ExternalLink, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight, Link2
+  ExternalLink, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight, Link2,
+  Brain, Map
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
 import PDFViewer from '../components/PDFViewer';
+import NoteMindMap from '../components/NoteMindMap';
 
 
 interface KnowledgeGap {
@@ -71,6 +73,9 @@ const NoteDetailPage: React.FC = () => {
   const [viewMode, setViewMode] = useState<'text' | 'pdf'>('text');
   const [pdfInfo, setPdfInfo] = useState<{ publicUrl: string; fileName: string; } | null>(null);
 
+  // New state for tab management
+  const [activeTab, setActiveTab] = useState<'content' | 'mindmap'>('content');
+
   const [conceptsExist, setConceptsExist] = useState(false);
   const [gapsExist, setGapsExist] = useState(false);
   const [conceptsLoading, setConceptsLoading] = useState(true);
@@ -94,6 +99,7 @@ const NoteDetailPage: React.FC = () => {
     setRelatedNotes([]);
     setIsFindingRelated(false);
     setViewMode('text');
+    setActiveTab('content'); // Reset to content tab when note changes
 
     const foundNote = notes.find((n) => n.id === id);
 
@@ -447,7 +453,7 @@ I can help with:
         
         <div className="flex space-x-2">
           {/* PDF/Text Toggle for PDF notes */}
-          {isPdfNote && pdfInfo && !editMode && (
+          {isPdfNote && pdfInfo && !editMode && activeTab === 'content' && (
             <button
               onClick={toggleViewMode}
               className="flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors"
@@ -515,81 +521,127 @@ I can help with:
         {/* Main content */}
         <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {!editMode ? (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">{note.title}</h1>
-                {isPdfAvailable && (
-                  <div className="flex items-center space-x-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      <FileText className="h-3 w-3 mr-1" />
-                      PDF Available
-                    </span>
-                    {pdfInfo && (
-                      <span className="text-xs text-gray-500">
-                        Viewing: {viewMode === 'text' ? 'Extracted Text' : 'Original PDF'}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mb-6">
-                {note.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+            <div>
+              {/* Tab Navigation */}
+              <div className="border-b border-gray-200">
+                <nav className="flex space-x-8 px-6 pt-4" aria-label="Tabs">
+                  <button
+                    onClick={() => setActiveTab('content')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'content'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                   >
-                    {tag}
-                  </span>
-                ))}
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Note Content
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('mindmap')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'mindmap'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <Map className="h-4 w-4 mr-2" />
+                      Mind Map
+                    </div>
+                  </button>
+                </nav>
               </div>
 
-              {/* AI Summary Display */}
-              {note.summary && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                  <div className="flex items-start">
-                    <Sparkles className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-blue-900 mb-2">AI-Generated Summary</h4>
-                      <div className="text-sm text-blue-800 prose prose-sm max-w-none">
-                        <ReactMarkdown>{note.summary}</ReactMarkdown>
+              {/* Tab Content */}
+              {activeTab === 'content' ? (
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-3xl font-bold text-gray-900">{note.title}</h1>
+                    {isPdfAvailable && (
+                      <div className="flex items-center space-x-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          <FileText className="h-3 w-3 mr-1" />
+                          PDF Available
+                        </span>
+                        {pdfInfo && (
+                          <span className="text-xs text-gray-500">
+                            Viewing: {viewMode === 'text' ? 'Extracted Text' : 'Original PDF'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {note.tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* AI Summary Display */}
+                  {note.summary && (
+                    <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                      <div className="flex items-start">
+                        <Sparkles className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-blue-900 mb-2">AI-Generated Summary</h4>
+                          <div className="text-sm text-blue-800 prose prose-sm max-w-none">
+                            <ReactMarkdown>{note.summary}</ReactMarkdown>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  )}
+                  
+                  {/* Content Display - Toggle between text and PDF */}
+                  {viewMode === 'text' || !isPdfAvailable ? (
+                    <div className="prose prose-indigo max-w-none note-content">
+                      <ReactMarkdown>{note.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <PDFViewer 
+                      pdfUrl={note.pdfPublicUrl!} 
+                      fileName={note.originalFilename || 'document.pdf'}
+                    />
+                  )}
+                  
+                  <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500">
+                    <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
+                    <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
+                    {note.tags.includes('PDF') && ( 
+                        <p className="flex items-center mt-1">
+                          {isPdfAvailable ? (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                              <span>Original PDF stored and available for viewing.</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
+                              <span>PDF upload failed (e.g., file too large). Only text is available.</span>
+                            </>
+                          )}
+                        </p>
+                    )}
                   </div>
                 </div>
-              )}
-              
-              {/* Content Display - Toggle between text and PDF */}
-              {viewMode === 'text' || !isPdfAvailable ? (
-                <div className="prose prose-indigo max-w-none note-content">
-                  <ReactMarkdown>{note.content}</ReactMarkdown>
-                </div>
               ) : (
-                <PDFViewer 
-                  pdfUrl={note.pdfPublicUrl!} 
-                  fileName={note.originalFilename || 'document.pdf'}
-                />
+                // Mind Map Tab Content
+                <div className="h-[600px]">
+                  <NoteMindMap 
+                    noteId={note.id}
+                    noteTitle={note.title}
+                    noteContent={note.content}
+                  />
+                </div>
               )}
-              
-              <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500">
-                <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
-                <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
-                {note.tags.includes('PDF') && ( 
-                    <p className="flex items-center mt-1">
-                      {isPdfAvailable ? (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
-                          <span>Original PDF stored and available for viewing.</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
-                          <span>PDF upload failed (e.g., file too large). Only text is available.</span>
-                        </>
-                      )}
-                    </p>
-                )}
-              </div>
             </div>
           ) : (
             <div className="p-6">

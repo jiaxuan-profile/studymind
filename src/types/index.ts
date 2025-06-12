@@ -27,6 +27,7 @@ export interface GraphNode {
   name: string;
   val: number;
   color?: string;
+  definition?: string; // Added for mind map tooltips
 }
 
 export interface GraphLink {
