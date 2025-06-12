@@ -1,279 +1,197 @@
 // api/generate-questions.ts 
 
-import { createClient, Client } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Handler } from '@netlify/functions';
 
-interface NoteConcept {
-  concepts: { name: string; definition: string }[];
-  mastery_level: number;
-}
-
-interface NoteData {
-  id: string;
-  title: string;
-  content: string;
-  summary: string;
-  embedding: string;
-  note_concepts: NoteConcept[];
-  user_id: string;
-}
-
-interface UserConcept {
-  concepts: { name: string; definition: string };
-  mastery_level: number;
-}
-
 interface Question {
   question: string;
-  hint?: string;
-  connects?: string[];
-  difficulty?: 'easy' | 'medium' | 'hard';
-  mastery_context?: string;
+  hint: string;
+  connects: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  mastery_context: string;
+  options?: string[];
+  answer?: string;
 }
 
-interface KnowledgeGap {
-  id: string;
-  note_id: string;
-  concept: string;
-  gap_type: string;
-  missing_prerequisite?: string;
-  user_mastery?: number;
-  resources: string[];
-  reinforcement_strategy: string;
-  priority_score?: number;
-  status: string;
-  user_id: string;
+interface ConceptWithMastery {
+    id: string;
+    name: string;
+    mastery_level: number;
 }
 
 function extractJSONFromMarkdown(text: string): string {
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-  if (jsonMatch) {
-    return jsonMatch[1].trim();
-  }
-  return text.trim();
-}
-
-function generateQuestionId(): string {
-  return 'q_' + Math.random().toString(36).substr(2, 12);
+  return jsonMatch ? jsonMatch[1].trim() : text.trim();
 }
 
 const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Content-Type': 'application/json',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json'
   };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers };
+  }
 
   try {
     const noteId = event.queryStringParameters?.noteId;
-    const difficulty = event.queryStringParameters?.difficulty;
+    const difficultyFilter = event.queryStringParameters?.difficulty;
+    const questionTypeFilter = event.queryStringParameters?.questionType; 
 
     if (!noteId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing noteId in query parameters' }),
-      };
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing noteId' }) };
     }
 
-    const supabase: Client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const authHeader = event.headers.authorization;
+    if (!authHeader) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Missing Authorization header' }) };
+    }
+    const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
-    // Fetch note data
     const { data: note, error: noteError } = await supabase
       .from('notes')
-      .select('id, title, content, summary, note_concepts(concepts(name, definition), mastery_level), user_id')
+      .select('title, content, user_id')
       .eq('id', noteId)
       .single();
+    if (noteError || !note) throw new Error(`Note not found or permission denied for id: ${noteId}.`);
 
-    if (noteError || !note) {
-      console.error("Supabase error fetching note:", noteError);
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: `Note not found: The ID '${noteId}' does not exist.` }),
-      };
+    const { data: noteConceptsData, error: conceptsError } = await supabase
+        .from('note_concepts')
+        .select('concepts ( id, name )') 
+        .eq('note_id', noteId);
+
+    if (conceptsError) throw new Error(`Could not fetch concepts for note: ${conceptsError.message}`);
+
+    const conceptsInThisNote = noteConceptsData?.map(nc => nc.concepts).filter(Boolean) || [];
+    
+    if (conceptsInThisNote.length === 0) {
+        return { statusCode: 200, headers, body: JSON.stringify({ questions: [], message: "No concepts found on this note to generate questions." }) };
+    }
+    const conceptIdsInNote = conceptsInThisNote.map(c => c.id);
+
+    // Fetch the user's mastery for ONLY the concepts found in this note.
+    const { data: masteryData, error: masteryError } = await supabase
+        .from('user_concept_mastery')
+        .select('concept_id, mastery_level')
+        .eq('user_id', note.user_id)
+        .in('concept_id', conceptIdsInNote); 
+
+    if (masteryError) throw new Error(`Could not fetch mastery data: ${masteryError.message}`);
+    
+    const masteryMap = new Map(masteryData?.map(item => [item.concept_id, item.mastery_level]) || []);
+  
+    const conceptsForPrompt: ConceptWithMastery[] = conceptsInThisNote.map(concept => ({
+      id: concept.id,
+      name: concept.name,
+      mastery_level: masteryMap.get(concept.id) ?? 0.5 
+    }));  
+    
+    // Fetch the knowledge gaps separately
+    const { data: noteGaps, error: gapsError } = await supabase
+        .from('knowledge_gaps')
+        .select('concept, gap_type, reinforcement_strategy')
+        .eq('note_id', noteId);
+    if (gapsError) console.warn("Could not fetch knowledge gaps, proceeding without them.");
+
+    let questionTypeInstruction = "Generate short-answer questions that require a 1-3 sentence response.";
+    let jsonFormatExample = `
+      "question": "Based on the note, explain the primary function of a Mutex.",
+      "hint": "Think about what 'mutual exclusion' means in the context of shared resources.",
+      "connects": ["Mutex", "Mutual Exclusion"],
+      "difficulty": "medium",
+      "mastery_context": "Tests understanding of a core synchronization primitive."`;
+
+    if (questionTypeFilter === 'mcq') {
+      questionTypeInstruction = "Generate Multiple Choice Questions (MCQs). Each question must have an 'options' array with 4 strings, and an 'answer' field with the correct option string.";
+      jsonFormatExample = `
+      "question": "Which of the following is NOT a condition for deadlock?",
+      "options": ["Mutual Exclusion", "Hold and Wait", "Preemption", "Circular Wait"],
+      "answer": "Preemption",
+      "hint": "Review the four necessary conditions for deadlock to occur.",
+      "connects": ["Deadlock"],
+      "difficulty": "easy",
+      "mastery_context": "Tests recall of deadlock conditions."`;
+    } else if (questionTypeFilter === 'open') {
+      questionTypeInstruction = "Generate open-ended questions that require detailed explanation, comparison, or synthesis of multiple concepts.";
+    }
+    
+    let difficultyInstruction = `
+      2.  ADAPTIVE DIFFICULTY:
+          - For concepts with mastery < 0.4, create 'easy' questions.
+          - For concepts with mastery between 0.4 and 0.8, create 'medium' questions.
+          - For concepts with mastery > 0.8, create 'hard' questions.`;
+    
+    if (difficultyFilter && difficultyFilter !== 'mixed') {
+        difficultyInstruction = `2.  DIFFICULTY: The user has requested only '${difficultyFilter}' difficulty questions. Ensure all generated questions have this difficulty level.`;
     }
 
-    const noteData: NoteData = note;
-
-    // Fetch user's concept mastery profile
-    const { data: userConcepts, error: userConceptsError } = await supabase
-      .from('note_concepts')
-      .select('concepts!inner(name, definition), mastery_level')
-      .eq('user_id', noteData.user_id);
-
-    if (userConceptsError) {
-      console.error("Could not fetch user's overall concept mastery, proceeding without it.", userConceptsError);
-    }
-
-    // Fetch knowledge gaps for the note
-    const { data: noteGaps, error: noteGapsError } = await supabase
-      .from('knowledge_gaps')
-      .select('*')
-      .eq('note_id', noteId);
-
-    if (noteGapsError) {
-      console.error("Could not fetch knowledge gaps, proceeding without it.", noteGapsError);
-    } else {
-      console.log("Fetched knowledge gaps:", noteGaps);
-    }
-
-    const gaps: KnowledgeGap[] = noteGaps || [];
-
-    // Categorize concepts based on mastery levels
-    const strugglingConcepts = userConcepts?.filter(uc => uc.mastery_level < 0.3).map(uc => uc.concepts) || [];
-    const developingConcepts = userConcepts?.filter(uc => uc.mastery_level >= 0.3 && uc.mastery_level < 0.7).map(uc => uc.concepts) || [];
-    const masteredConcepts = userConcepts?.filter(uc => uc.mastery_level >= 0.7).map(uc => uc.concepts) || [];
-
-    console.log(`User concept breakdown: Struggling(${strugglingConcepts.length}), Developing(${developingConcepts.length}), Mastered(${masteredConcepts.length})`);
-
-    // Extract current note concepts
-    const currentNoteConcepts = noteData.note_concepts.flatMap(nc => nc.concepts || []);
-
-    const currentNoteConceptNames = new Set(currentNoteConcepts.map(c => c.name));
-    const strugglingWithCurrentNote = strugglingConcepts.filter(c => currentNoteConceptNames.has(c.name));
-
-    if (strugglingWithCurrentNote.length > 0) {
-      console.log(`Prerequisite check triggered. User is struggling with: ${strugglingWithCurrentNote.map(c => c.name).join(', ')}`);
-    }
-
+    // Construct a clear, high-quality prompt for the AI
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-
-    // Generate questions based on gaps, user's concept mastery, and optional difficulty
+    
     const prompt = `
-      You are an expert tutor generating practice questions based on a student's notes and their learning profile.
+      You are an expert tutor generating 5-7 practice questions based on a student's notes and their specific learning profile for those notes.
 
-      CONTEXT FROM THE STUDENT'S NOTE:
+      NOTE CONTEXT:
       ---
-      TITLE: ${noteData.title}
-      SUMMARY: ${noteData.summary}
+      TITLE: ${note.title}
       FULL CONTENT:
-      ${noteData.content}
+      ${note.content.substring(0, 8000)}
       ---
 
-      STUDENT'S LEARNING PROFILE:
-      - Concepts from THIS note: ${currentNoteConcepts.map(c => c.name).join(', ') || 'None'}
-      - Concepts the student is STRUGGLING with (<30% mastery): ${strugglingConcepts.map(c => c.name).join(', ') || 'None'}
-      - Concepts the student is DEVELOPING (30-70% mastery): ${developingConcepts.map(c => c.name).join(', ') || 'None'}
-      - Concepts the student has MASTERED (>=70% mastery): ${masteredConcepts.map(c => c.name).join(', ') || 'None'}
-      - Knowledge gaps identified: ${gaps.map(gap => gap.concept).join(', ') || 'None'}
+      STUDENT'S PROFILE FOR THIS NOTE:
+      - Concepts & Current Mastery: ${JSON.stringify(conceptsForPrompt, null, 2)}
+      - Identified Knowledge Gaps: ${JSON.stringify(noteGaps || [], null, 2)}
 
-      YOUR TASK:
-      Generate 5-7 practice questions following these rules precisely.
+      YOUR TASK & RULES:
+      1.  **Question Type:** ${questionTypeInstruction}
+      ${difficultyInstruction}
+      3.  GROUNDING: ALL questions MUST be directly based on the "FULL CONTENT" provided.
+      4.  FORMAT: Return ONLY a valid JSON array of question objects, no markdown.
+      5.  HINTS: Provide a useful hint for each question.
+      6.  CONNECTIONS: The 'connects' array should list the key concepts tested.
 
-      RULES:
-      1. GROUNDING: ALL questions MUST be directly based on the "FULL CONTENT" provided above. Use specific examples, scenarios, or code from the note.
-      2. ADAPTIVE DIFFICULTY:
-          - For "STRUGGLING" concepts, create 'easy' questions that test basic definitions and identification. If concepts from this note are on the struggling list, prioritize them.
-          - For "DEVELOPING" or new concepts from this note, create 'medium' questions that require explanation, comparison, or application.
-          - For "MASTERED" concepts, create 'hard' questions that connect them with new concepts from the note, requiring synthesis or analysis.
-          - For "Knowledge gaps", create questions that address the missing prerequisites and reinforce weak areas.
-          ${difficulty ? `- Generate questions with difficulty level: ${difficulty}.` : ''}
-      3. FORMAT: Return ONLY a valid JSON array of objects, with no markdown code blocks or other text.
-      4. HINTS: Provide a useful hint for each question that guides the student without giving away the answer.
-
-      EXAMPLE JSON FORMAT:
-      [
-        {
-          "question": "Based on the ACID properties discussed in your notes, explain why the bank transfer example requires both atomicity and consistency.",
-          "hint": "Think about what happens if the process fails after debiting one account but before crediting the other.",
-          "connects": ["ACID properties", "atomicity", "consistency"],
-          "difficulty": "medium",
-          "mastery_context": "Connects new concepts of atomicity and consistency."
-        }
-      ]
+      EXAMPLE JSON OBJECT FORMAT:
+      {
+        ${jsonFormatExample}
+      }
     `;
-
+    
+    // Generate, parse, and save the questions
     const result = await model.generateContent(prompt);
     const rawText = extractJSONFromMarkdown(result.response.text());
-    let questions: Question[] = [];
+    const generatedQuestions: Question[] = JSON.parse(rawText);
 
-    try {
-      questions = JSON.parse(rawText);
-
-      if (!Array.isArray(questions) || questions.length === 0) throw new Error("Parsed result is not a non-empty array.");
-
-      const allRelevantConcepts = new Set([
-        ...currentNoteConcepts.map(c => c.name),
-        ...strugglingConcepts.map(c => c.name),
-        ...developingConcepts.map(c => c.name),
-        ...masteredConcepts.map(c => c.name),
-        ...gaps.map(gap => gap.concept)
-      ]);
-
-      const validatedQuestions = questions
-        .map(q => ({
-          ...q,
-          difficulty: q.difficulty || 'medium',
-          connects: q.connects || [],
-          hint: q.hint || 'Review the key ideas in your notes.',
-          mastery_context: q.mastery_context || 'Tests concepts from your notes.',
-        }))
-        .filter(q => {
-          return q.question && q.question.length > 15;
-        });
-
-      if (validatedQuestions.length === 0) {
-        console.warn("AI generated questions, but none passed validation. Falling back.");
-        throw new Error("Validation filter removed all generated questions.");
-      }
-
-      questions = validatedQuestions;
-
-    } catch (e: any) {
-      console.error("Error processing Gemini response:", e.message);
-      console.error("Raw response for debugging:", rawText);
-
-      questions = currentNoteConcepts.slice(0, 3).map((concept, index) => ({
-        question: `Explain the concept of "${concept.name}" as described in your notes and provide an example.`,
-        hint: `Review the definition: ${concept.definition}`,
-        connects: [concept.name],
-        difficulty: index === 0 ? 'easy' : 'medium' as 'easy' | 'medium',
-        mastery_context: `Tests your foundational understanding of ${concept.name}.`
-      }));
-    }
-
-    // Insert questions into the new questions table
-    const questionsToInsert = questions.slice(0, 5).map(q => ({
-      id: generateQuestionId(),
+    const questionsToInsert = generatedQuestions.map(q => ({
+      id: `q_${noteId}_${Math.random().toString(36).substring(2, 9)}`,
       note_id: noteId,
+      user_id: note.user_id,
       question: q.question,
       hint: q.hint,
       connects: q.connects,
       difficulty: q.difficulty,
       mastery_context: q.mastery_context,
-      user_id: noteData.user_id
+      question_type: questionTypeFilter || 'short',
+      options: q.options || null,
+      answer: q.answer || null,
     }));
 
-    const { data: insertedQuestions, error: insertError } = await supabase
-      .from('questions')
-      .insert(questionsToInsert)
-      .select();
-
-    if (insertError) {
-      console.error("Error inserting questions:", insertError);
-      // Still return the questions even if insertion fails
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          questions: questions.slice(0, 5),
-          warning: "Questions generated but not saved to database"
-        }),
-      };
+    if (questionsToInsert.length > 0) {
+      const { error: insertError } = await supabase.from('questions').insert(questionsToInsert);
+      if (insertError) throw new Error(`Failed to save generated questions: ${insertError.message}`);
     }
-
-    console.log(`Successfully inserted ${insertedQuestions?.length || 0} questions`);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        questions: insertedQuestions || questions.slice(0, 5),
-        message: `Generated and saved ${insertedQuestions?.length || 0} questions`
-      }),
+      body: JSON.stringify({ questions: questionsToInsert }),
     };
+
   } catch (error: any) {
     console.error("Critical error in generate-questions handler:", error);
     return {

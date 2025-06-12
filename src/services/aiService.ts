@@ -20,6 +20,9 @@ interface AIAnalysisResult {
   }>;
 }
 
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard' | 'mixed';
+export type QuestionType = 'mcq' | 'short' | 'open';
+
 const getApiBaseUrl = () => {
   const isDev = process.env.NODE_ENV === 'development';
   return isDev ? '/api' : 'https://studymindai.me/.netlify/functions';
@@ -252,15 +255,28 @@ export async function generateNoteSummary(content: string): Promise<string> {
   }
 }
 
-export const generateQuestionsForNote = async (noteId: string) => {
+export const generateQuestionsForNote = async (
+  noteId: string,
+  options: {
+    difficulty?: QuestionDifficulty;
+    questionType?: QuestionType;
+  } = {}
+) => {
   try {
-    console.log('AI Service: Generating questions for note:', noteId);
+    console.log('AI Service: Generating questions for note:', noteId, 'with options:', options);
     
-    // Get the session token
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error("User not authenticated for question generation.");
 
-    const response = await fetch(`${getApiBaseUrl()}/generate-questions?noteId=${noteId}`, { 
+    const params = new URLSearchParams({ noteId });
+    if (options.difficulty) {
+      params.append('difficulty', options.difficulty);
+    }
+    if (options.questionType) {
+      params.append('questionType', options.questionType);
+    }
+
+    const response = await fetch(`${getApiBaseUrl()}/generate-questions?${params.toString()}`, { 
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`
@@ -269,19 +285,12 @@ export const generateQuestionsForNote = async (noteId: string) => {
     
     if (!response.ok) {
       const errorText = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch {
-        errorData = { error: `HTTP ${response.status}: ${errorText}` };
-      }     
-      throw new Error(errorData.error || `Failed to generate questions: ${response.status}`);
-    }
-    
-    const data = await response.json();
-
-    console.log('AI Service: Questions generated and saved on server.');
-    return data.questions || [];
+      throw new Error(`Failed to generate questions: ${errorText}`);
+  }
+  
+  const data = await response.json();
+  console.log('AI Service: Questions generated and saved on server.');
+  return data.questions || [];
     
   } catch (error) {
     console.error('AI Service: Question generation failed:', error);
@@ -360,5 +369,33 @@ export const getSavedGapsForNote = async (noteId: string) => {
   } catch (error) {
     console.error('Error fetching saved gaps:', error);
     return [];
+  }
+};
+
+export const findRelatedNotes = async (noteId: string) => {
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("User not authenticated.");
+
+    const response = await fetch(`${getApiBaseUrl()}/find-related-notes`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ noteId })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to find related notes.');
+    }
+
+    const data = await response.json();
+    return data.relatedNotes || [];
+
+  } catch (error) {
+    console.error("AI Service: Error finding related notes:", error);
+    throw error;
   }
 };

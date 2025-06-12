@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Book, ArrowLeft } from 'lucide-react';
 
@@ -14,9 +14,12 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, signIn, signUp, forgotPassword } = useAuth();
 
-  if (user) {
-    return <Navigate to="/" />;
-  }
+  useEffect(() => {
+    if (user) {
+      console.log("LoginPage: User detected, navigating to /");
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +36,6 @@ const LoginPage: React.FC = () => {
         setSuccess('Please check your email to verify your account.');
       } else {
         await signIn(email, password);
-        navigate('/');
       }
     } catch (error) {
       setError((error as Error).message);

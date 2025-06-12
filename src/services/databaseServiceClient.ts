@@ -161,26 +161,49 @@ export async function getNoteById(id: string) {
   }
 }
 
-export async function getAllNotes(page = 1, pageSize = 12) {
+export async function getAllNotes(
+  page = 1, 
+  pageSize = 12,
+  options: {
+    searchTerm?: string;
+    tags?: string[];
+  } = {}
+) {
   try {
-    console.log("Database Service: Fetching paginated notes", { page, pageSize });
+    console.log("Database Service: Fetching notes with options", { page, pageSize, options });
     
-    // Get current user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('User not authenticated');
     
-    // Get both data and count in a single query
-    const { data, error, count } = await supabase
+    // Start building the query
+    let query = supabase
       .from('notes')
       .select('*', { count: 'exact' })
-      .eq('user_id', user.id)
+      .eq('user_id', user.id);
+
+    // Add search term filter if provided
+    if (options.searchTerm) {
+      query = query.or(`title.ilike.%${options.searchTerm}%,content.ilike.%${options.searchTerm}%`);
+    }
+
+    // Add tags filter if provided
+    if (options.tags && options.tags.length > 0) {
+      query = query.contains('tags', options.tags);
+    }
+    
+    // Add ordering and pagination at the end
+    query = query
       .order('updated_at', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
+
+    // Execute the fully constructed query
+    const { data, error, count } = await query;
 
     if (error) {
       console.error("Database Service: Supabase error:", error);
       throw new Error(`Failed to fetch notes: ${error.message}`);
     }
+    
     console.log("Database Service: Returning counts", { count });
     return { data, count };
 
@@ -393,3 +416,12 @@ export const saveNoteGaps = async (noteId: string, gaps: any[]) => {
   console.log("Database Service: Knowledge gaps saved successfully");
   return { data };
 };
+
+export async function getAllUserTags() {
+  const { data, error } = await supabase.rpc('get_all_user_tags');
+  if (error) {
+      console.error("Error fetching all user tags:", error);
+      return [];
+  }
+  return data;
+}

@@ -1,69 +1,90 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText, List, Grid } from 'lucide-react';
 import DocumentUploader from '../components/DocumentUploader';
 import Pagination from '../components/Pagination';
-import { deleteNoteFromDatabase } from '../services/databaseServiceClient';
+import { useDebounce } from '../hooks/useDebounce'; 
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const { 
     notes, 
-    addNote, 
+    addNote,
     deleteNote, 
-    pagination, 
-    setPage, 
-    setPageSize,
+    pagination,
+    loadNotes,
+    allTags,
+    loadAllTags, 
     isLoading,
     error 
   } = useStore();
   
-  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  // Local state for UI controls
+  const [searchTerm, setSearchTerm] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(12);
+
   const [showPdfUploader, setShowPdfUploader] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-
-  // Update search term when URL search param changes
-  useEffect(() => {
-    const urlSearch = searchParams.get('search');
-    if (urlSearch && urlSearch !== searchTerm) {
-      setSearchTerm(urlSearch);
-    }
-  }, [searchParams]);
-
-  // Update URL when search term changes
-  useEffect(() => {
-    if (searchTerm) {
-      setSearchParams({ search: searchTerm });
-    } else {
-      setSearchParams({});
-    }
-  }, [searchTerm, setSearchParams]);
   
-  // Get all unique tags from notes
-  const allTags = Array.from(
-    new Set(notes.flatMap((note) => note.tags))
-  ).sort();
+  // Debounce the search term to avoid excessive API calls
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
+  // A ref to prevent the main effect from running on the initial mount
+  const isInitialMount = useRef(true);
   
-  // Filter notes based on search term and selected tags
-  const filteredNotes = notes.filter((note) => {
-    const matchesSearch = searchTerm === '' || 
-      note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesTags = selectedTags.length === 0 || 
-      selectedTags.every((tag) => note.tags.includes(tag));
-    
-    return matchesSearch && matchesTags;
-  });
+  // Load all available tags once when the component first mounts
+  useEffect(() => {
+    loadAllTags();
+  }, [loadAllTags]);
+
+  // This is now the SINGLE effect responsible for fetching data
+  useEffect(() => {
+    // Skip the very first run to prevent a double load with App.tsx
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // This effect runs whenever a filter changes
+    console.log("Filters changed, reloading notes from server.");
+    loadNotes(currentPage, pageSize, { 
+      searchTerm: debouncedSearchTerm, 
+      tags: selectedTags 
+    });
+
+  }, [debouncedSearchTerm, selectedTags, currentPage, pageSize, loadNotes]);
 
   const handleTagToggle = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter((t) => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
+    const newTags = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    setSelectedTags(newTags);
+    setCurrentPage(1); // Reset to page 1 when filters change
+  };
+
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset to page 1 when search term changes
+  };
+  
+  const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setPageSize(Number(e.target.value));
+      setCurrentPage(1); // Reset to page 1 when page size changes
+  };
+
+  const clearSearch = () => {
+    setSearchTerm('');
+  };
+
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();    
+    if (window.confirm('Are you sure you want to delete this note?')) {
+      await deleteNote(id); 
     }
   };
 
@@ -91,26 +112,6 @@ const NotesPage: React.FC = () => {
     }
   };
   
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      try {
-        await deleteNoteFromDatabase(id);
-        deleteNote(id);
-      } catch (error) {
-        console.error("Error deleting note:", error);
-        alert(`Failed to delete note: ${(error as Error).message}`);
-      }
-    }
-  };
-
-  const clearSearch = () => {
-    setSearchTerm('');
-    setSearchParams({});
-  };
-
   const renderNoteCard = (note: any) => (
     <Link
       key={note.id}
@@ -152,7 +153,7 @@ const NotesPage: React.FC = () => {
     </Link>
   );
 
-  if (isLoading) {
+  if (isLoading && pagination.totalNotes === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="text-center">
@@ -208,7 +209,7 @@ const NotesPage: React.FC = () => {
             </div>
             <input
               type="text"
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm"
+              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md"
               placeholder="Search notes..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -292,8 +293,8 @@ const NotesPage: React.FC = () => {
             </div>
 
             <select
-              value={pagination.pageSize}
-              onChange={(e) => setPageSize(Number(e.target.value))}
+              value={pageSize}
+              onChange={handlePageSizeChange}
               className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700"
             >
               <option value="12">12 per page</option>
@@ -372,22 +373,22 @@ const NotesPage: React.FC = () => {
       )}
       
       {/* Notes Grid/List */}
-      {filteredNotes.length > 0 ? (
+      {notes.length > 0 ? (
         <>
           <div className={
             viewMode === 'grid'
               ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
               : 'space-y-4'
           }>
-            {filteredNotes.map(renderNoteCard)}
+            {notes.map(renderNoteCard)}
           </div>
           
           {/* Pagination */}
           <div className="mt-8">
             <Pagination
-              currentPage={pagination.currentPage}
+              currentPage={currentPage}
               totalPages={pagination.totalPages}
-              onPageChange={setPage}
+              onPageChange={setCurrentPage}
             />
             <p className="text-center mt-4 text-sm text-gray-500">
               Showing {(pagination.currentPage - 1) * pagination.pageSize + 1} to{' '}

@@ -2,9 +2,8 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useStore } from '../store';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Search, Info, RotateCcw } from 'lucide-react';
+import { Search, Info, RotateCcw, XCircle } from 'lucide-react'; 
 import { GraphData, GraphNode, GraphLink } from '../types';
-import { getConceptCategories } from '../services/databaseServiceClient';
 import { supabase } from '../services/supabase';
 import { Link } from 'react-router-dom';
 
@@ -12,8 +11,8 @@ interface ConceptDetails {
   id: string;
   name: string;
   definition: string;
-  noteIds: string[];
-  relatedConceptIds: string[];
+  noteIds: string[]; 
+  relatedConceptIds: string[]; 
 }
 
 interface CategoryColors {
@@ -29,7 +28,6 @@ const ConceptsPage: React.FC = () => {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [selectedConcept, setSelectedConcept] = useState<ConceptDetails | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [highlightLinks, setHighlightLinks] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<string[]>([]);
@@ -39,8 +37,6 @@ const ConceptsPage: React.FC = () => {
   const [labelsEnabled, setLabelsEnabled] = useState(true);
   const graphRef = useRef<any>(null);
 
-  const hasCenteredRef = useRef(false);
-
   const NODE_LABEL_ZOOM_THRESHOLD = 1.5;
   const LINK_LABEL_ZOOM_THRESHOLD = 2.0;
 
@@ -49,86 +45,132 @@ const ConceptsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Reset the centered flag whenever the data is reloaded
-    hasCenteredRef.current = false;
-
-    const loadConceptData = async () => {
+    const loadUserConceptGraph = async () => {
       try {
         setLoading(true);
         setError(null);
+        setSelectedConcept(null);
 
-        const [conceptsResult, relationshipsResult, noteConceptsResult, categoriesResult] = await Promise.all([
-          supabase.from('concepts').select('*'),
-          supabase.from('concept_relationships').select('*, relationship_type'),
-          supabase.from('note_concepts').select('note_id, concept_id'),
-          getConceptCategories()
-        ]);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated.");
 
-        if (conceptsResult.error || relationshipsResult.error || noteConceptsResult.error) {
-          throw new Error(`Supabase error: ${conceptsResult.error?.message || relationshipsResult.error?.message || noteConceptsResult.error?.message}`);
+        // Fetch user's notes
+        const { data: userNotes, error: notesError } = await supabase
+          .from('notes')
+          .select('id, tags')
+          .eq('user_id', user.id);
+        if (notesError) throw notesError;
+
+        const userNoteIds = userNotes.map(n => n.id);
+        if (userNoteIds.length === 0) {
+            setGraphData({ nodes: [], links: [] });
+            setLoading(false);
+            return;
         }
 
-        const concepts = conceptsResult.data;
-        const relationships = relationshipsResult.data;
-        const noteConcepts = noteConceptsResult.data;
-        const categories = categoriesResult;
-        const colors = generateCategoryColors(categories);
-        setCategories(categories);
-        setCategoryColors(colors);
-        
-        const linkedConceptIds = new Set<string>();
-        relationships.forEach(rel => {
-          linkedConceptIds.add(rel.source_id);
-          linkedConceptIds.add(rel.target_id);
+        // Fetch concepts linked to those notes
+        const { data: noteConcepts, error: ncError } = await supabase
+          .from('note_concepts')
+          .select('note_id, concept_id')
+          .in('note_id', userNoteIds);
+        if (ncError) throw ncError;
+
+        const learnedConceptIdSet = new Set(noteConcepts.map(nc => nc.concept_id));
+        if (learnedConceptIdSet.size === 0) {
+            setGraphData({ nodes: [], links: [] });
+            setLoading(false);
+            return;
+        }
+
+        // Convert the Set to an Array before using it in the filter.
+        const learnedConceptIdsArray = Array.from(learnedConceptIdSet);
+
+        // Fetch relationships using the new array
+        const [sourceRelationships, targetRelationships] = await Promise.all([
+          supabase
+              .from('concept_relationships')
+              .select('source_id, target_id, strength, relationship_type')
+              .in('source_id', learnedConceptIdsArray), // Use the array
+          supabase
+              .from('concept_relationships')
+              .select('source_id, target_id, strength, relationship_type')
+              .in('target_id', learnedConceptIdsArray)  // Use the array
+        ]);
+
+        if (sourceRelationships.error) throw sourceRelationships.error;
+        if (targetRelationships.error) throw targetRelationships.error;
+
+        // Combine and de-duplicate the results in JavaScript.
+        const allRelationshipsMap = new Map();
+        const combinedRels = [...(sourceRelationships.data || []), ...(targetRelationships.data || [])];
+
+        combinedRels.forEach(rel => {
+            const id = `${rel.source_id}-${rel.target_id}`;
+            if (!allRelationshipsMap.has(id)) {
+                allRelationshipsMap.set(id, rel);
+            }
         });
 
-        const nodes: GraphNode[] = concepts
-          .filter(concept => linkedConceptIds.has(concept.id)) 
-          .map(concept => {
-            const conceptNotes = noteConcepts
-              .filter(nc => nc.concept_id === concept.id)
-              .map(nc => nc.note_id);
-            
-            const noteCategories = conceptNotes
-              .map(noteId => {
-                const note = notes.find(n => n.id === noteId);
-                return note?.tags[0] || '';
-              })
-              .filter(Boolean);
+        const relationships = Array.from(allRelationshipsMap.values());
 
-            if (!concept) {
-              console.error("Error: concept is undefined or null");
-              return null;
-            }
+        // Gather all concept IDs from the now-complete relationship list
+        const allGraphConceptIds = new Set(learnedConceptIdSet);
+        relationships.forEach(rel => {
+            allGraphConceptIds.add(rel.source_id);
+            allGraphConceptIds.add(rel.target_id);
+        });
 
-            const topCategory = getMostCommonCategory(noteCategories);
-            const node: GraphNode = {
-              id: concept.id,
-              name: concept.name,
-              val: 1 + conceptNotes.length * 0.5,
-              color: colors[topCategory] || '#94A3B8',
+        const { data: concepts, error: conceptsError } = await supabase
+            .from('concepts')
+            .select('id, name, definition')
+            .in('id', Array.from(allGraphConceptIds));
+        if (conceptsError) throw conceptsError;
+
+        const allUserTags = [...new Set(userNotes.flatMap(n => n.tags || []))];
+        const colors = generateCategoryColors(allUserTags);
+        setCategories(allUserTags);
+        setCategoryColors(colors);
+        
+        const noteIdToTagsMap = new Map(userNotes.map(n => [n.id, n.tags || []]));
+        const conceptIdToNoteIdsMap = new Map<string, string[]>();
+        noteConcepts.forEach(nc => {
+          if (!conceptIdToNoteIdsMap.has(nc.concept_id)) {
+              conceptIdToNoteIdsMap.set(nc.concept_id, []);
+          }
+          conceptIdToNoteIdsMap.get(nc.concept_id)!.push(nc.note_id);
+        });
+
+        const nodes: GraphNode[] = concepts.map(concept => {
+            const linkedNoteIds = conceptIdToNoteIdsMap.get(concept.id) || [];
+            const linkedNoteTags = linkedNoteIds.flatMap(id => noteIdToTagsMap.get(id) || []);
+            const topCategory = getMostCommonCategory(linkedNoteTags) || 'Default';
+            return {
+                id: concept.id,
+                name: concept.name,
+                val: 1 + linkedNoteIds.length * 0.5,
+                color: colors[topCategory] || '#94A3B8',
+                category: topCategory,
             };
-            return node;
-          }).filter((node): node is GraphNode => node !== null);
+        });
 
         const links: EnhancedGraphLink[] = relationships.map(rel => ({
-          source: rel.source_id,
-          target: rel.target_id,
-          value: rel.strength,
-          relationshipType: rel.relationship_type || 'related to'
+            source: rel.source_id,
+            target: rel.target_id,
+            value: rel.strength,
+            relationshipType: rel.relationship_type,
         }));
 
-        setGraphData({ nodes, links });          
-      } catch (err) {
-        console.error('Error loading concept data:', err);
-        setError('Failed to load concept data. Please try again later.');
+        setGraphData({ nodes, links });
+
+      } catch (err: any) {
+        console.error('Error loading concept graph:', err);
+        setError(`Failed to load concept graph: ${err.message}`);
       } finally {
         setLoading(false);
       }
     };
-
-    loadConceptData();
-  }, [notes]); 
+    loadUserConceptGraph();
+  }, []); 
 
   const generateCategoryColors = (categories: string[]): CategoryColors => {
     const baseColors = {
@@ -165,52 +207,54 @@ const ConceptsPage: React.FC = () => {
       .sort((a, b) => b[1] - a[1])[0][0];
   };
 
-  const handleNodeClick = async (node: any) => {
-    try {
-      const { data: concept, error } = await supabase
-        .from('concepts')
-        .select('*')
-        .eq('id', node.id)
-        .single();
-
-      if (error) throw error;
-
-      const { data: noteConceptsData } = await supabase
-        .from('note_concepts')
-        .select('note_id')
-        .eq('concept_id', node.id);
-
-      const { data: relationships } = await supabase
-        .from('concept_relationships')
-        .select('target_id')
-        .eq('source_id', node.id);
-      
-      setSelectedConcept({
-        ...concept,
-        noteIds: noteConceptsData?.map(nc => nc.note_id) || [],
-        relatedConceptIds: relationships?.map(r => r.target_id) || []
-      });
-
-      const connectedNodeIds = new Set([
-        node.id,
-        ...(relationships?.map(r => r.target_id) || [])
-      ]);
-
-      const connectedLinkIds = new Set<string>();
-      graphData.links.forEach((link) => {
-        if (
-          (link.source === node.id && connectedNodeIds.has(link.target as string)) ||
-          (link.target === node.id && connectedNodeIds.has(link.source as string))
-        ) {
-          connectedLinkIds.add(`${link.source}-${link.target}`);
-        }
-      });
-
-      setHighlightLinks(connectedLinkIds);      
-    } catch (error) {
-      console.error('Error fetching concept details:', error);
+  const handleNodeClick = useCallback(async (node: any) => {
+    if (!node?.id) {
+        setSelectedConcept(null);
+        return;
     }
-  };
+
+    setSelectedConcept({
+        id: node.id,
+        name: node.name,
+        definition: "Loading details...",
+        noteIds: [],
+        relatedConceptIds: [],
+    });
+
+    try {
+        const [conceptDetails, noteLinks, relationshipLinks] = await Promise.all([
+            supabase.from('concepts').select('definition').eq('id', node.id).single(),
+            supabase.from('note_concepts').select('note_id').eq('concept_id', node.id),
+            supabase.from('concept_relationships').select('target_id').eq('source_id', node.id)
+        ]);
+
+        if (conceptDetails.error) throw conceptDetails.error;
+        if (noteLinks.error) throw noteLinks.error;
+        if (relationshipLinks.error) throw relationshipLinks.error;
+
+        // Safely extract the data and transform it into arrays of strings
+        const foundNoteIds = noteLinks.data?.map(link => link.note_id) || [];
+        const foundRelatedIds = relationshipLinks.data?.map(link => link.target_id) || [];
+
+        // Set the final state object, which now matches the JSX expectations perfectly
+        setSelectedConcept({
+            id: node.id,
+            name: node.name,
+            definition: conceptDetails.data.definition || "No definition available.",
+            noteIds: foundNoteIds,
+            relatedConceptIds: foundRelatedIds,
+        });
+
+    } catch (err) {
+        console.error('Error fetching concept details:', err);
+        setSelectedConcept(prev => prev ? { ...prev, definition: "Could not load concept details." } : null);
+    }
+  }, [graphRef]);
+
+  const handleClearSelection = () => {
+    setSelectedConcept(null);
+    handleResetView();
+  }
 
   const handleNodeHover = (node: GraphNode | null) => {
     setHoveredNode(node);
@@ -218,22 +262,20 @@ const ConceptsPage: React.FC = () => {
 
   const handleSearch = () => {
     if (!searchTerm) {
-      setHighlightLinks(new Set());
       setSelectedConcept(null);
       return;
     }
-
     const term = searchTerm.toLowerCase();
-    const matchedNode = graphData.nodes.find(
-      (n) => n.name.toLowerCase().includes(term)
-    );
-
+    const matchedNode = graphData.nodes.find(n => n.name.toLowerCase().includes(term));
     if (matchedNode) {
       handleNodeClick(matchedNode);
+    } else {
+        alert("Concept not found.");
     }
   };
 
   const handleResetView = () => {
+    setSelectedConcept(null);
     if (graphRef.current) {
       graphRef.current.zoomToFit(400, 50);
     }
@@ -347,10 +389,12 @@ const ConceptsPage: React.FC = () => {
           </div>
         </div>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden relative">
+
+          {/* ...Graph controls... */}
           <div className="p-4 border-b border-gray-200">
-            {/* ...Search and Reset buttons... */}
             <div className="flex items-center space-x-3">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -362,17 +406,13 @@ const ConceptsPage: React.FC = () => {
                   placeholder="Search concepts..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      handleSearch();
-                    }
-                  }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
                 />
               </div>
               <button
                 onClick={handleResetView}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm leading-4 font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                title="Reset view to fit all nodes"
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm leading-4 font-medium text-gray-700 bg-white hover:bg-gray-50"
+                title="Reset view and clear selection"
               >
                 <RotateCcw className="h-4 w-4 mr-1" />
                 Reset View
@@ -384,55 +424,52 @@ const ConceptsPage: React.FC = () => {
                 Node labels: {(labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) ? 'ON' : 'OFF'} | 
                 Link labels: {(labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) ? 'ON' : 'OFF'}
               </div>
-              <div className="text-xs text-gray-400">
-                {!labelsEnabled && 'Labels manually disabled'}
-              </div>
             </div>
           </div>
+
           <div className="w-full h-[600px]">
             {graphData.nodes.length > 0 ? (
               <ForceGraph2D
                 ref={graphRef}
                 graphData={graphData}
                 nodeLabel={getNodeTooltip}
-                nodeColor={node => {
-                  const n = node as GraphNode;
-                  return (selectedConcept && selectedConcept.id === n.id) ? '#6366F1' : n.color;
-                }}
-                nodeRelSize={6}
+                onNodeHover={handleNodeHover}
+                onZoom={handleZoom}
                 nodeCanvasObject={(node, ctx, globalScale) => {
                   const n = node as GraphNode;
                   const label = getNodeLabel(n);
-                  const fontSize = 12 / globalScale;
+                  const isSelected = selectedConcept?.id === n.id;
+                  const isNeighbor = selectedConcept?.relatedConceptIds.includes(n.id as string);
+                  const isDimmed = selectedConcept && !isSelected && !isNeighbor;
+                  
+                  const color = isSelected ? '#4338CA' : (n.color || '#94A3B8');
                   const nodeRadius = Math.sqrt(Math.max(0, n.val || 1)) * 4;
+
+                  ctx.globalAlpha = isDimmed ? 0.2 : 1.0; 
+                  
                   ctx.beginPath();
                   ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
-                  ctx.fillStyle = (selectedConcept && selectedConcept.id === n.id) ? '#6366F1' : (n.color || '#94A3B8');
+                  ctx.fillStyle = color;
                   ctx.fill();
+
+                  if (!isDimmed && (isSelected || isNeighbor)) {
+                      ctx.strokeStyle = '#818CF8';
+                      ctx.lineWidth = 1.5 / globalScale;
+                      ctx.stroke();
+                  }
+
                   if (label && labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
-                    ctx.font = `${fontSize * 1.2}px Sans-Serif`;
+                    ctx.font = `${12 / globalScale}px Sans-Serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.fillStyle = '#1f2937';
-                    ctx.fillText(label, n.x!, n.y! + nodeRadius + fontSize * 1.5);
+                    ctx.fillText(label, n.x!, n.y! + nodeRadius + 5 / globalScale);
                   }
+                  
+                  ctx.globalAlpha = 1.0; // Reset alpha
                 }}
-                nodeCanvasObjectMode={() => 'replace'}
-                linkWidth={(link) => {
-                  const l = link as GraphLink;
-                  const id = `${link.source}-${link.target}`;
-                  return highlightLinks.size === 0 || highlightLinks.has(id)
-                    ? 2 * (l.value || 1)
-                    : 0.5;
-                }}
-                linkColor={(link) => {
-                  const l = link as GraphLink;
-                  const id = `${l.source}-${l.target}`;
-                  return highlightLinks.size === 0 || highlightLinks.has(id)
-                    ? 'rgba(79, 70, 229, 0.8)'
-                    : 'rgba(203, 213, 225, 0.5)';
-                }}
-                linkLabel={getLinkLabel}
+                linkWidth={link => (selectedConcept && (link.source.id === selectedConcept.id || link.target.id === selectedConcept.id)) ? 2 : 1}
+                linkColor={link => (selectedConcept && (link.source.id === selectedConcept.id || link.target.id === selectedConcept.id)) ? '#6366F1' : 'rgba(150, 150, 150, 0.2)'}
                 linkCanvasObject={(link, ctx, globalScale) => {
                   const l = link as EnhancedGraphLink;
                   const label = getLinkLabel(l);
@@ -455,10 +492,7 @@ const ConceptsPage: React.FC = () => {
                   }
                 }}
                 linkCanvasObjectMode={() => (labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) ? 'after' : undefined}
-                onNodeClick={handleNodeClick}
-                onNodeHover={handleNodeHover}
-                onZoom={handleZoom}
-                cooldownTicks={100}                
+                onNodeClick={handleNodeClick}                 
               />
             ) : (
               <div className="flex items-center justify-center h-full">
@@ -466,15 +500,19 @@ const ConceptsPage: React.FC = () => {
               </div>
             )}
           </div>
+
         </div>
+
+        {/* ...Side Panel... */}
         <div className="space-y-6">
-          {/* ...Concept details panel... */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-            <div className="p-4 bg-primary/5 border-b border-gray-200">
-              <div className="flex items-center">
-                <Info className="h-5 w-5 text-primary mr-2" />
-                <h2 className="text-lg font-semibold text-gray-900">Concept Details</h2>
-              </div>
+            <div className="p-4 bg-primary/5 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center"><Info className="h-5 w-5 text-primary mr-2" /> Concept Details</h2>
+              {selectedConcept && (
+                  <button onClick={handleClearSelection} className="text-gray-400 hover:text-red-500 transition-colors" title="Clear selection">
+                      <XCircle size={20}/>
+                  </button>
+              )}
             </div>
             {selectedConcept ? (
               <div className="p-4">

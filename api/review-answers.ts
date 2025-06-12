@@ -1,180 +1,169 @@
-// review-answers.ts
+// api/review-answers.ts
 
-import { createClient, Client } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Handler } from '@netlify/functions';
 
-interface Answer {
+interface SubmittedAnswer {
   questionId: string;
-  answer: string;
-}
-
-interface QuestionContext {
-  questionId: string;
-  question: string;
-  correctAnswer: string;
-  explanation: string;
+  answerText: string;
 }
 
 interface Feedback {
   questionId: string;
   isCorrect: boolean;
   feedback: string;
-  correctAnswer: string;
 }
 
-interface ReviewResponse {
-  feedbacks: Feedback[];
-  score: number;
-}
-
+// Helper to sanitize JSON
 function extractJSONFromMarkdown(text: string): string {
-    // Try to extract code block first
-    const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch) {
-      return codeBlockMatch[1].trim();
-    }
-  
-    // Fallback: try to extract first valid JSON object manually
-    const jsonStart = text.indexOf('{');
-    const jsonEnd = text.lastIndexOf('}');
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      return text.substring(jsonStart, jsonEnd + 1);
-    }
-  
-    // Give up: return raw
-    return text.trim();
-  }  
-  
+  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+  return jsonMatch ? jsonMatch[1].trim() : text.trim();
+}
+
 const handler: Handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Content-Type': 'application/json',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json'
   };
+
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers };
+  }
 
   try {
     const { answers, noteId } = JSON.parse(event.body || '{}');
-
-    if (!answers || !noteId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing answers or noteId in request body' }),
-      };
+    if (!answers || !Array.isArray(answers) || answers.length === 0) {
+      return { statusCode: 400, headers, body: JSON.stringify({ error: 'Missing or invalid answers array' }) };
     }
 
-    const supabase: Client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    // 1. Create an AUTHENTICATED Supabase client
+    const authHeader = event.headers.authorization;
+    if (!authHeader) {
+      return { statusCode: 401, headers, body: JSON.stringify({ error: 'Missing Authorization header' }) };
+    }
+    const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!, {
+      global: { headers: { Authorization: authHeader } }
+    });
+    
+    // Get user from token
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("User not found or token invalid.");
 
-    // Fetch note data and question contexts
+    // 2. Fetch the note content for context
     const { data: note, error: noteError } = await supabase
       .from('notes')
-      .select('id, title, content, summary, note_questions(questions)')
+      .select('content')
       .eq('id', noteId)
       .single();
+    if (noteError) throw new Error(`Could not fetch note context: ${noteError.message}`);
 
-    if (noteError || !note) {
-      console.error("Supabase error fetching note:", noteError);
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({ error: `Note not found: The ID '${noteId}' does not exist.` }),
-      };
-    }
+    // 3. Fetch the original questions from the DB to get the ground truth
+    const questionIds = answers.map((a: SubmittedAnswer) => a.questionId);
+    const { data: originalQuestions, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, question, answer, connects') // 'answer' is the correct answer for MCQs
+        .in('id', questionIds);
+    if (questionsError) throw new Error(`Could not fetch questions: ${questionsError.message}`);
 
-    const noteData = note;
-    const questions = noteData.note_questions || [];
+    // Create a map for easy lookup
+    const questionsMap = new Map(originalQuestions.map(q => [q.id, q]));
 
+    // 4. Construct a clear, high-quality prompt for the AI
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
-    // Generate feedback using AI
     const prompt = `
-    You are an expert tutor reviewing student answers based on their notes and a set of predefined questions.
-    
-    STUDENT NOTES CONTEXT:
-    ---
-    TITLE: ${noteData.title}
-    SUMMARY: ${noteData.summary}
-    FULL CONTENT:
-    ${noteData.content}
-    ---
-    
-    STUDENT'S SUBMITTED ANSWERS:
-    ${answers.map((answer: Answer) => `Question ID: ${answer.questionId}, Answer: ${answer.answer}`).join('\n')}
-    
-    QUESTION BANK (with correct answers and explanations):
-    ${questions.map((q: any) => `Question ID: ${q.id}, Question: ${q.question}, Correct Answer: ${q.correctAnswer}, Explanation: ${q.explanation}`).join('\n')}
-    
-    YOUR TASK:
-    Carefully evaluate the student's answers against the correct answers and explanations above.
-    
-    FOLLOW THESE RULES STRICTLY:
-    1. For each student answer:
-       - Evaluate if it is correct ("isCorrect": true or false).
-       - Provide constructive, educational feedback explaining your judgment clearly.
-       - ALWAYS include the correct answer in the field "correctAnswer" — this must:
-         - Be directly relevant to the question being asked.
-         - Be phrased clearly as a correct and complete answer to the exact question.
-         - NEVER be "undefined" or generic — if the correct answer field in the context is missing, **infer it from the explanation or notes**.
-         - Be written in a way that helps the student understand **exactly why the correct answer is correct** in their specific case.
-    2. At the end, return a total "score" as a count of correct answers.
-    3. Your output must be valid JSON only. Do not include any Markdown, backticks, or extra commentary.
-    
-    RESPONSE FORMAT:
-    
-    {
-      "feedbacks": [
+      You are an expert tutor evaluating a student's answers to questions based on their notes.
+
+      NOTE CONTENT (for context):
+      ---
+      ${note.content.substring(0, 6000)}
+      ---
+
+      QUESTIONS AND STUDENT'S ANSWERS:
+      ${answers.map((ans: SubmittedAnswer) => {
+        const q = questionsMap.get(ans.questionId);
+        return `
+        Question ID: "${q?.id}"
+        Question: "${q?.question}"
+        Correct Answer (if available): "${q?.answer || 'N/A'}"
+        Student's Answer: "${ans.answerText}"
+        `;
+      }).join('\n')}
+
+      YOUR TASK:
+      For each question, evaluate the student's answer.
+
+      RULES:
+      1.  For Multiple Choice Questions (where a 'Correct Answer' is provided), check if the student's answer matches.
+      2.  For short-answer or open-ended questions (where 'Correct Answer' is 'N/A'), judge the correctness based on the provided "NOTE CONTENT".
+      3.  Provide concise, constructive feedback for each answer. If the answer is wrong, briefly explain why and what the correct answer should cover.
+      4.  Return ONLY a valid JSON array of feedback objects. Do not include markdown or other text.
+
+      JSON OUTPUT FORMAT:
+      [
         {
-          "questionId": "1",
+          "questionId": "The ID of the question",
+          "isCorrect": true,
+          "feedback": "Your explanation is spot on! You correctly identified that mutual exclusion is the key to preventing the race condition."
+        },
+        {
+          "questionId": "The ID of another question",
           "isCorrect": false,
-          "feedback": "Your answer was incorrect. The two threads read the same balance of 1000 and both subtract 100, resulting in both writing back 900 — overwriting one another. This is a classic race condition.",
-          "correctAnswer": "Because both threads read the balance as 1000 before either writes the updated balance back, they both deduct 100 and write 900, overwriting each other’s changes. This is a race condition caused by the lack of mutual exclusion."
+          "feedback": "Not quite. While 'Hold and Wait' is a condition for deadlock, 'Preemption' is the absence of a condition. The correct answer was Preemption."
         }
-      ],
-      "score": 0
-    }
-    `;    
-    
+      ]
+    `;
+
+    // 5. Generate, parse, and process the feedback
     const result = await model.generateContent(prompt);
     const rawText = extractJSONFromMarkdown(result.response.text());
-    let reviewResponse: ReviewResponse | null = null;
+    const feedbacks: Feedback[] = JSON.parse(rawText);
 
-    try {
-      reviewResponse = JSON.parse(rawText);
-      console.debug(reviewResponse);
+    // 6. Update user mastery based on feedback
+    for (const fb of feedbacks) {
+        const question = questionsMap.get(fb.questionId);
+        if (!question || !question.connects || question.connects.length === 0) {
+            continue; // Skip if question has no linked concepts
+        }
 
-      if (!reviewResponse || !reviewResponse.feedbacks) {
-        throw new Error("Parsed result is not a valid review response.");
-      }
+        // Determine the mastery change
+        const masteryChange = fb.isCorrect ? 0.1 : -0.15;
 
-    } catch (e: any) {
-      console.error("Error processing Gemini response:", e.message);
-      console.error("Raw response for debugging:", rawText);
+        // For every concept linked to this question, update the user's mastery
+        for (const conceptName of question.connects) {
+            // Find the concept's ID
+            const { data: concept } = await supabase.from('concepts').select('id').eq('name', conceptName).single();
+            if (concept) {
+                // Fetch current mastery to update it
+                const { data: currentMastery } = await supabase
+                    .from('user_concept_mastery')
+                    .select('mastery_level')
+                    .eq('user_id', user.id)
+                    .eq('concept_id', concept.id)
+                    .single();
+                
+                const currentLevel = currentMastery?.mastery_level ?? 0.5;
+                const newLevel = Math.max(0, Math.min(1, currentLevel + masteryChange));
 
-      // Fallback: generate basic feedback if AI fails
-      reviewResponse = {
-        feedbacks: answers.map((answer: Answer) => {
-          const context = questions.find((q: any) => q.id === answer.questionId);
-          const isCorrect = answer.answer.toLowerCase().trim() === context.correctAnswer.toLowerCase().trim();
-          return {
-            questionId: answer.questionId,
-            isCorrect,
-            feedback: isCorrect ? "Correct! Well done." : `Incorrect. The correct answer is ${context.correctAnswer}. ${context.explanation}`,
-            correctAnswer: context.correctAnswer,
-          };
-        }),
-        score: answers.filter((answer: Answer) => {
-          const context = questions.find((q: any) => q.id === answer.questionId);
-          return answer.answer.toLowerCase().trim() === context.correctAnswer.toLowerCase().trim();
-        }).length,
-      };
+                // Call the RPC function to update or insert the mastery level
+                await supabase.rpc('update_user_mastery', {
+                    user_uuid: user.id,
+                    concept_id_param: concept.id,
+                    new_mastery_level: newLevel
+                });
+            }
+        }
     }
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(reviewResponse),
+      body: JSON.stringify({ feedbacks }),
     };
+
   } catch (error: any) {
     console.error("Critical error in review-answers handler:", error);
     return {

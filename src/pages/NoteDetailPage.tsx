@@ -1,19 +1,18 @@
 // src/pages/NoteDetailPage.tsx
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../store';
 import ReactMarkdown from 'react-markdown';
 import { 
   ArrowLeft, Edit, Trash, Save, X, BrainCircuit, Lightbulb, HelpCircle,
   FileText, Eye, ToggleLeft, ToggleRight, Sparkles, AlertTriangle, CheckCircle,
-  ExternalLink, Target, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight
+  ExternalLink, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight, Link2
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-// Import the delete function from the service client
 import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
-import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
+import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
 import PDFViewer from '../components/PDFViewer';
 
 
@@ -35,12 +34,18 @@ interface Concept {
   definition: string;
 }
 
+interface RelatedNote {
+  id: string;
+  title: string;
+  similarity: number;
+}
+
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { notes, updateNote, deleteNote: deleteNoteFromStore } = useStore(); // Renamed to avoid conflict
-  
+  const { notes, updateNote, deleteNote: deleteNoteFromStore } = useStore(); 
+
   const [note, setNote] = useState(notes.find((n) => n.id === id));
   const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,6 +58,7 @@ const NoteDetailPage: React.FC = () => {
       tags: current?.tags?.join(', ') || '',
     };
   });
+
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -71,6 +77,9 @@ const NoteDetailPage: React.FC = () => {
   const [relatedConcepts, setRelatedConcepts] = useState<Concept[]>([]);
   const [expandedGaps, setExpandedGaps] = useState<Set<string>>(new Set());
 
+  const [relatedNotes, setRelatedNotes] = useState<RelatedNote[]>([]);
+  const [isFindingRelated, setIsFindingRelated] = useState(false);
+
   useEffect(() => {
     if (location.state?.isNewNote) {
       navigate(location.pathname, { replace: true });
@@ -78,12 +87,18 @@ const NoteDetailPage: React.FC = () => {
   }, [location.state, navigate, location.pathname]);
   
   useEffect(() => {
+    setRelatedNotes([]);
+    setIsFindingRelated(false);
+    setViewMode('text');
+
     const foundNote = notes.find((n) => n.id === id);
+
     if (id && !foundNote) {
       console.warn(`NoteDetailPage: Note with id "${id}" not found in store. Navigating away.`);
       navigate('/notes', { replace: true });
       return;
     }
+
     if (foundNote) {
       setNote(foundNote);
       setEditedNote({
@@ -91,14 +106,17 @@ const NoteDetailPage: React.FC = () => {
         content: foundNote.content,
         tags: foundNote.tags.join(', '),
       });
+
       if (foundNote.pdfPublicUrl && foundNote.originalFilename) {
         setPdfInfo({
           publicUrl: foundNote.pdfPublicUrl,
           fileName: foundNote.originalFilename
         });
       } else {
+        setPdfInfo(null);
         fetchPdfInfo(foundNote.id);
       }
+      
       checkExistingData(foundNote.id);
     }
   }, [id, notes, navigate]);
@@ -164,19 +182,47 @@ const NoteDetailPage: React.FC = () => {
 
   const handleGenerateAIData = async () => {
     if (!note) return;
+
     setAiProcessing(true);
     try {
       console.log("Generating AI analysis for note:", note.id);
+
       const analysis = await analyzeNote(note.content, note.title, note.id);
       if (analysis) {
+        const updatedSummary = analysis.summary || note.summary;
+        const updatedTags = [...new Set([...note.tags, ...analysis.suggestedTags])];
+
+        const noteUpdates = {
+            summary: updatedSummary,
+            tags: updatedTags,
+            analysis_status: 'completed',
+        };
+
+        console.log("Persisting AI analysis (summary and tags) to the database...");
+
+        await saveNoteToDatabase({
+            id: note.id,
+            user_id: note.user_id!,
+            title: note.title,
+            content: note.content,
+            updatedAt: new Date().toISOString(),
+            ...noteUpdates,
+        });
+        console.log("Database updated successfully.");
+        
+        const updatedNoteForUI = { 
+            ...note, 
+            ...noteUpdates,
+            updatedAt: new Date(),
+        };
+        setNote(updatedNoteForUI);
+        updateNote(note.id, noteUpdates);
+
         await analyzeGapsForNote(note.id);
         await generateQuestionsForNote(note.id);
-        if (analysis.summary) {
-          const updatedNote = { ...note, summary: analysis.summary };
-          setNote(updatedNote);
-          updateNote(note.id, { summary: analysis.summary });
-        }
+        
         await checkExistingData(note.id);
+        
         console.log("AI analysis completed successfully");
       }
     } catch (error) {
@@ -338,6 +384,20 @@ I can help with:
 
   const toggleViewMode = () => {
     setViewMode(prev => prev === 'text' ? 'pdf' : 'text');
+  };
+
+  const handleFindRelated = async () => {
+    if (!note) return;
+    setIsFindingRelated(true);
+    try {
+        const results = await findRelatedNotes(note.id);
+        setRelatedNotes(results);
+    } catch (error) {
+        console.error("Failed to find related notes:", error);
+        alert("Could not find related notes at this time.");
+    } finally {
+        setIsFindingRelated(false);
+    }
   };
  
   return (
@@ -676,7 +736,39 @@ I can help with:
               )}
             </div>
           )}
-          
+
+          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Related Notes</h3>
+            
+            {isFindingRelated ? (
+                <div className="flex items-center text-sm text-gray-500">
+                    <RefreshCw className="animate-spin h-4 w-4 mr-2" />
+                    <span>Searching for similar notes...</span>
+                </div>
+            ) : relatedNotes.length > 0 ? (
+                <div className="space-y-2">
+                    {relatedNotes.map(related => (
+                        <Link key={related.id} to={`/notes/${related.id}`} className="block p-2 rounded-md bg-white border border-gray-200 hover:border-primary transition-colors">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium text-gray-800 truncate">{related.title}</span>
+                                <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                    {Math.round(related.similarity * 100)}% similar
+                                </span>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            ) : (
+                <button
+                    onClick={handleFindRelated}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                    <Link2 className="h-4 w-4 mr-2" />
+                    Find Similar Notes
+                </button>
+            )}
+          </div>
+    
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
             <h3 className="text-sm font-medium text-gray-900 mb-2">Suggested Actions</h3>
             <div className="space-y-2">

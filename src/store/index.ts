@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { Note, Concept, User } from '../types';
 import { 
   getAllNotes, 
+  getAllUserTags,
   updateNoteSummary, 
   deleteNoteFromDatabase,
 } from '../services/databaseServiceClient';
@@ -27,6 +28,8 @@ interface State {
   concepts: Concept[];
   relationships: ConceptRelationship[];
   linkedConcepts: Concept[];
+  allTags: string[];
+
   currentNote: Note | null;
   user: User | null;
   theme: 'light' | 'dark';
@@ -38,7 +41,8 @@ interface State {
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => Promise<void>;
   setCurrentNote: (note: Note | null) => void;
-  loadNotes: (page?: number, pageSize?: number) => Promise<void>;
+  loadNotes: (page?: number, pageSize?: number, options?: { searchTerm?: string; tags?: string[] }) => Promise<void>;
+  loadAllTags: () => Promise<void>;
   setPage: (page: number) => void;
   setPageSize: (size: number) => void;
   summarizeNote: (id: string) => Promise<void>;
@@ -58,6 +62,7 @@ export const useStore = create<State>((set, get) => ({
   linkedConcepts: [],
   concepts: [],
   relationships: [],
+  allTags: [],
   currentNote: null,
   user: null,
   theme: 'light',
@@ -70,11 +75,11 @@ export const useStore = create<State>((set, get) => ({
     totalNotes: 0,
   },
   
-  loadNotes: async (page = 1, pageSize = 12) => {
+  loadNotes: async (page = 1, pageSize = 12, options = {}) => {
     set({ isLoading: true, error: null });
 
     try {
-      const { data, count } = await getAllNotes(page, pageSize);
+      const { data, count } = await getAllNotes(page, pageSize, options);
       const totalPages = Math.ceil((count ?? 0) / pageSize);
       
       set({ 
@@ -103,6 +108,15 @@ export const useStore = create<State>((set, get) => ({
         error: error instanceof Error ? error.message : 'Failed to load notes',
         isLoading: false 
       });
+    }
+  },
+  
+  loadAllTags: async () => {
+    try {
+        const tags = await getAllUserTags();
+        set({ allTags: tags });
+    } catch(error) {
+        console.error("Store: Failed to load all tags", error);
     }
   },
   

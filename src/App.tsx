@@ -30,19 +30,15 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { loadNotes, resetStore } = useStore();
+  const { resetStore } = useStore();
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user) {
-      console.log("AppRoutes: User detected, loading notes.");
-      loadNotes();
-    } else {
-      // User is logged out, clear the store.
+    if (!user) {
       console.log("AppRoutes: No user detected, resetting store.");
       resetStore();
     }
-  }, [user, loadNotes, resetStore]);
+  }, [user, resetStore]); 
 
   return (
     <Routes>

@@ -240,3 +240,25 @@ FOREIGN KEY (concept_id) REFERENCES public.concepts(id)
 ON DELETE CASCADE;
 
 CREATE INDEX IF NOT EXISTS idx_note_concepts_concept ON public.note_concepts(concept_id);
+
+-- Add support for Multiple Choice Questions (MCQs) to the questions table
+ALTER TABLE public.questions
+ADD COLUMN IF NOT EXISTS options TEXT[],
+ADD COLUMN IF NOT EXISTS answer TEXT;
+
+ALTER TABLE public.questions
+ADD COLUMN IF NOT EXISTS question_type TEXT 
+CHECK (question_type IN ('mcq', 'short', 'open'))
+DEFAULT 'short';
+
+CREATE OR REPLACE FUNCTION get_all_user_tags()
+RETURNS text[] AS $$
+BEGIN
+  RETURN ARRAY(
+    SELECT DISTINCT unnest(tags)
+    FROM notes
+    WHERE user_id = auth.uid()
+    ORDER BY 1
+  );
+END;
+$$ LANGUAGE plpgsql;

@@ -32,24 +32,27 @@ const MAP_PROMPT = `You are an expert academic analyst. From the following text 
 Format the response STRICTLY as a JSON object with a single key "concepts", which is an array of objects, each with "name" and "definition" strings.
 Example: {"concepts": [{"name": "Quantum Entanglement", "definition": "A physical phenomenon where particles are linked in such a way that their states remain correlated regardless of the distance separating them."}]}`;
 
-
-// System prompt for the "Reduce" step: Synthesize the final result from all extracted concepts.
 // System prompt for the "Reduce" step: Synthesize the final result from all extracted concepts.
 const REDUCE_PROMPT = `You are a master synthesizer. You will be given a list of concepts extracted from a larger document. Your tasks are:
 1.  De-duplicate the concepts, merging similar ideas. The final concept list should be clean and comprehensive.
 2.  Generate a concise, overarching summary of the entire document based on these concepts.
 3.  Identify the 5 most relevant, high-level academic tags for the document. Return exactly 5.
-4.  Determine the relationships between the final concepts. The valid relationship types are 'prerequisite', 'related', and 'builds-upon'.
+4.  Determine the relationships (prerequisite, related, builds-upon) between the final concepts.
+
+---
+CRITICAL RULES:
+1.  **Resolve Acronyms:** If a concept is introduced with an acronym (e.g., "Depth-First Search (DFS)"), ALWAYS use the full name ("Depth-First Search") as the concept name. Do not create separate concepts for the acronym.
+2.  **Ignore Code Identifiers:** Do NOT extract variable names, function names (e.g., 'dfs'), or class names from code snippets as concepts. Focus only on the abstract ideas they represent.
+---
 
 Format the response STRICTLY as a JSON object with the following fields:
 - "tags" (array of exactly 5 strings)
 - "concepts" (the final, de-duplicated array of objects with "name" and "definition")
-- "relationships" (array of relationship objects, each with "source", "target", "type", and "strength" fields). IMPORTANT: The keys for the relationship endpoints MUST be "source" and "target".
+- "relationships" (array of objects with "source", "target", "type", and "strength" fields). IMPORTANT: The keys for the relationship endpoints MUST be "source" and "target".
 - "summary" (the final summary string)
 
 Example of a single relationship object within the "relationships" array:
-{ "source": "Concept A", "target": "Concept B", "type": "related", "strength": 0.8 }`;
-
+{ "source": "Depth-First Search", "target": "Topological Sorting", "type": "related", "strength": 0.8 }`;
 
 // Helper to chunk text
 function chunkText(text: string, chunkSize: number = 4000, overlap: number = 200): string[] {
