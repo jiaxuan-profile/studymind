@@ -42,7 +42,7 @@ const HelpSupportPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Sample FAQ data
+  // Updated FAQ data with latest features
   const faqs: FAQItem[] = [
     {
       id: '1',
@@ -53,44 +53,62 @@ const HelpSupportPage: React.FC = () => {
     {
       id: '2',
       question: 'What is the Pomodoro timer and how do I use it?',
-      answer: 'The Pomodoro timer is a productivity tool integrated into StudyMind. Click the timer icon in the bottom-right corner to access it. You can customize work periods, break durations, and track your focus sessions. The timer helps you maintain concentration while studying.',
+      answer: 'The Pomodoro timer is a productivity tool integrated into StudyMind. Click the timer icon in the bottom-right corner to access it. You can customize work periods (1-120 minutes), break durations (1-30 minutes for short breaks, 1-60 minutes for long breaks), and cycles before long breaks (2-10 cycles). Note: Settings changes take effect after you reset the timer. The timer helps you maintain concentration while studying and tracks your focus sessions.',
       category: 'features'
     },
     {
       id: '3',
       question: 'How does the AI-powered review system work?',
-      answer: 'StudyMind automatically generates review questions from your uploaded documents. Go to the Review page, select your notes and difficulty level, then start a session. The AI creates questions based on your content and tracks your progress over time.',
+      answer: 'StudyMind features an advanced review system with wizard-style setup. Go to the Review page, select your notes and difficulty level (easy/medium/hard/all), choose question type (currently short answer, with MCQ and open-ended coming soon), then start a session. The AI creates personalized questions based on your content and tracks your progress over time with session-based learning.',
       category: 'features'
     },
     {
       id: '4',
       question: 'Can I see connections between my notes and concepts?',
-      answer: 'Yes! Visit the Concept Graph page to see visual connections between concepts in your notes. The graph shows relationships and helps you understand how different topics relate to each other.',
+      answer: 'Yes! Visit the Concept Graph page to see visual connections between concepts in your notes. The graph shows relationships and helps you understand how different topics relate to each other. You can zoom in to see concept names and relationships, and click on nodes to view detailed information.',
       category: 'features'
     },
     {
       id: '5',
+      question: 'What is the Concept Mastery System?',
+      answer: 'StudyMind uses a 3-tier mastery classification system: 🟢 Mastered (≥70%) - used as foundation for new questions, 🟡 Developing (30-70%) - targeted with focused practice, 🔴 Struggling (<30%) - flagged for remedial attention. The system provides adaptive question weights with higher frequency of developing concept questions and gradual reintroduction of struggling concepts.',
+      category: 'features'
+    },
+    {
+      id: '6',
+      question: 'How does session-based review tracking work?',
+      answer: 'StudyMind tracks your review sessions comprehensively. Each session gets a unique ID, stores all your answers with session context, provides real-time statistics, and maintains a complete review history. You can view past sessions, track improvement over time, and see completion rates and difficulty distributions.',
+      category: 'features'
+    },
+    {
+      id: '7',
       question: 'How do I reset my password?',
       answer: 'On the login page, click "Forgot your password?" and enter your email address. You\'ll receive instructions to reset your password. If you don\'t receive the email, check your spam folder.',
       category: 'account'
     },
     {
-      id: '6',
+      id: '8',
       question: 'Is my data secure and private?',
       answer: 'Yes, StudyMind takes data security seriously. All your notes and personal information are encrypted and stored securely. We use industry-standard security practices and never share your data with third parties.',
       category: 'account'
     },
     {
-      id: '7',
+      id: '9',
       question: 'Why aren\'t my review questions generating?',
       answer: 'Make sure you have AI analysis enabled when uploading documents. If questions still don\'t appear, try uploading documents with more substantial content. Very short notes may not generate enough questions for review.',
       category: 'troubleshooting'
     },
     {
-      id: '8',
+      id: '10',
       question: 'The concept graph is not showing any connections. What should I do?',
       answer: 'Concept connections are created when you upload documents with AI analysis enabled. If you have existing notes without AI analysis, try re-uploading them with AI enabled, or create new notes with substantial content.',
       category: 'troubleshooting'
+    },
+    {
+      id: '11',
+      question: 'How does the focus time analytics work?',
+      answer: 'The integrated Pomodoro timer tracks your daily productivity and focus patterns. It monitors completed pomodoros, total focus time, current streak, and provides session statistics. You can view your focus time alongside learning progress for comprehensive productivity insights.',
+      category: 'features'
     }
   ];
 
@@ -325,18 +343,23 @@ const HelpSupportPage: React.FC = () => {
                     <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
                       Category
                     </label>
-                    <select
-                      id="category"
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                      value={contactForm.category}
-                      onChange={(e) => setContactForm({ ...contactForm, category: e.target.value })}
-                    >
-                      <option value="general">General Question</option>
-                      <option value="technical">Technical Issue</option>
-                      <option value="feature">Feature Request</option>
-                      <option value="billing">Billing</option>
-                      <option value="bug">Bug Report</option>
-                    </select>
+                    <div className="relative">
+                      <select
+                        id="category"
+                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm appearance-none bg-white pr-10"
+                        value={contactForm.category}
+                        onChange={(e) => setContactForm({ ...contactForm, category: e.target.value })}
+                      >
+                        <option value="general">General Question</option>
+                        <option value="technical">Technical Issue</option>
+                        <option value="feature">Feature Request</option>
+                        <option value="billing">Billing</option>
+                        <option value="bug">Bug Report</option>
+                      </select>
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
                   </div>
 
                   <div>
