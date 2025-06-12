@@ -30,15 +30,20 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { resetStore } = useStore();
+  const { loadNotes, resetStore } = useStore();
   const { user } = useAuth();
 
   useEffect(() => {
-    if (!user) {
+    if (user) {
+      // User is logged in, so load their essential data immediately.
+      console.log("AppRoutes: User detected, triggering initial data load.");
+      loadNotes(); // <-- THIS IS THE KEY FIX
+    } else {
+      // User is logged out, clear any lingering data.
       console.log("AppRoutes: No user detected, resetting store.");
       resetStore();
     }
-  }, [user, resetStore]); 
+  }, [user, loadNotes, resetStore]);
 
   return (
     <Routes>
