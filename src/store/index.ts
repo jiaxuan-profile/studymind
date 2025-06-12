@@ -23,6 +23,14 @@ interface ConceptRelationship {
   strength: number;
 }
 
+interface PomodoroSettings {
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
+  cyclesBeforeLongBreak: number;
+  soundEnabled: boolean;
+}
+
 interface State {
   notes: Note[];
   concepts: Concept[];
@@ -36,6 +44,9 @@ interface State {
   isLoading: boolean;
   error: string | null;
   pagination: PaginationState;
+  
+  // Pomodoro settings
+  pomodoroSettings: PomodoroSettings;
   
   addNote: (note: Note) => Promise<Note>;
   updateNote: (id: string, updates: Partial<Note>) => void;
@@ -55,6 +66,9 @@ interface State {
   toggleTheme: () => void;
   resetStore: () => void;
   loadConcepts: () => Promise<void>;
+  
+  // Pomodoro actions
+  updatePomodoroSettings: (updates: Partial<PomodoroSettings>) => void;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -73,6 +87,15 @@ export const useStore = create<State>((set, get) => ({
     totalPages: 1,
     pageSize: 12,
     totalNotes: 0,
+  },
+  
+  // Default Pomodoro settings
+  pomodoroSettings: {
+    workDuration: 25,
+    shortBreakDuration: 5,
+    longBreakDuration: 15,
+    cyclesBeforeLongBreak: 4,
+    soundEnabled: true,
   },
   
   loadNotes: async (page = 1, pageSize = 12, options = {}) => {
@@ -256,4 +279,9 @@ export const useStore = create<State>((set, get) => ({
       });
     }
   },
+  
+  // Pomodoro settings actions
+  updatePomodoroSettings: (updates) => set((state) => ({
+    pomodoroSettings: { ...state.pomodoroSettings, ...updates }
+  })),
 }));

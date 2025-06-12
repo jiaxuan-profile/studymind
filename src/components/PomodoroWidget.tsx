@@ -3,10 +3,7 @@ import {
   Play, 
   Pause, 
   RotateCcw, 
-  Settings, 
   X, 
-  Volume2, 
-  VolumeX,
   Coffee,
   Brain,
   Award,
@@ -14,13 +11,7 @@ import {
   ChevronUp,
   ChevronDown
 } from 'lucide-react';
-
-interface PomodoroSettings {
-  workDuration: number; // in minutes
-  shortBreakDuration: number; // in minutes
-  longBreakDuration: number; // in minutes
-  cyclesBeforeLongBreak: number;
-}
+import { useStore } from '../store';
 
 interface PomodoroStats {
   completedPomodoros: number;
@@ -33,26 +24,17 @@ type TimerState = 'work' | 'shortBreak' | 'longBreak';
 const PomodoroWidget: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [isMinimized, setIsMinimized] = useState(true);
-  const [showSettings, setShowSettings] = useState(false);
-  
-  // Settings
-  const [settings, setSettings] = useState<PomodoroSettings>({
-    workDuration: 25,
-    shortBreakDuration: 5,
-    longBreakDuration: 15,
-    cyclesBeforeLongBreak: 4
-  });
+  const { pomodoroSettings } = useStore();
   
   // Timer state
   const [isRunning, setIsRunning] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(settings.workDuration * 60);
+  const [timeLeft, setTimeLeft] = useState(pomodoroSettings.workDuration * 60);
   const [currentState, setCurrentState] = useState<TimerState>('work');
   const [currentCycle, setCurrentCycle] = useState(1);
   const [completedCycles, setCompletedCycles] = useState(0);  
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Audio and notifications
-  const [soundEnabled, setSoundEnabled] = useState(true);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   
   // Stats
@@ -84,25 +66,19 @@ const PomodoroWidget: React.FC = () => {
     if (savedStats) {
       setStats(JSON.parse(savedStats));
     }
-    
-    const savedSettings = localStorage.getItem('pomodoroSettings');
-    if (savedSettings) {
-      const loadedSettings = JSON.parse(savedSettings);
-      setSettings(loadedSettings);
-      setTimeLeft(loadedSettings.workDuration * 60);
-    }
   }, []);
+
+  // Update timer when settings change
+  useEffect(() => {
+    if (!isRunning) {
+      setTimeLeft(pomodoroSettings.workDuration * 60);
+    }
+  }, [pomodoroSettings.workDuration, isRunning]);
 
   // Save stats to localStorage
   const saveStats = useCallback((newStats: PomodoroStats) => {
     localStorage.setItem('pomodoroStats', JSON.stringify(newStats));
     setStats(newStats);
-  }, []);
-
-  // Save settings to localStorage
-  const saveSettings = useCallback((newSettings: PomodoroSettings) => {
-    localStorage.setItem('pomodoroSettings', JSON.stringify(newSettings));
-    setSettings(newSettings);
   }, []);
 
   // Timer logic
@@ -149,7 +125,7 @@ const PomodoroWidget: React.FC = () => {
   }, []);
 
   const playNotificationSound = () => {
-    if (soundEnabled && audioRef.current) {
+    if (pomodoroSettings.soundEnabled && audioRef.current) {
       try {
         audioRef.current.play();
       } catch (error) {
@@ -166,7 +142,7 @@ const PomodoroWidget: React.FC = () => {
       const newStats = {
         ...stats,
         completedPomodoros: stats.completedPomodoros + 1,
-        totalFocusTime: stats.totalFocusTime + settings.workDuration,
+        totalFocusTime: stats.totalFocusTime + pomodoroSettings.workDuration,
         currentStreak: stats.currentStreak + 1
       };
       saveStats(newStats);
@@ -174,19 +150,19 @@ const PomodoroWidget: React.FC = () => {
       setCompletedCycles(prev => prev + 1);
       
       // Determine next break type
-      if (currentCycle >= settings.cyclesBeforeLongBreak) {
+      if (currentCycle >= pomodoroSettings.cyclesBeforeLongBreak) {
         setCurrentState('longBreak');
-        setTimeLeft(settings.longBreakDuration * 60);
+        setTimeLeft(pomodoroSettings.longBreakDuration * 60);
         setCurrentCycle(1);
       } else {
         setCurrentState('shortBreak');
-        setTimeLeft(settings.shortBreakDuration * 60);
+        setTimeLeft(pomodoroSettings.shortBreakDuration * 60);
         setCurrentCycle(prev => prev + 1);
       }
     } else {
       // Break completed, start work
       setCurrentState('work');
-      setTimeLeft(settings.workDuration * 60);
+      setTimeLeft(pomodoroSettings.workDuration * 60);
     }
     
     // Show notification
@@ -214,7 +190,7 @@ const PomodoroWidget: React.FC = () => {
   const resetTimer = () => {
     setIsRunning(false);
     setCurrentState('work');
-    setTimeLeft(settings.workDuration * 60);
+    setTimeLeft(pomodoroSettings.workDuration * 60);
     setCurrentCycle(1);
     setCompletedCycles(0);
   };
@@ -238,10 +214,10 @@ const PomodoroWidget: React.FC = () => {
 
   const progress = () => {
     const totalTime = currentState === 'work' 
-      ? settings.workDuration * 60
+      ? pomodoroSettings.workDuration * 60
       : currentState === 'shortBreak'
-      ? settings.shortBreakDuration * 60
-      : settings.longBreakDuration * 60;
+      ? pomodoroSettings.shortBreakDuration * 60
+      : pomodoroSettings.longBreakDuration * 60;
     
     return ((totalTime - timeLeft) / totalTime) * 100;
   };
@@ -263,156 +239,7 @@ const PomodoroWidget: React.FC = () => {
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
-      {/* Settings Modal */}
-      {showSettings && (
-        <div className="absolute bottom-full right-0 mb-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden">
-          <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-4 py-3 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900 flex items-center">
-                <Settings className="h-5 w-5 mr-2" />
-                Timer Settings
-              </h3>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-          
-          <div className="p-4 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Work Duration (minutes)
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => saveSettings({...settings, workDuration: Math.max(1, settings.workDuration - 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                <input
-                  type="number"
-                  value={settings.workDuration}
-                  onChange={(e) => saveSettings({...settings, workDuration: parseInt(e.target.value) || 25})}
-                  className="w-16 text-center border border-gray-300 rounded px-2 py-1"
-                  min="1"
-                  max="120"
-                />
-                <button
-                  onClick={() => saveSettings({...settings, workDuration: Math.min(120, settings.workDuration + 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Short Break (minutes)
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => saveSettings({...settings, shortBreakDuration: Math.max(1, settings.shortBreakDuration - 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                <input
-                  type="number"
-                  value={settings.shortBreakDuration}
-                  onChange={(e) => saveSettings({...settings, shortBreakDuration: parseInt(e.target.value) || 5})}
-                  className="w-16 text-center border border-gray-300 rounded px-2 py-1"
-                  min="1"
-                  max="30"
-                />
-                <button
-                  onClick={() => saveSettings({...settings, shortBreakDuration: Math.min(30, settings.shortBreakDuration + 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Long Break (minutes)
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => saveSettings({...settings, longBreakDuration: Math.max(1, settings.longBreakDuration - 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                <input
-                  type="number"
-                  value={settings.longBreakDuration}
-                  onChange={(e) => saveSettings({...settings, longBreakDuration: parseInt(e.target.value) || 15})}
-                  className="w-16 text-center border border-gray-300 rounded px-2 py-1"
-                  min="1"
-                  max="60"
-                />
-                <button
-                  onClick={() => saveSettings({...settings, longBreakDuration: Math.min(60, settings.longBreakDuration + 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cycles before Long Break
-              </label>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => saveSettings({...settings, cyclesBeforeLongBreak: Math.max(2, settings.cyclesBeforeLongBreak - 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-                <input
-                  type="number"
-                  value={settings.cyclesBeforeLongBreak}
-                  onChange={(e) => saveSettings({...settings, cyclesBeforeLongBreak: parseInt(e.target.value) || 4})}
-                  className="w-16 text-center border border-gray-300 rounded px-2 py-1"
-                  min="2"
-                  max="10"
-                />
-                <button
-                  onClick={() => saveSettings({...settings, cyclesBeforeLongBreak: Math.min(10, settings.cyclesBeforeLongBreak + 1)})}
-                  className="p-1 rounded border border-gray-300 hover:bg-gray-50"
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-              <span className="text-sm font-medium text-gray-700">Sound Notifications</span>
-              <button
-                onClick={() => setSoundEnabled(!soundEnabled)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  soundEnabled ? 'bg-primary' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    soundEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* Reset Confirmation Modal */}
       {showResetConfirm && (
         <div className="absolute bottom-full right-0 mb-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-10">
           <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-4 py-3 border-b border-gray-200">
@@ -470,7 +297,7 @@ const PomodoroWidget: React.FC = () => {
       <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-3xl">
         {isMinimized ? (
           /* Minimized View */
-          <div className="p-4 flex items-center space-x-3 cursor-pointer\" onClick={() => setIsMinimized(false)}>
+          <div className="p-4 flex items-center space-x-3 cursor-pointer" onClick={() => setIsMinimized(false)}>
             <div className={`p-2 rounded-full ${stateInfo.color}`}>
               <StateIcon className="h-5 w-5" />
             </div>
@@ -516,24 +343,11 @@ const PomodoroWidget: React.FC = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900">{stateInfo.label}</h3>
                     <p className="text-sm text-gray-600">
-                      Cycle {currentCycle} of {settings.cyclesBeforeLongBreak}
+                      Cycle {currentCycle} of {pomodoroSettings.cyclesBeforeLongBreak}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => setSoundEnabled(!soundEnabled)}
-                    className="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors"
-                    title={soundEnabled ? 'Mute notifications' : 'Enable notifications'}
-                  >
-                    {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                  </button>
-                  <button
-                    onClick={() => setShowSettings(!showSettings)}
-                    className="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors"
-                  >
-                    <Settings className="h-4 w-4" />
-                  </button>
                   <button
                     onClick={() => setIsMinimized(true)}
                     className="p-2 rounded-full bg-white/50 hover:bg-white/80 transition-colors"
@@ -615,7 +429,7 @@ const PomodoroWidget: React.FC = () => {
                   <span>{completedCycles} completed</span>
                 </div>
                 <div className="flex space-x-1">
-                  {Array.from({ length: settings.cyclesBeforeLongBreak }, (_, i) => (
+                  {Array.from({ length: pomodoroSettings.cyclesBeforeLongBreak }, (_, i) => (
                     <div
                       key={i}
                       className={`flex-1 h-2 rounded-full ${

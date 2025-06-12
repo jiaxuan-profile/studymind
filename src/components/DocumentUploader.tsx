@@ -5,10 +5,12 @@ import { Upload, AlertCircle, Lightbulb } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { useStore } from '../store';
+import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from '../services/aiService';
-import { uploadPDFToStorage, PDFStorageInfo } from '../services/pdfStorageService'; // Assuming PDFStorageInfo is exported
+import { uploadPDFToStorage, PDFStorageInfo } from '../services/pdfStorageService';
 import { supabase } from '../services/supabase';
 
 // This is required for pdf.js to work in modern bundlers
@@ -24,6 +26,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [useAI, setUseAI] = useState(false);
   const { addNote } = useStore();
+  const { addToast } = useToast();
+  const { addNotification } = useNotifications();
 
   useEffect(() => {
     const checkSupabaseConfig = async () => {
@@ -54,6 +58,8 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         throw new Error('Unsupported file type');
       }
 
+      addToast(`Processing ${fileType.toUpperCase()} file...`, 'info');
+
       // 2. Extract content from the file
       console.log(`Extracting content from ${fileType}...`);
       const content = await extractContentFromFile(file, fileType);
@@ -64,14 +70,14 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       // 3. Check for duplicates
       const exists = await checkDocumentExists(content);
       if (exists) {
-        setError('This document has already been uploaded.');
-        setIsUploading(false); // Stop the process here
+        addToast('This document has already been uploaded.', 'warning');
+        setIsUploading(false);
         return;
       }
 
       // 4. Generate a unique ID and title for the new note
       const noteId = Math.random().toString(36).substring(2, 11);
-      const title = file.name.replace(/\.[^/.]+$/, ""); // More robust extension removal
+      const title = file.name.replace(/\.[^/.]+$/, "");
 
       // 5. Handle PDF-specific logic: upload to storage
       let pdfStorageInfo: PDFStorageInfo | null = null;
@@ -82,11 +88,13 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
           console.log("PDF uploaded to storage successfully:", pdfStorageInfo);
         } catch (storageError) {
           console.warn("Failed to upload PDF to storage (continuing with text content):", storageError);
+          addToast('PDF storage failed, but text content will be saved', 'warning');
         }
       }
 
       // 6. Generate embedding for the content
       console.log("Generating embedding for uploaded document...");
+      addToast('Generating document embedding...', 'info');
       const embedding = await generateEmbeddingOnClient(content, title);
       console.log("Embedding generated successfully");
 
@@ -100,7 +108,7 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         tags: [fileType.toUpperCase(), 'Imported'],
         summary: '',
         embedding,
-        analysis_status: useAI ? 'pending_analysis' : 'completed', // 'completed' if no AI is used
+        analysis_status: useAI ? 'pending_analysis' : 'completed',
         updated_at: now.toISOString(),
         created_at: now.toISOString(),
         pdf_storage_path: pdfStorageInfo?.path ?? null,
@@ -111,6 +119,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       console.log("Saving document to database...");
       await saveNoteToDatabase(noteData);
       console.log("Document saved to database successfully.");
+
+      addToast('Document uploaded successfully!', 'success');
+      addNotification(`Document "${title}" uploaded successfully`, 'success', 'Upload');
 
       // If AI is not used, add to store and finish
       if (!useAI) {
@@ -128,9 +139,10 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       }
 
       // --- AI Processing Pipeline ---
-      // This section now correctly handles the workflow without the schema-breaking `knowledge_graph` field.
       try {
         console.log("Starting AI analysis pipeline...");
+        addToast('Starting AI analysis...', 'info');
+        addNotification(`AI analysis started for "${title}"`, 'info', 'AI Analysis');
         
         const analysis = await analyzeNote(content, title, noteId);
         
@@ -151,6 +163,9 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
         await saveNoteToDatabase({ ...updatedNoteWithAnalysis, analysis_status: 'completed' });
         console.log("AI analysis process complete.");
 
+        addToast('AI analysis completed!', 'success');
+        addNotification(`AI analysis completed for "${title}" - concepts extracted and questions generated`, 'success', 'AI Analysis');
+
         addNote({
           ...updatedNoteWithAnalysis,
           createdAt: now,
@@ -163,6 +178,10 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       } catch (aiError) {
         console.error('AI analysis failed:', aiError);
         await saveNoteToDatabase({ ...noteData, analysis_status: 'failed' });
+        
+        addToast('AI analysis failed, but document was saved', 'error');
+        addNotification(`AI analysis failed for "${title}" - document saved without AI features`, 'error', 'AI Analysis');
+        
         // Still add the base note to the store so the user has it
         addNote({
           ...noteData,
@@ -177,7 +196,10 @@ const DocumentUploader: React.FC<DocumentUploaderProps> = ({ onClose }) => {
       if (onClose) onClose();
 
     } catch (err) {
-      setError(`Failed to process file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      const errorMessage = `Failed to process file: ${err instanceof Error ? err.message : 'Unknown error'}`;
+      setError(errorMessage);
+      addToast(errorMessage, 'error');
+      addNotification(`Upload failed: ${err instanceof Error ? err.message : 'Unknown error'}`, 'error', 'Upload');
       console.error('File processing error:', err);
     } finally {
       setIsUploading(false);

@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../store';
+import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import ReactMarkdown from 'react-markdown';
 import { 
   ArrowLeft, Edit, Trash, Save, X, BrainCircuit, Lightbulb, HelpCircle,
@@ -45,6 +47,8 @@ const NoteDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { notes, updateNote, deleteNote: deleteNoteFromStore } = useStore(); 
+  const { addToast } = useToast();
+  const { addNotification } = useNotifications();
 
   const [note, setNote] = useState(notes.find((n) => n.id === id));
   const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
@@ -186,6 +190,9 @@ const NoteDetailPage: React.FC = () => {
     setAiProcessing(true);
     try {
       console.log("Generating AI analysis for note:", note.id);
+      
+      addToast('Starting AI analysis...', 'info');
+      addNotification(`AI analysis started for "${note.title}"`, 'info', 'AI Analysis');
 
       const analysis = await analyzeNote(note.content, note.title, note.id);
       if (analysis) {
@@ -223,11 +230,15 @@ const NoteDetailPage: React.FC = () => {
         
         await checkExistingData(note.id);
         
+        addToast('AI analysis completed successfully!', 'success');
+        addNotification(`AI analysis completed for "${note.title}" - concepts extracted and questions generated`, 'success', 'AI Analysis');
+        
         console.log("AI analysis completed successfully");
       }
     } catch (error) {
       console.error('Error generating AI data:', error);
-      alert('Failed to generate AI analysis. Please try again.');
+      addToast('Failed to generate AI analysis. Please try again.', 'error');
+      addNotification(`AI analysis failed for "${note.title}"`, 'error', 'AI Analysis');
     } finally {
       setAiProcessing(false);
     }
@@ -274,17 +285,25 @@ const NoteDetailPage: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
       setIsDeleting(true);
       try {
+        addToast('Deleting note...', 'info');
+        
         // The service function is now idempotent, but we await its completion.
         await deleteNoteFromDatabase(note.id);
         
         // If the above line completes without error, the delete was successful.
         console.log("Delete operation confirmed by service. Updating UI.");
         deleteNoteFromStore(note.id);
+        
+        addToast('Note deleted successfully', 'success');
+        addNotification(`Note "${note.title}" was deleted`, 'info', 'Note Management');
+        
         navigate('/notes');
 
       } catch (error) {
         console.error("Failed to delete note:", error);
-        alert(`Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`);
+        const errorMessage = `Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`;
+        addToast(errorMessage, 'error');
+        addNotification(errorMessage, 'error', 'Note Management');
         setIsDeleting(false); 
       }
     }
@@ -302,6 +321,8 @@ const NoteDetailPage: React.FC = () => {
       const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
       const now = new Date();
       let newEmbedding: number[] | undefined = note.embedding;
+
+      addToast('Saving note...', 'info');
 
       if (updatedTitle !== note.title || updatedContent !== note.content) {
         newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
@@ -322,9 +343,15 @@ const NoteDetailPage: React.FC = () => {
       updateNote(note.id, noteUpdatesForStore);
       setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
       setEditMode(false);
+      
+      addToast('Note saved successfully!', 'success');
+      addNotification(`Note "${updatedTitle}" was updated`, 'success', 'Note Management');
+      
     } catch (error) {
       console.error("Failed to save note:", error);
-      alert(`Error saving note: ${(error as Error).message}`);
+      const errorMessage = `Error saving note: ${(error as Error).message}`;
+      addToast(errorMessage, 'error');
+      addNotification(errorMessage, 'error', 'Note Management');
     } finally {
       setIsSaving(false);
     }
@@ -390,11 +417,18 @@ I can help with:
     if (!note) return;
     setIsFindingRelated(true);
     try {
+        addToast('Finding related notes...', 'info');
         const results = await findRelatedNotes(note.id);
         setRelatedNotes(results);
+        
+        if (results.length > 0) {
+          addToast(`Found ${results.length} related notes`, 'success');
+        } else {
+          addToast('No related notes found', 'info');
+        }
     } catch (error) {
         console.error("Failed to find related notes:", error);
-        alert("Could not find related notes at this time.");
+        addToast("Could not find related notes at this time.", 'error');
     } finally {
         setIsFindingRelated(false);
     }
