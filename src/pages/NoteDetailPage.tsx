@@ -812,11 +812,11 @@ I can help with:
               {conceptsExist && relatedConcepts.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-md p-3">
                   <h4 className="text-xs font-medium text-gray-700 mb-2">Related Concepts:</h4>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {relatedConcepts.slice(0, 3).map((concept) => (
-                      <div key={concept.id} className="text-xs">
-                        <div className="font-medium text-gray-900">{concept.name}</div>
-                        <div className="text-gray-600 truncate">{concept.definition}</div>
+                      <div key={concept.id} className="text-sm">
+                        <div className="font-medium text-gray-900 mb-1">{concept.name}</div>
+                        <div className="text-gray-600 leading-relaxed">{concept.definition}</div>
                       </div>
                     ))}
                     {relatedConcepts.length > 3 && (
@@ -868,7 +868,7 @@ I can help with:
                       <div key={gap.id} className="border border-gray-100 rounded-md">
                         <button
                           onClick={() => toggleGapExpansion(gap.id)}
-                          className="w-full p-2 text-left hover:bg-gray-50 transition-colors"
+                          className="w-full p-3 text-left hover:bg-gray-50 transition-colors"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
@@ -889,46 +889,48 @@ I can help with:
                         </button>
                         
                         {expandedGaps.has(gap.id) && (
-                          <div className="px-2 pb-2 border-t border-gray-100">
-                            <div className="pt-2 space-y-2">
+                          <div className="px-3 pb-3 border-t border-gray-100">
+                            <div className="pt-3 space-y-3">
                               {gap.missing_prerequisite && (
                                 <div>
-                                  <div className="text-xs font-medium text-gray-700">Missing Prerequisite:</div>
-                                  <div className="text-xs text-gray-600">{gap.missing_prerequisite}</div>
+                                  <div className="text-sm font-semibold text-gray-800">Missing Prerequisite:</div>
+                                  <div className="text-sm text-gray-700 mt-1">{gap.missing_prerequisite}</div>
                                 </div>
                               )}
                               
                               {gap.user_mastery !== undefined && (
                                 <div>
-                                  <div className="text-xs font-medium text-gray-700">Current Mastery:</div>
-                                  <div className="flex items-center space-x-2">
+                                  <div className="text-sm font-semibold text-gray-800">Current Mastery:</div>
+                                  <div className="flex items-center space-x-2 mt-1">
                                     <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                                       <div 
                                         className="bg-primary h-1.5 rounded-full" 
                                         style={{ width: `${gap.user_mastery * 100}%` }}
                                       ></div>
                                     </div>
-                                    <span className="text-xs text-gray-600">{Math.round(gap.user_mastery * 100)}%</span>
+                                    <span className="text-sm text-gray-700">{Math.round(gap.user_mastery * 100)}%</span>
                                   </div>
                                 </div>
                               )}
                               
                               <div>
-                                <div className="text-xs font-medium text-gray-700">Strategy:</div>
-                                <div className="text-xs text-gray-600">{gap.reinforcement_strategy}</div>
+                                <div className="text-sm font-semibold text-gray-800">Strategy:</div>
+                                <div className="p-3 bg-gray-50 rounded-md border border-gray-100 mt-1">
+                                  <div className="text-sm text-gray-700">{gap.reinforcement_strategy}</div>
+                                </div>
                               </div>
                               
                               {gap.resources && gap.resources.length > 0 && (
                                 <div>
-                                  <div className="text-xs font-medium text-gray-700">Resources:</div>
-                                  <ul className="mt-1 space-y-1 text-xs text-gray-600">
+                                  <div className="text-sm font-semibold text-gray-800">Resources:</div>
+                                  <ul className="mt-1 space-y-1 text-sm text-gray-700">
                                     {gap.resources.map((resource, index) => {
                                       const urlIndex = resource.indexOf('http');
 
                                       if (urlIndex === -1) {
                                         // Handle non-link resources
                                         return (
-                                          <li key={index} className="flex items-center">
+                                          <li key={index} className="flex items-center py-1">
                                             <BookOpen className="mr-2 h-3 w-3 flex-shrink-0 text-gray-400" />
                                             <span>{resource}</span>
                                           </li>
@@ -942,8 +944,8 @@ I can help with:
                                       const urlPart = resource.substring(urlIndex).trim();
 
                                       return (
-                                        <li key={index} className="flex items-center justify-between">
-                                          <span className="truncate pr-2" title={textPart}>
+                                        <li key={index} className="flex items-center justify-between py-1">
+                                          <span className="pr-2" title={textPart}>
                                             {textPart}
                                           </span>
                                           <a
