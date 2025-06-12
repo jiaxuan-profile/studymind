@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Menu, Search, Bell, Settings, Moon, Sun } from 'lucide-react';
+import { Menu, Search, Bell, Settings, Moon, Sun, LogOut } from 'lucide-react';
 import { useStore } from '../store';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -11,6 +12,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const { theme, toggleTheme, notes } = useStore();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   
   // Filter notes based on search term
@@ -46,6 +48,15 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   const handleSearchBlur = () => {
     // Delay hiding results to allow clicking on them
     setTimeout(() => setShowSearchResults(false), 200);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
   
   return (
@@ -161,7 +172,14 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
             <Settings className="h-6 w-6" aria-hidden="true" />
           </button>
           
-          {/* Profile dropdown would go here */}
+          <button 
+            onClick={handleSignOut}
+            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4 mr-1" />
+            Sign Out
+          </button>
         </div>
       </div>
     </header>
