@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { Plus, Search, Filter, Clock, Trash, FileText, List, Grid } from 'lucide-react';
 import DocumentUploader from '../components/DocumentUploader';
@@ -8,7 +8,6 @@ import { useDebounce } from '../hooks/useDebounce';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const { 
     notes, 
     addNote,
@@ -41,22 +40,26 @@ const NotesPage: React.FC = () => {
     loadAllTags();
   }, [loadAllTags]);
 
-  // This is now the SINGLE effect responsible for fetching data
+  // This is the SINGLE effect responsible for fetching data based on filter changes
   useEffect(() => {
-    // Skip the very first run to prevent a double load with App.tsx
+    // On the very first render, do nothing. The data loaded by App.tsx is already in the store.
     if (isInitialMount.current) {
       isInitialMount.current = false;
       return;
     }
 
-    // This effect runs whenever a filter changes
-    console.log("Filters changed, reloading notes from server.");
-    loadNotes(currentPage, pageSize, { 
-      searchTerm: debouncedSearchTerm, 
-      tags: selectedTags 
-    });
+    const handler = setTimeout(() => {
+      console.log('NotesPage: Filters changed, reloading notes from server.');
+      loadNotes(currentPage, pageSize, { 
+        searchTerm: debouncedSearchTerm, 
+        tags: selectedTags 
+      });
+    }, 500);
 
-  }, [debouncedSearchTerm, selectedTags, currentPage, pageSize, loadNotes]);
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [debouncedSearchTerm, selectedTags, currentPage, pageSize]); 
 
   const handleTagToggle = (tag: string) => {
     const newTags = selectedTags.includes(tag)
@@ -68,7 +71,7 @@ const NotesPage: React.FC = () => {
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1); // Reset to page 1 when search term changes
+    setCurrentPage(1); // Reset to page 1 when page size changes
   };
   
   const handlePageSizeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -112,46 +115,101 @@ const NotesPage: React.FC = () => {
     }
   };
   
-  const renderNoteCard = (note: any) => (
-    <Link
-      key={note.id}
-      to={`/notes/${note.id}`}
-      className={`bg-white/90 backdrop-blur-sm border border-gray-100 rounded-xl shadow-lg 
-                 hover:shadow-xl transition-all duration-300 overflow-hidden
-                 ${viewMode === 'grid' ? 'hover:scale-[1.02]' : 'hover:bg-gray-50'}`}
-    >
-      <div className="p-6">
-        <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{note.title}</h2>
-        <p className="text-gray-600 mb-4 line-clamp-3">
-          {note.content.replace(/[#*`]/g, '').split('\n')[0]}
-        </p>
-        
-        <div className="flex flex-wrap gap-2 mb-4">
-          {note.tags.map((tag: string, i: number) => (
-            <span
-              key={i}
-              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-        
-        <div className="flex justify-between items-center text-sm text-gray-500">
-          <div className="flex items-center">
-            <Clock className="h-4 w-4 mr-1" />
-            {new Date(note.updatedAt).toLocaleDateString()}
+  const renderNoteCard = (note: any) => {
+    if (viewMode === 'list') {
+      return (
+        <Link
+          key={note.id}
+          to={`/notes/${note.id}`}
+          className="block bg-white/90 backdrop-blur-sm border border-gray-100 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden hover:border-primary/20"
+        >
+          <div className="p-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center space-x-3 mb-2">
+                  <h2 className="text-lg font-semibold text-gray-900 truncate">{note.title}</h2>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <Clock className="h-4 w-4 mr-1" />
+                    {new Date(note.updatedAt).toLocaleDateString()}
+                  </div>
+                </div>
+                
+                <p className="text-gray-600 text-sm line-clamp-2 mb-3">
+                  {note.content.replace(/[#*`]/g, '').split('\n')[0]}
+                </p>
+                
+                <div className="flex flex-wrap gap-1">
+                  {note.tags.slice(0, 4).map((tag: string, i: number) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                  {note.tags.length > 4 && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600">
+                      +{note.tags.length - 4} more
+                    </span>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex-shrink-0 ml-4">
+                <button
+                  onClick={(e) => handleDelete(note.id, e)}
+                  className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Delete note"
+                >
+                  <Trash className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </div>
-          <button
-            onClick={(e) => handleDelete(note.id, e)}
-            className="p-1 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500"
-          >
-            <Trash className="h-4 w-4" />
-          </button>
+        </Link>
+      );
+    }
+
+    // Grid view (existing styling)
+    return (
+      <Link
+        key={note.id}
+        to={`/notes/${note.id}`}
+        className="bg-white/90 backdrop-blur-sm border border-gray-100 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden hover:scale-[1.02] hover:border-primary/20"
+      >
+        <div className="p-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-2">{note.title}</h2>
+          <p className="text-gray-600 mb-4 line-clamp-3">
+            {note.content.replace(/[#*`]/g, '').split('\n')[0]}
+          </p>
+          
+          <div className="flex flex-wrap gap-2 mb-4">
+            {note.tags.map((tag: string, i: number) => (
+              <span
+                key={i}
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+          
+          <div className="flex justify-between items-center text-sm text-gray-500">
+            <div className="flex items-center">
+              <Clock className="h-4 w-4 mr-1" />
+              {new Date(note.updatedAt).toLocaleDateString()}
+            </div>
+            <button
+              onClick={(e) => handleDelete(note.id, e)}
+              className="p-1 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500"
+            >
+              <Trash className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-      </div>
-    </Link>
-  );
+      </Link>
+    );
+  };
 
   if (isLoading && pagination.totalNotes === 0) {
     return (
@@ -212,7 +270,7 @@ const NotesPage: React.FC = () => {
               className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md"
               placeholder="Search notes..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
             />
             {searchTerm && (
               <button
@@ -378,7 +436,7 @@ const NotesPage: React.FC = () => {
           <div className={
             viewMode === 'grid'
               ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'
-              : 'space-y-4'
+              : 'space-y-3'
           }>
             {notes.map(renderNoteCard)}
           </div>

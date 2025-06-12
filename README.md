@@ -1,6 +1,6 @@
 # StudyMind - AI-Powered Study Assistant
 
-StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, and integrated focus time management.
+StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, integrated focus time management, and a comprehensive notification system.
 
 ## Learning Approach
 
@@ -37,10 +37,22 @@ StudyMind supports both formative and summative assessment strategies:
 - Vector similarity search for related content
 - Intelligent question generation
 
-### 📊 Knowledge Graph
-- Visual concept mapping and relationships
-- Interactive exploration of connections
-- Relationship discovery between ideas
+### 📊 Knowledge Graph & Mind Maps
+- **Global Concept Graph**: Shows connections between concepts across all your notes
+  - Interactive exploration of relationships between different topics
+  - Visual representation of your entire knowledge base
+  - Zoom functionality to see concept names and relationships
+  - Click on nodes to view detailed information and related notes
+- **Note-Specific Mind Maps**: Individual note visualization showing concept relationships within that specific document
+  - AI-powered concept extraction from note content
+  - Interactive visualization of how concepts relate within a single note
+  - Hover over concepts to see definitions
+  - Click concepts to highlight connections
+  - Helps with visualizing connections and relationships
+  - Improves comprehension and memory retention
+  - Identifies key concepts quickly
+  - Facilitates better recall during study sessions
+  - Personalizes the learning experience for each note
 
 ### 🎓 Advanced Review System
 - **Session-Based Learning**: Track progress across multiple study sessions
@@ -59,6 +71,15 @@ StudyMind supports both formative and summative assessment strategies:
 - **Smart Notifications**: Audio alerts and browser notifications for session transitions
 - **Minimizable Widget**: Compact view that doesn't interfere with your workflow
 - **Session Statistics**: Track your daily productivity and focus patterns
+- **Settings Management**: Configure timer settings through the notification center (changes take effect after reset)
+
+### 🔔 Toast & Notification System
+- **Real-time Feedback**: Instant toast notifications for user actions
+- **Notification Center**: Centralized hub for all system notifications and settings
+- **Smart Alerts**: Visual indicators for unread notifications with count badges
+- **Persistent History**: Keep track of up to 50 recent notifications
+- **Categorized Notifications**: Organized by type (AI Analysis, Upload, Note Management, etc.)
+- **Settings Integration**: Access Pomodoro timer settings directly from the notification center
 
 ### 📈 Learning Analytics
 - Session completion tracking
@@ -75,7 +96,12 @@ StudyMind supports both formative and summative assessment strategies:
 - **Adaptive Question Weights**:
   - Higher frequency of developing concept questions
   - Gradual reintroduction of struggling concepts
-  
+
+### 🌙 Theme Support
+- **Light/Dark Mode**: Toggle between light and dark themes
+- **Persistent Settings**: Theme preference saved across sessions
+- **Comprehensive Coverage**: Dark mode support for all components and pages
+
 ## Database Setup
 
 All database migrations are located in the `supabase/migrations/` folder. Execute them in order to set up the complete database schema:
@@ -102,14 +128,41 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
 5. **Session Duration Tracking** (`20250608194500_sturdy_vine.sql`)
    - Duration tracking for review sessions
 
+6. **Questions and Knowledge Gaps** (`20250608195500_resilient_root.sql`)
+   - Dedicated questions table with multiple choice support
+   - Knowledge gaps analysis and tracking
+
+7. **PDF Storage** (`20250610134150_mute_cloud.sql`)
+   - PDF file storage and viewing capabilities
+   - Storage bucket configuration
+
+8. **Global Concepts System** (`20250611204500_unwavering_roots.sql`)
+   - Global concept sharing and mastery tracking
+   - User-specific mastery levels
+
 ## Recent Updates
 
-### ✅ Integrated Pomodoro Focus Timer (Latest)
+### ✅ Toast & Notification System (Latest)
+- **Real-time Feedback**: Comprehensive toast notification system for immediate user feedback
+- **Notification Center**: Centralized hub accessible via bell icon in header
+- **Smart Indicators**: Unread count badges and visual alerts
+- **Persistent Storage**: Notifications saved locally with up to 50 recent items
+- **Settings Integration**: Pomodoro timer settings moved to notification center for better UX
+- **Categorized Alerts**: Organized notifications by type (AI Analysis, Upload, Note Management)
+
+### ✅ Enhanced UI/UX Improvements
+- **StudyMind Badge**: Moved to sidebar next to logo for better branding
+- **Theme Toggle**: Fully functional dark/light mode with persistent settings
+- **Improved Styling**: Enhanced contact form dropdown and overall visual polish
+- **Better Navigation**: Streamlined user interface with fewer clicks required
+
+### ✅ Integrated Pomodoro Focus Timer
 - **Productivity Enhancement**: Built-in focus timer to complement study sessions
 - **Customizable Settings**: Personalize work/break intervals and notification preferences
 - **Progress Tracking**: Monitor focus time alongside learning progress
 - **Seamless Integration**: Timer widget that works alongside all study features
 - **Session Persistence**: Settings and statistics saved across browser sessions
+- **Settings Note**: Timer settings changes take effect after reset to avoid interrupting active sessions
 
 ### ✅ Session-Based Review Tracking
 - **Wizard-Style Review Flow**: Step-by-step review session setup
@@ -172,7 +225,7 @@ npm run dev
 
 ### Frontend
 - **React + TypeScript**: Modern, type-safe component architecture
-- **Tailwind CSS**: Utility-first styling with custom design system
+- **Tailwind CSS**: Utility-first styling with custom design system and dark mode support
 - **Zustand**: Lightweight state management
 - **React Router**: Client-side routing and navigation
 
@@ -198,9 +251,10 @@ The project is configured for deployment on Netlify with serverless functions fo
 ## Tech Stack
 
 - **Frontend**: React + Vite + TypeScript
-- **Styling**: Tailwind CSS with custom design system
+- **Styling**: Tailwind CSS with custom design system and dark mode
 - **State Management**: Zustand
 - **Database**: Supabase (PostgreSQL + Vector)
 - **AI**: Google Gemini Pro
 - **Deployment**: Netlify with serverless functions
 - **File Processing**: PDF.js, Mammoth.js for document parsing
+- **Notifications**: Custom toast and notification system

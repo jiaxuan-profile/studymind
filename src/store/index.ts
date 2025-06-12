@@ -23,6 +23,14 @@ interface ConceptRelationship {
   strength: number;
 }
 
+interface PomodoroSettings {
+  workDuration: number;
+  shortBreakDuration: number;
+  longBreakDuration: number;
+  cyclesBeforeLongBreak: number;
+  soundEnabled: boolean;
+}
+
 interface State {
   notes: Note[];
   concepts: Concept[];
@@ -36,6 +44,9 @@ interface State {
   isLoading: boolean;
   error: string | null;
   pagination: PaginationState;
+  
+  // Pomodoro settings
+  pomodoroSettings: PomodoroSettings;
   
   addNote: (note: Note) => Promise<Note>;
   updateNote: (id: string, updates: Partial<Note>) => void;
@@ -55,6 +66,9 @@ interface State {
   toggleTheme: () => void;
   resetStore: () => void;
   loadConcepts: () => Promise<void>;
+  
+  // Pomodoro actions
+  updatePomodoroSettings: (updates: Partial<PomodoroSettings>) => void;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -65,7 +79,7 @@ export const useStore = create<State>((set, get) => ({
   allTags: [],
   currentNote: null,
   user: null,
-  theme: 'light',
+  theme: (typeof window !== 'undefined' && localStorage.getItem('studymind-theme') as 'light' | 'dark') || 'light',
   isLoading: false,
   error: null,
   pagination: {
@@ -73,6 +87,15 @@ export const useStore = create<State>((set, get) => ({
     totalPages: 1,
     pageSize: 12,
     totalNotes: 0,
+  },
+  
+  // Default Pomodoro settings
+  pomodoroSettings: {
+    workDuration: 25,
+    shortBreakDuration: 5,
+    longBreakDuration: 15,
+    cyclesBeforeLongBreak: 4,
+    soundEnabled: true,
   },
   
   loadNotes: async (page = 1, pageSize = 12, options = {}) => {
@@ -200,7 +223,15 @@ export const useStore = create<State>((set, get) => ({
   })),
   
   setUser: (user) => set({ user }),
-  toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
+  
+  toggleTheme: () => set((state) => {
+    const newTheme = state.theme === 'light' ? 'dark' : 'light';
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('studymind-theme', newTheme);
+    }
+    return { theme: newTheme };
+  }),
   
   resetStore: () => set({
     notes: [],
@@ -256,4 +287,9 @@ export const useStore = create<State>((set, get) => ({
       });
     }
   },
+  
+  // Pomodoro settings actions
+  updatePomodoroSettings: (updates) => set((state) => ({
+    pomodoroSettings: { ...state.pomodoroSettings, ...updates }
+  })),
 }));

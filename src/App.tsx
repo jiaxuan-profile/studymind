@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import NotesPage from './pages/NotesPage';
@@ -13,6 +15,7 @@ import HelpSupportPage from './pages/HelpSupportPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import ToastContainer from './components/ToastContainer';
 import { useStore } from './store';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -30,44 +33,67 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { resetStore } = useStore();
+  const { loadNotes, resetStore, theme } = useStore();
   const { user } = useAuth();
 
+  // Apply theme to document
   useEffect(() => {
-    if (!user) {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    if (user) {
+      // User is logged in, so load their essential data immediately.
+      console.log("AppRoutes: User detected, triggering initial data load.");
+      loadNotes(); // <-- THIS IS THE KEY FIX
+    } else {
+      // User is logged out, clear any lingering data.
       console.log("AppRoutes: No user detected, resetting store.");
       resetStore();
     }
-  }, [user, resetStore]); 
+  }, [user, loadNotes, resetStore]);
 
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+    <>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+        
+        <Route path="/" element={
+          <PrivateRoute>
+            <Layout />
+          </PrivateRoute>
+        }>
+          <Route index element={<HomePage />} />
+          <Route path="notes" element={<NotesPage />} />
+          <Route path="notes/:id" element={<NoteDetailPage />} />
+          <Route path="concepts" element={<ConceptsPage />} />
+          <Route path="review" element={<ReviewPage />} />
+          <Route path="history" element={<ReviewHistoryPage />} />
+          <Route path="session/:sessionId" element={<ViewSessionPage />} />
+          <Route path="help" element={<HelpSupportPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
+      </Routes>
       
-      <Route path="/" element={
-        <PrivateRoute>
-          <Layout />
-        </PrivateRoute>
-      }>
-        <Route index element={<HomePage />} />
-        <Route path="notes" element={<NotesPage />} />
-        <Route path="notes/:id" element={<NoteDetailPage />} />
-        <Route path="concepts" element={<ConceptsPage />} />
-        <Route path="review" element={<ReviewPage />} />
-        <Route path="history" element={<ReviewHistoryPage />} />
-        <Route path="session/:sessionId" element={<ViewSessionPage />} />
-        <Route path="help" element={<HelpSupportPage />} />
-        <Route path="*" element={<NotFoundPage />} />
-      </Route>
-    </Routes>
+      {/* Toast Container - positioned globally */}
+      <ToastContainer />
+    </>
   );
 }
 
 function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <ToastProvider>
+        <NotificationProvider>
+          <AppRoutes />
+        </NotificationProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

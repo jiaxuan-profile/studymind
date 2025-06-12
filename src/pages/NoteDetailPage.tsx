@@ -3,17 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useStore } from '../store';
+import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import ReactMarkdown from 'react-markdown';
 import { 
   ArrowLeft, Edit, Trash, Save, X, BrainCircuit, Lightbulb, HelpCircle,
   FileText, Eye, ToggleLeft, ToggleRight, Sparkles, AlertTriangle, CheckCircle,
-  ExternalLink, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight, Link2
+  ExternalLink, BookOpen, Zap, RefreshCw, ChevronDown, ChevronRight, Link2,
+  Brain, Map
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
 import PDFViewer from '../components/PDFViewer';
+import NoteMindMap from '../components/NoteMindMap';
 
 
 interface KnowledgeGap {
@@ -45,6 +49,8 @@ const NoteDetailPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { notes, updateNote, deleteNote: deleteNoteFromStore } = useStore(); 
+  const { addToast } = useToast();
+  const { addNotification } = useNotifications();
 
   const [note, setNote] = useState(notes.find((n) => n.id === id));
   const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
@@ -66,6 +72,9 @@ const NoteDetailPage: React.FC = () => {
   
   const [viewMode, setViewMode] = useState<'text' | 'pdf'>('text');
   const [pdfInfo, setPdfInfo] = useState<{ publicUrl: string; fileName: string; } | null>(null);
+
+  // New state for tab management
+  const [activeTab, setActiveTab] = useState<'content' | 'mindmap'>('content');
 
   const [conceptsExist, setConceptsExist] = useState(false);
   const [gapsExist, setGapsExist] = useState(false);
@@ -90,6 +99,7 @@ const NoteDetailPage: React.FC = () => {
     setRelatedNotes([]);
     setIsFindingRelated(false);
     setViewMode('text');
+    setActiveTab('content'); // Reset to content tab when note changes
 
     const foundNote = notes.find((n) => n.id === id);
 
@@ -186,6 +196,9 @@ const NoteDetailPage: React.FC = () => {
     setAiProcessing(true);
     try {
       console.log("Generating AI analysis for note:", note.id);
+      
+      addToast('Starting AI analysis...', 'info');
+      addNotification(`AI analysis started for "${note.title}"`, 'info', 'AI Analysis');
 
       const analysis = await analyzeNote(note.content, note.title, note.id);
       if (analysis) {
@@ -223,11 +236,15 @@ const NoteDetailPage: React.FC = () => {
         
         await checkExistingData(note.id);
         
+        addToast('AI analysis completed successfully!', 'success');
+        addNotification(`AI analysis completed for "${note.title}" - concepts extracted and questions generated`, 'success', 'AI Analysis');
+        
         console.log("AI analysis completed successfully");
       }
     } catch (error) {
       console.error('Error generating AI data:', error);
-      alert('Failed to generate AI analysis. Please try again.');
+      addToast('Failed to generate AI analysis. Please try again.', 'error');
+      addNotification(`AI analysis failed for "${note.title}"`, 'error', 'AI Analysis');
     } finally {
       setAiProcessing(false);
     }
@@ -274,17 +291,25 @@ const NoteDetailPage: React.FC = () => {
     if (window.confirm('Are you sure you want to delete this note?')) {
       setIsDeleting(true);
       try {
+        addToast('Deleting note...', 'info');
+        
         // The service function is now idempotent, but we await its completion.
         await deleteNoteFromDatabase(note.id);
         
         // If the above line completes without error, the delete was successful.
         console.log("Delete operation confirmed by service. Updating UI.");
         deleteNoteFromStore(note.id);
+        
+        addToast('Note deleted successfully', 'success');
+        addNotification(`Note "${note.title}" was deleted`, 'info', 'Note Management');
+        
         navigate('/notes');
 
       } catch (error) {
         console.error("Failed to delete note:", error);
-        alert(`Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`);
+        const errorMessage = `Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`;
+        addToast(errorMessage, 'error');
+        addNotification(errorMessage, 'error', 'Note Management');
         setIsDeleting(false); 
       }
     }
@@ -302,6 +327,8 @@ const NoteDetailPage: React.FC = () => {
       const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
       const now = new Date();
       let newEmbedding: number[] | undefined = note.embedding;
+
+      addToast('Saving note...', 'info');
 
       if (updatedTitle !== note.title || updatedContent !== note.content) {
         newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
@@ -322,9 +349,15 @@ const NoteDetailPage: React.FC = () => {
       updateNote(note.id, noteUpdatesForStore);
       setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
       setEditMode(false);
+      
+      addToast('Note saved successfully!', 'success');
+      addNotification(`Note "${updatedTitle}" was updated`, 'success', 'Note Management');
+      
     } catch (error) {
       console.error("Failed to save note:", error);
-      alert(`Error saving note: ${(error as Error).message}`);
+      const errorMessage = `Error saving note: ${(error as Error).message}`;
+      addToast(errorMessage, 'error');
+      addNotification(errorMessage, 'error', 'Note Management');
     } finally {
       setIsSaving(false);
     }
@@ -390,11 +423,18 @@ I can help with:
     if (!note) return;
     setIsFindingRelated(true);
     try {
+        addToast('Finding related notes...', 'info');
         const results = await findRelatedNotes(note.id);
         setRelatedNotes(results);
+        
+        if (results.length > 0) {
+          addToast(`Found ${results.length} related notes`, 'success');
+        } else {
+          addToast('No related notes found', 'info');
+        }
     } catch (error) {
         console.error("Failed to find related notes:", error);
-        alert("Could not find related notes at this time.");
+        addToast("Could not find related notes at this time.", 'error');
     } finally {
         setIsFindingRelated(false);
     }
@@ -413,7 +453,7 @@ I can help with:
         
         <div className="flex space-x-2">
           {/* PDF/Text Toggle for PDF notes */}
-          {isPdfNote && pdfInfo && !editMode && (
+          {isPdfNote && pdfInfo && !editMode && activeTab === 'content' && (
             <button
               onClick={toggleViewMode}
               className="flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-700 bg-white hover:bg-gray-50 transition-colors"
@@ -481,81 +521,127 @@ I can help with:
         {/* Main content */}
         <div className="md:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           {!editMode ? (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-3xl font-bold text-gray-900">{note.title}</h1>
-                {isPdfAvailable && (
-                  <div className="flex items-center space-x-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      <FileText className="h-3 w-3 mr-1" />
-                      PDF Available
-                    </span>
-                    {pdfInfo && (
-                      <span className="text-xs text-gray-500">
-                        Viewing: {viewMode === 'text' ? 'Extracted Text' : 'Original PDF'}
-                      </span>
-                    )}
-                  </div>
-                )}
-              </div>
-              
-              <div className="flex flex-wrap gap-2 mb-6">
-                {note.tags.map((tag, i) => (
-                  <span
-                    key={i}
-                    className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+            <div>
+              {/* Tab Navigation */}
+              <div className="border-b border-gray-200">
+                <nav className="flex space-x-8 px-6 pt-4" aria-label="Tabs">
+                  <button
+                    onClick={() => setActiveTab('content')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'content'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                   >
-                    {tag}
-                  </span>
-                ))}
+                    <div className="flex items-center">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Note Content
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('mindmap')}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeTab === 'mindmap'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center">
+                      <Map className="h-4 w-4 mr-2" />
+                      Mind Map
+                    </div>
+                  </button>
+                </nav>
               </div>
 
-              {/* AI Summary Display */}
-              {note.summary && (
-                <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
-                  <div className="flex items-start">
-                    <Sparkles className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <h4 className="text-sm font-medium text-blue-900 mb-2">AI-Generated Summary</h4>
-                      <div className="text-sm text-blue-800 prose prose-sm max-w-none">
-                        <ReactMarkdown>{note.summary}</ReactMarkdown>
+              {/* Tab Content */}
+              {activeTab === 'content' ? (
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-3xl font-bold text-gray-900">{note.title}</h1>
+                    {isPdfAvailable && (
+                      <div className="flex items-center space-x-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          <FileText className="h-3 w-3 mr-1" />
+                          PDF Available
+                        </span>
+                        {pdfInfo && (
+                          <span className="text-xs text-gray-500">
+                            Viewing: {viewMode === 'text' ? 'Extracted Text' : 'Original PDF'}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2 mb-6">
+                    {note.tags.map((tag, i) => (
+                      <span
+                        key={i}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* AI Summary Display */}
+                  {note.summary && (
+                    <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
+                      <div className="flex items-start">
+                        <Sparkles className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <h4 className="text-sm font-medium text-blue-900 mb-2">AI-Generated Summary</h4>
+                          <div className="text-sm text-blue-800 prose prose-sm max-w-none">
+                            <ReactMarkdown>{note.summary}</ReactMarkdown>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  )}
+                  
+                  {/* Content Display - Toggle between text and PDF */}
+                  {viewMode === 'text' || !isPdfAvailable ? (
+                    <div className="prose prose-indigo max-w-none note-content">
+                      <ReactMarkdown>{note.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <PDFViewer 
+                      pdfUrl={note.pdfPublicUrl!} 
+                      fileName={note.originalFilename || 'document.pdf'}
+                    />
+                  )}
+                  
+                  <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500">
+                    <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
+                    <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
+                    {note.tags.includes('PDF') && ( 
+                        <p className="flex items-center mt-1">
+                          {isPdfAvailable ? (
+                            <>
+                              <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                              <span>Original PDF stored and available for viewing.</span>
+                            </>
+                          ) : (
+                            <>
+                              <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
+                              <span>PDF upload failed (e.g., file too large). Only text is available.</span>
+                            </>
+                          )}
+                        </p>
+                    )}
                   </div>
                 </div>
-              )}
-              
-              {/* Content Display - Toggle between text and PDF */}
-              {viewMode === 'text' || !isPdfAvailable ? (
-                <div className="prose prose-indigo max-w-none note-content">
-                  <ReactMarkdown>{note.content}</ReactMarkdown>
-                </div>
               ) : (
-                <PDFViewer 
-                  pdfUrl={note.pdfPublicUrl!} 
-                  fileName={note.originalFilename || 'document.pdf'}
-                />
+                // Mind Map Tab Content
+                <div className="h-[600px]">
+                  <NoteMindMap 
+                    noteId={note.id}
+                    noteTitle={note.title}
+                    noteContent={note.content}
+                  />
+                </div>
               )}
-              
-              <div className="mt-6 pt-6 border-t border-gray-100 text-sm text-gray-500">
-                <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
-                <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
-                {note.tags.includes('PDF') && ( 
-                    <p className="flex items-center mt-1">
-                      {isPdfAvailable ? (
-                        <>
-                          <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
-                          <span>Original PDF stored and available for viewing.</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
-                          <span>PDF upload failed (e.g., file too large). Only text is available.</span>
-                        </>
-                      )}
-                    </p>
-                )}
-              </div>
             </div>
           ) : (
             <div className="p-6">
@@ -812,11 +898,11 @@ I can help with:
               {conceptsExist && relatedConcepts.length > 0 && (
                 <div className="bg-white border border-gray-200 rounded-md p-3">
                   <h4 className="text-xs font-medium text-gray-700 mb-2">Related Concepts:</h4>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {relatedConcepts.slice(0, 3).map((concept) => (
-                      <div key={concept.id} className="text-xs">
-                        <div className="font-medium text-gray-900">{concept.name}</div>
-                        <div className="text-gray-600 truncate">{concept.definition}</div>
+                      <div key={concept.id} className="text-sm">
+                        <div className="font-medium text-gray-900 mb-1">{concept.name}</div>
+                        <div className="text-gray-600 leading-relaxed">{concept.definition}</div>
                       </div>
                     ))}
                     {relatedConcepts.length > 3 && (
@@ -868,7 +954,7 @@ I can help with:
                       <div key={gap.id} className="border border-gray-100 rounded-md">
                         <button
                           onClick={() => toggleGapExpansion(gap.id)}
-                          className="w-full p-2 text-left hover:bg-gray-50 transition-colors"
+                          className="w-full p-3 text-left hover:bg-gray-50 transition-colors"
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-2">
@@ -889,46 +975,48 @@ I can help with:
                         </button>
                         
                         {expandedGaps.has(gap.id) && (
-                          <div className="px-2 pb-2 border-t border-gray-100">
-                            <div className="pt-2 space-y-2">
+                          <div className="px-3 pb-3 border-t border-gray-100">
+                            <div className="pt-3 space-y-3">
                               {gap.missing_prerequisite && (
                                 <div>
-                                  <div className="text-xs font-medium text-gray-700">Missing Prerequisite:</div>
-                                  <div className="text-xs text-gray-600">{gap.missing_prerequisite}</div>
+                                  <div className="text-sm font-semibold text-gray-800">Missing Prerequisite:</div>
+                                  <div className="text-sm text-gray-700 mt-1">{gap.missing_prerequisite}</div>
                                 </div>
                               )}
                               
                               {gap.user_mastery !== undefined && (
                                 <div>
-                                  <div className="text-xs font-medium text-gray-700">Current Mastery:</div>
-                                  <div className="flex items-center space-x-2">
+                                  <div className="text-sm font-semibold text-gray-800">Current Mastery:</div>
+                                  <div className="flex items-center space-x-2 mt-1">
                                     <div className="flex-1 bg-gray-200 rounded-full h-1.5">
                                       <div 
                                         className="bg-primary h-1.5 rounded-full" 
                                         style={{ width: `${gap.user_mastery * 100}%` }}
                                       ></div>
                                     </div>
-                                    <span className="text-xs text-gray-600">{Math.round(gap.user_mastery * 100)}%</span>
+                                    <span className="text-sm text-gray-700">{Math.round(gap.user_mastery * 100)}%</span>
                                   </div>
                                 </div>
                               )}
                               
                               <div>
-                                <div className="text-xs font-medium text-gray-700">Strategy:</div>
-                                <div className="text-xs text-gray-600">{gap.reinforcement_strategy}</div>
+                                <div className="text-sm font-semibold text-gray-800">Strategy:</div>
+                                <div className="p-3 bg-gray-50 rounded-md border border-gray-100 mt-1">
+                                  <div className="text-sm text-gray-700">{gap.reinforcement_strategy}</div>
+                                </div>
                               </div>
                               
                               {gap.resources && gap.resources.length > 0 && (
                                 <div>
-                                  <div className="text-xs font-medium text-gray-700">Resources:</div>
-                                  <ul className="mt-1 space-y-1 text-xs text-gray-600">
+                                  <div className="text-sm font-semibold text-gray-800">Resources:</div>
+                                  <ul className="mt-1 space-y-1 text-sm text-gray-700">
                                     {gap.resources.map((resource, index) => {
                                       const urlIndex = resource.indexOf('http');
 
                                       if (urlIndex === -1) {
                                         // Handle non-link resources
                                         return (
-                                          <li key={index} className="flex items-center">
+                                          <li key={index} className="flex items-center py-1">
                                             <BookOpen className="mr-2 h-3 w-3 flex-shrink-0 text-gray-400" />
                                             <span>{resource}</span>
                                           </li>
@@ -942,8 +1030,8 @@ I can help with:
                                       const urlPart = resource.substring(urlIndex).trim();
 
                                       return (
-                                        <li key={index} className="flex items-center justify-between">
-                                          <span className="truncate pr-2" title={textPart}>
+                                        <li key={index} className="flex items-center justify-between py-1">
+                                          <span className="pr-2" title={textPart}>
                                             {textPart}
                                           </span>
                                           <a
