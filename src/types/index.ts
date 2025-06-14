@@ -114,9 +114,11 @@ duration_seconds?: number;
 export interface GraphNode {
   id: string;
   name: string;
+  definition?: string;
   val: number; // Determines the size of the node
   color?: string;
   category?: string;
+  hasDefinition?: boolean;
   x?: number;
   y?: number;
   vx?: number;
