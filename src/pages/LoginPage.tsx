@@ -55,10 +55,7 @@ const LoginPage: React.FC = () => {
   const handleDemoLogin = (userType: 'power' | 'standard') => {
     setActiveDemoUser(userType); 
     if (userType === 'power') {
-      setEmail('pro_user@studymindai.me');
-      setPassword('password123');
-    } else {
-      setEmail('standard_user@studymindai.me');
+      setEmail('demo@studymindai.me');
       setPassword('password123');
     }
   };
