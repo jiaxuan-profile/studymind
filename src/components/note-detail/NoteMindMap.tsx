@@ -20,25 +20,13 @@ interface NoteMindMapProps {
   noteContent: string;
 }
 
-interface ConceptWithRelationships {
-  id: string;
-  name: string;
-  definition: string;
-  relationships: {
-    target_id: string;
-    target_name: string;
-    relationship_type: string;
-    strength: number;
-  }[];
-}
-
 const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteContent }) => {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [labelsEnabled, setLabelsEnabled] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [_hoveredNode, setHoveredNode] = useState<GraphNode | null>(null); 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
   const graphRef = useRef<any>(null);
 
@@ -49,10 +37,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     setZoomLevel(transform.k);
   }, []);
 
-  // Fetch concepts and relationships from database
   const loadConceptsFromDatabase = async () => {
     if (!noteContent.trim()) {
       setError('Note content is empty. Add some content to generate a mind map.');
+      setGraphData({ nodes: [], links: [] });
       return;
     }
 
@@ -60,7 +48,6 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     setError(null);
     
     try {
-      // Get concepts linked to this note
       const { data: noteConceptsData, error: noteConceptsError } = await supabase
         .from('note_concepts')
         .select(`
@@ -82,10 +69,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         return;
       }
 
-      // Extract concept IDs for relationship queries
       const conceptIds = noteConceptsData.map(nc => nc.concepts.id);
 
-      // Get relationships between these concepts
       const { data: relationshipsData, error: relationshipsError } = await supabase
         .from('concept_relationships')
         .select(`
@@ -100,17 +85,15 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
       if (relationshipsError) throw relationshipsError;
 
-      // Create nodes from concepts
       const nodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
         id: nc.concepts.id,
         name: nc.concepts.name,
         definition: nc.concepts.definition,
-        val: 1 + (nc.relevance_score || 0.5) * 2, // Size based on relevance
+        val: 1 + (nc.relevance_score || 0.5) * 2,
         color: getConceptColor(index, nc.relevance_score || 0.5),
         hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim())
       }));
 
-      // Create links from relationships
       const links: GraphLink[] = (relationshipsData || [])
         .filter(rel => 
           conceptIds.includes(rel.source_id) && 
@@ -124,13 +107,6 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         }));
 
       setGraphData({ nodes, links });
-      
-      // Auto-fit the graph after a short delay
-      setTimeout(() => {
-        if (graphRef.current) {
-          graphRef.current.zoomToFit(400, 50);
-        }
-      }, 100);
 
     } catch (err) {
       console.error('Error loading concepts from database:', err);
@@ -141,99 +117,89 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
   };
 
   const getConceptColor = (index: number, relevance: number): string => {
-    // Base colors with intensity based on relevance
     const baseColors = [
-      '#6366F1', // Primary
-      '#10B981', // Secondary  
-      '#F59E0B', // Accent
-      '#EF4444', // Red
-      '#8B5CF6', // Purple
-      '#06B6D4', // Cyan
-      '#84CC16', // Lime
-      '#F97316', // Orange
+      '#6366F1', '#10B981', '#F59E0B', '#EF4444', 
+      '#8B5CF6', '#06B6D4', '#84CC16', '#F97316',
     ];
-    
     const baseColor = baseColors[index % baseColors.length];
-    
-    // Adjust opacity based on relevance (higher relevance = more opaque)
     const opacity = Math.max(0.6, relevance);
-    
-    // Convert hex to rgba
     const hex = baseColor.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
-    
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
 
   const getLinkColor = (relationshipType: string): string => {
     switch (relationshipType) {
-      case 'prerequisite':
-        return '#EF4444'; // Red - shows dependency
-      case 'builds-upon':
-        return '#10B981'; // Green - shows progression
-      case 'related':
-        return '#6366F1'; // Blue - shows connection
-      default:
-        return '#9CA3AF'; // Gray - default
+      case 'prerequisite': return '#EF4444';
+      case 'builds-upon': return '#10B981';
+      case 'related': return '#6366F1';
+      default: return '#9CA3AF';
     }
   };
 
-  const handleNodeClick = useCallback((node: any) => {
+  const handleNodeClick = useCallback((node: GraphNode) => { 
     setSelectedNode(node);
   }, []);
 
   const handleNodeHover = useCallback((node: GraphNode | null) => {
     setHoveredNode(node);
+    if (typeof window !== 'undefined') {
+        const canvas = graphRef.current?.canvas;
+        if (canvas) {
+          canvas.style.cursor = node ? 'pointer' : '';
+        }
+    }
   }, []);
 
   const handleResetView = () => {
     setSelectedNode(null);
-    if (graphRef.current) {
-      graphRef.current.zoomToFit(400, 50);
+    if (graphRef.current && graphData.nodes.length > 0) {
+      graphRef.current.zoomToFit(400, 30); 
     }
   };
 
-  const getNodeTooltip = (node: any) => {
-    const n = node as GraphNode;
-    
-    // Don't show tooltip if no definition
-    if (!n.definition || !n.definition.trim()) {
+  const getNodeTooltip = (node: GraphNode) => { 
+    if (!node.definition || !node.definition.trim()) {
       return null;
     }
-    
+    const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+    const bgColor = isDarkMode ? '#374151' : 'white'; 
+    const textColor = isDarkMode ? '#D1D5DB' : '#6b7280'; 
+    const headingColor = isDarkMode ? '#F3F4F6' : '#1f2937';
+    const borderColor = isDarkMode ? '#4B5563' : '#e5e7eb';
+
     return `<div style="
-      background: white; 
-      border: 1px solid #e5e7eb; 
+      background: ${bgColor}; 
+      border: 1px solid ${borderColor}; 
       border-radius: 8px; 
       padding: 12px; 
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       max-width: 300px;
       font-family: system-ui, -apple-system, sans-serif;
     ">
-      <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #1f2937;">${n.name}</div>
-      <div style="color: #6b7280; font-size: 14px; line-height: 1.4;">${n.definition}</div>
+      <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: ${headingColor};">${node.name}</div>
+      <div style="color: ${textColor}; font-size: 14px; line-height: 1.4;">${node.definition}</div>
     </div>`;
   };
 
-  // Load mind map when component mounts
   useEffect(() => {
     loadConceptsFromDatabase();
-  }, [noteId]);
+  }, [noteId, noteContent]);
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* Controls */}
-      <div className="p-4 border-b border-gray-200 bg-gray-50">
+      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-4">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Brain className="h-5 w-5 mr-2 text-primary" />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+              <Brain className="h-5 w-5 mr-2 text-primary-600 dark:text-primary-400" />
               Mind Map for "{noteTitle}"
             </h3>
             {graphData.nodes.length > 0 && (
-              <span className="text-sm text-gray-600">
+              <span className="text-sm text-gray-600 dark:text-gray-400">
                 {graphData.nodes.length} concepts, {graphData.links.length} connections
               </span>
             )}
@@ -242,7 +208,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           <div className="flex items-center space-x-2">
             <button
               onClick={() => setLabelsEnabled(!labelsEnabled)}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
             >
               {labelsEnabled ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
               {labelsEnabled ? 'Hide Labels' : 'Show Labels'}
@@ -250,7 +216,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             
             <button
               onClick={handleResetView}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
             >
               <RotateCcw className="h-4 w-4 mr-1" />
               Reset View
@@ -271,7 +237,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
         </div>
         
-        <div className="text-xs text-gray-500 flex items-center justify-between">
+        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
           <div>
             <span className="mr-4">💡 Hover over concepts to see definitions</span>
             <span className="mr-4">🔍 Click concepts to highlight connections</span>
@@ -279,28 +245,19 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 text-xs">
-              <div className="flex items-center">
-                <div className="w-3 h-0.5 bg-red-500 mr-1"></div>
-                <span>Prerequisite</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-0.5 bg-green-500 mr-1"></div>
-                <span>Builds Upon</span>
-              </div>
-              <div className="flex items-center">
-                <div className="w-3 h-0.5 bg-blue-500 mr-1"></div>
-                <span>Related</span>
-              </div>
+              <div className="flex items-center"><div className="w-3 h-0.5 bg-red-500 mr-1"></div>Prerequisite</div>
+              <div className="flex items-center"><div className="w-3 h-0.5 bg-green-500 mr-1"></div>Builds Upon</div>
+              <div className="flex items-center"><div className="w-3 h-0.5 bg-blue-500 mr-1"></div>Related</div>
             </div>
             <label className="flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={labelsEnabled}
                 onChange={(e) => setLabelsEnabled(e.target.checked)}
-                className="sr-only"
+                className="sr-only peer"
               />
               <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                labelsEnabled ? 'bg-primary' : 'bg-gray-200'
+                labelsEnabled ? 'bg-primary dark:bg-primary-500' : 'bg-gray-200 dark:bg-gray-600'
               }`}>
                 <span
                   className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
@@ -308,19 +265,19 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                   }`}
                 />
               </div>
-              <span className="ml-2 text-xs font-medium text-gray-700">Labels</span>
+              <span className="ml-2 text-xs font-medium text-gray-700 dark:text-gray-300">Labels</span>
             </label>
           </div>
         </div>
       </div>
 
       {/* Mind Map Content */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative bg-gray-50 dark:bg-gray-900">
         {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75 z-10">
+          <div className="absolute inset-0 flex items-center justify-center bg-white/75 dark:bg-gray-900/75 z-10">
             <div className="text-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
-              <p className="text-gray-600">Loading mind map from database...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-primary-600 dark:text-primary-400 mx-auto mb-2" />
+              <p className="text-gray-600 dark:text-gray-400">Loading mind map from database...</p>
             </div>
           </div>
         )}
@@ -328,16 +285,13 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         {error && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center max-w-md mx-auto p-6">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Unable to Load Mind Map</h3>
-              <p className="text-gray-600 mb-4">{error}</p>
+              <AlertCircle className="h-12 w-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Unable to Load Mind Map</h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">{error}</p>
               <button
                 onClick={loadConceptsFromDatabase}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
-              >
-                <Database className="h-4 w-4 mr-2" />
-                Try Again
-              </button>
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
+              ><Database className="h-4 w-4 mr-2" />Try Again</button>
             </div>
           </div>
         )}
@@ -345,19 +299,16 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         {!loading && !error && graphData.nodes.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center max-w-md mx-auto p-6">
-              <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Concepts Found</h3>
-              <p className="text-gray-600 mb-4">
+              <Brain className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Concepts Found</h3>
+              <p className="text-gray-600 dark:text-gray-300 mb-4">
                 This note doesn't have any analyzed concepts yet. 
                 Upload the document with AI analysis enabled to generate concepts and relationships.
               </p>
               <button
                 onClick={loadConceptsFromDatabase}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
-              >
-                <Database className="h-4 w-4 mr-2" />
-                Check Again
-              </button>
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
+              ><Database className="h-4 w-4 mr-2" />Check Again</button>
             </div>
           </div>
         )}
@@ -366,17 +317,16 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           <ForceGraph2D
             ref={graphRef}
             graphData={graphData}
-            nodeLabel={getNodeTooltip}
-            onNodeHover={handleNodeHover}
-            onNodeClick={handleNodeClick}
-            onZoom={handleZoom}
-            // Enhanced link visualization
+            nodeLabel={getNodeTooltip as any}
+            onNodeHover={handleNodeHover as any}
+            onNodeClick={handleNodeClick as any}
+            onZoom={handleZoom}            
             linkDirectionalArrowLength={6}
             linkDirectionalArrowRelPos={1}
             linkDirectionalParticles={1}
             linkDirectionalParticleSpeed={0.01}
             nodeCanvasObject={(node, ctx, globalScale) => {
-              const n = node as GraphNode;
+              const n = node as GraphNode; 
               const isSelected = selectedNode?.id === n.id;
               const isConnected = selectedNode && graphData.links.some(link => 
                 (link.source === selectedNode.id && link.target === n.id) ||
@@ -389,94 +339,77 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
               ctx.globalAlpha = isDimmed ? 0.3 : 1.0;
               
-              // Draw node circle
               ctx.beginPath();
               ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
               ctx.fillStyle = color;
               ctx.fill();
 
-              // Highlight selected or connected nodes
               if (isSelected || isConnected) {
                 ctx.strokeStyle = isSelected ? '#4338CA' : '#818CF8';
                 ctx.lineWidth = 2 / globalScale;
                 ctx.stroke();
               }
 
-              // Add visual indicator for nodes with definitions
               if (n.hasDefinition) {
-                // Small info icon in top-right of node
-                const iconSize = 3 / globalScale;
-                const iconX = n.x! + nodeRadius - iconSize;
-                const iconY = n.y! - nodeRadius + iconSize;
-                
-                ctx.beginPath();
-                ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
-                ctx.fillStyle = '#3B82F6';
-                ctx.fill();
-                
-                // Small 'i' in the circle
-                ctx.fillStyle = 'white';
-                ctx.font = `${iconSize * 1.2}px Arial`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('i', iconX, iconY);
+                const iconSize = Math.max(1, 3 / globalScale);
+                const iconX = n.x! + nodeRadius - iconSize * 0.9;
+                const iconY = n.y! - nodeRadius + iconSize * 0.9;
+                ctx.beginPath(); ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                ctx.fillStyle = '#3B82F6'; ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = `${iconSize * 1.2}px Arial`;
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('i', iconX, iconY);
               } else {
-                // Gray dot for nodes without definitions
-                const iconSize = 2 / globalScale;
-                const iconX = n.x! + nodeRadius - iconSize;
-                const iconY = n.y! - nodeRadius + iconSize;
-                
-                ctx.beginPath();
-                ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
-                ctx.fillStyle = '#9CA3AF';
-                ctx.fill();
+                const iconSize = Math.max(0.8, 2 / globalScale);
+                const iconX = n.x! + nodeRadius - iconSize * 0.9;
+                const iconY = n.y! - nodeRadius + iconSize * 0.9;
+                ctx.beginPath(); ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                ctx.fillStyle = '#9CA3AF'; ctx.fill();
               }
 
-              // Draw labels if enabled and zoom level is sufficient
               if (labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
                 ctx.font = `${12 / globalScale}px Sans-Serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = '#1f2937';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+                ctx.fillStyle = isDarkMode ? '#E5E7EB' : '#1f2937';
                 ctx.fillText(n.name, n.x!, n.y! + nodeRadius + 8 / globalScale);
               }
-              
               ctx.globalAlpha = 1.0;
             }}
-            linkWidth={link => {
+            linkWidth={(link: any) => { 
               if (!selectedNode) return 2;
-              const isConnected = link.source === selectedNode.id || link.target === selectedNode.id;
+              const isConnected = (link.source as GraphNode).id === selectedNode.id || 
+                                  (link.target as GraphNode).id === selectedNode.id;
               return isConnected ? 4 : 1;
             }}
-            linkColor={link => {
-              const l = link as GraphLink;
+            linkColor={(link: any) => { 
+              const l = link as GraphLink; 
               if (!selectedNode) return getLinkColor(l.relationshipType || 'related');
-              const isConnected = link.source === selectedNode.id || link.target === selectedNode.id;
+              const isConnected = (link.source as GraphNode).id === selectedNode.id || 
+                                  (link.target as GraphNode).id === selectedNode.id;
               return isConnected ? getLinkColor(l.relationshipType || 'related') : 'rgba(150, 150, 150, 0.2)';
             }}
-            linkCanvasObject={(link, ctx, globalScale) => {
+            linkCanvasObject={(link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
               if (!labelsEnabled || zoomLevel < LINK_LABEL_ZOOM_THRESHOLD) return;
               
-              const l = link as GraphLink;
-              const source = typeof link.source === 'object' ? link.source : graphData.nodes.find(n => n.id === link.source);
-              const target = typeof link.target === 'object' ? link.target : graphData.nodes.find(n => n.id === link.target);
+              const l = link as GraphLink; 
+              const sourceNode = link.source as GraphNode; 
+              const targetNode = link.target as GraphNode; 
               
-              if (source && target && l.relationshipType) {
-                const midX = (source.x! + target.x!) / 2;
-                const midY = (source.y! + target.y!) / 2;
+              if (sourceNode?.x != null && sourceNode?.y != null && targetNode?.x != null && targetNode?.y != null && l.relationshipType) {
+                const midX = (sourceNode.x + targetNode.x) / 2;
+                const midY = (sourceNode.y + targetNode.y) / 2;
                 
                 ctx.font = `${8 / globalScale}px Sans-Serif`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
                 ctx.fillStyle = getLinkColor(l.relationshipType);
-                ctx.strokeStyle = 'white';
+                ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; 
                 ctx.lineWidth = 2 / globalScale;
                 ctx.strokeText(l.relationshipType, midX, midY);
                 ctx.fillText(l.relationshipType, midX, midY);
               }
             }}
             linkCanvasObjectMode={() => (labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) ? 'after' : undefined}
-            cooldownTicks={100}
             d3AlphaDecay={0.015}
             d3VelocityDecay={0.4}
           />
@@ -485,32 +418,32 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
       {/* Selected Node Info */}
       {selectedNode && (
-        <div className="border-t border-gray-200 bg-gray-50 p-4">
+        <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center mb-1">
-                <h4 className="font-semibold text-gray-900">{selectedNode.name}</h4>
+                <h4 className="font-semibold text-gray-900 dark:text-gray-100">{selectedNode.name}</h4>
                 {selectedNode.hasDefinition && (
-                  <Info className="h-4 w-4 text-blue-500 ml-2" title="Has definition" />
+                  <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 ml-2" title="Has definition" />
                 )}
               </div>
               {selectedNode.definition && selectedNode.definition.trim() ? (
-                <p className="text-sm text-gray-600">{selectedNode.definition}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{selectedNode.definition}</p>
               ) : (
-                <p className="text-sm text-gray-400 italic">No definition available</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 italic">No definition available</p>
               )}
-              <div className="mt-2 text-xs text-gray-500">
-                Connected to {graphData.links.filter(link => 
-                  link.source === selectedNode.id || link.target === selectedNode.id
+              <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                Connected to {graphData.links.filter(link => { 
+                    return link.source === selectedNode.id || link.target === selectedNode.id;
+                  }
                 ).length} other concepts
               </div>
             </div>
             <button
               onClick={() => setSelectedNode(null)}
-              className="text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
+              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400 transition-colors ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              aria-label="Clear selection"
+            ><RotateCcw className="h-4 w-4" /></button>
           </div>
         </div>
       )}
