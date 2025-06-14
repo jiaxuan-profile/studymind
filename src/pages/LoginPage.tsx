@@ -138,7 +138,7 @@ const LoginPage: React.FC = () => {
           <div className="bg-primary/5 dark:bg-primary/10 border-l-4 border-primary dark:border-primary-light p-4 rounded-r-lg">
             <h3 className="font-bold text-gray-800 dark:text-gray-200">Demo Environment</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Sign up is disabled. Please use one of the accounts below to explore the app.
+              Sign up is disabled. Please use the account below to explore the app.
             </p>
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
               <button
