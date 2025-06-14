@@ -57,6 +57,10 @@ const LoginPage: React.FC = () => {
     if (userType === 'power') {
       setEmail('pro_user@studymindai.me');
       setPassword('password123');
+    } else {
+      setEmail('standard_user@studymindai.me');
+      setPassword('password123');
+    }
   };
 
   const renderForm = () => {
@@ -147,6 +151,14 @@ const LoginPage: React.FC = () => {
               >
                 <UserCheck className="h-4 w-4 mr-2" />
                 Login as Power User
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDemoLogin('standard')}
+                className={activeDemoUser === 'standard' ? primaryButtonClasses : secondaryButtonClasses}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Login as Standard User
               </button>
             </div>
           </div>
