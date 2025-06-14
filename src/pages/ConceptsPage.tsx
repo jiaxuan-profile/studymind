@@ -153,9 +153,11 @@ const ConceptsPage: React.FC = () => {
             return {
                 id: concept.id,
                 name: concept.name,
+                definition: concept.definition,
                 val: 1 + linkedNoteIds.length * 0.5,
                 color: colors[topCategory] || '#94A3B8',
                 category: topCategory,
+                hasDefinition: !!(concept.definition && concept.definition.trim())
             };
         });
 
@@ -310,24 +312,33 @@ const ConceptsPage: React.FC = () => {
   
   const getNodeTooltip = (node: any) => {
     const n = node as GraphNode;
+    
+    // Don't show tooltip if no definition
+    if (!n.definition || !n.definition.trim()) {
+      return null;
+    }
+    
     const bgColor = theme === 'dark' ? '#374151' : 'white';
     const textColor = theme === 'dark' ? '#E5E7EB' : '#1f2937';
     const borderColor = theme === 'dark' ? '#4B5563' : '#e5e7eb';
     const definitionColor = theme === 'dark' ? '#D1D5DB' : '#6b7280';
 
-    if (hoveredNode && hoveredNode.id === n.id && selectedConcept && selectedConcept.id === n.id) {
-      return `<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:8px;padding:12px;box-shadow:0 4px 6px -1px rgba(0,0,0,0.1);max-width:300px;font-family:system-ui,-apple-system,sans-serif;position:relative;transform:translateY(-70px);">
-          <div style="font-weight:bold;font-size:16px;margin-bottom:8px;color:${textColor};">
-            ${n.name}
-          </div>
-          <div style="color:${definitionColor};font-size:14px;line-height:1.4;">
-            ${selectedConcept.definition}
-          </div>
-        </div>`;
-    }
-    return `<div style="background:${bgColor};border:1px solid ${borderColor};border-radius:6px;padding:8px 12px;box-shadow:0 2px 4px rgba(0,0,0,0.1);font-family:system-ui,-apple-system,sans-serif;font-weight:bold;color:${textColor};position:relative;transform:translateY(-60px);">
+    return `<div style="
+      background: ${bgColor};
+      border: 1px solid ${borderColor};
+      border-radius: 8px;
+      padding: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      max-width: 300px;
+      font-family: system-ui, -apple-system, sans-serif;
+    ">
+      <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: ${textColor};">
         ${n.name}
-      </div>`;
+      </div>
+      <div style="color: ${definitionColor}; font-size: 14px; line-height: 1.4;">
+        ${n.definition}
+      </div>
+    </div>`;
   };
 
   if (loading) {
@@ -466,6 +477,36 @@ const ConceptsPage: React.FC = () => {
                     ctx.lineWidth = 1.5 / globalScale;
                     ctx.stroke();
                   } 
+
+                  // Add visual indicator for nodes with definitions
+                  if (n.hasDefinition) {
+                    // Small info icon in top-right of node
+                    const iconSize = 3 / globalScale;
+                    const iconX = n.x! + nodeRadius - iconSize;
+                    const iconY = n.y! - nodeRadius + iconSize;
+                    
+                    ctx.beginPath();
+                    ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                    ctx.fillStyle = '#3B82F6';
+                    ctx.fill();
+                    
+                    // Small 'i' in the circle
+                    ctx.fillStyle = 'white';
+                    ctx.font = `${iconSize * 1.2}px Arial`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('i', iconX, iconY);
+                  } else {
+                    // Gray dot for nodes without definitions
+                    const iconSize = 2 / globalScale;
+                    const iconX = n.x! + nodeRadius - iconSize;
+                    const iconY = n.y! - nodeRadius + iconSize;
+                    
+                    ctx.beginPath();
+                    ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                    ctx.fillStyle = '#9CA3AF';
+                    ctx.fill();
+                  }
 
                   if (label && labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
                     ctx.font = `${12 / globalScale}px Sans-Serif`;
