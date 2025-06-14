@@ -5,11 +5,11 @@ import {
   RotateCcw, 
   Eye, 
   EyeOff, 
-  Lightbulb, 
   AlertCircle, 
   Brain,
   Loader2,
-  Database
+  Database,
+  Info
 } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../../types';
 import { supabase } from '../../services/supabase';
@@ -106,7 +106,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         name: nc.concepts.name,
         definition: nc.concepts.definition,
         val: 1 + (nc.relevance_score || 0.5) * 2, // Size based on relevance
-        color: getConceptColor(index, nc.relevance_score || 0.5)
+        color: getConceptColor(index, nc.relevance_score || 0.5),
+        hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim())
       }));
 
       // Create links from relationships
@@ -196,7 +197,11 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
   const getNodeTooltip = (node: any) => {
     const n = node as GraphNode;
-    if (!n.definition) return n.name;
+    
+    // Don't show tooltip if no definition
+    if (!n.definition || !n.definition.trim()) {
+      return null;
+    }
     
     return `<div style="
       background: white; 
@@ -206,8 +211,6 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
       max-width: 300px;
       font-family: system-ui, -apple-system, sans-serif;
-      position: relative;
-      transform: translateY(-70px);
     ">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: #1f2937;">${n.name}</div>
       <div style="color: #6b7280; font-size: 14px; line-height: 1.4;">${n.definition}</div>
@@ -273,7 +276,6 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             <span className="mr-4">💡 Hover over concepts to see definitions</span>
             <span className="mr-4">🔍 Click concepts to highlight connections</span>
             <span className="mr-4">⚡ Zoom: {zoomLevel.toFixed(1)}x</span>
-            <span>🗄️ Data from database (no API calls)</span>
           </div>
           <div className="flex items-center space-x-3">
             <div className="flex items-center space-x-2 text-xs">
@@ -400,6 +402,36 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 ctx.stroke();
               }
 
+              // Add visual indicator for nodes with definitions
+              if (n.hasDefinition) {
+                // Small info icon in top-right of node
+                const iconSize = 3 / globalScale;
+                const iconX = n.x! + nodeRadius - iconSize;
+                const iconY = n.y! - nodeRadius + iconSize;
+                
+                ctx.beginPath();
+                ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                ctx.fillStyle = '#3B82F6';
+                ctx.fill();
+                
+                // Small 'i' in the circle
+                ctx.fillStyle = 'white';
+                ctx.font = `${iconSize * 1.2}px Arial`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('i', iconX, iconY);
+              } else {
+                // Gray dot for nodes without definitions
+                const iconSize = 2 / globalScale;
+                const iconX = n.x! + nodeRadius - iconSize;
+                const iconY = n.y! - nodeRadius + iconSize;
+                
+                ctx.beginPath();
+                ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                ctx.fillStyle = '#9CA3AF';
+                ctx.fill();
+              }
+
               // Draw labels if enabled and zoom level is sufficient
               if (labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
                 ctx.font = `${12 / globalScale}px Sans-Serif`;
@@ -456,9 +488,16 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         <div className="border-t border-gray-200 bg-gray-50 p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <h4 className="font-semibold text-gray-900 mb-1">{selectedNode.name}</h4>
-              {selectedNode.definition && (
+              <div className="flex items-center mb-1">
+                <h4 className="font-semibold text-gray-900">{selectedNode.name}</h4>
+                {selectedNode.hasDefinition && (
+                  <Info className="h-4 w-4 text-blue-500 ml-2" title="Has definition" />
+                )}
+              </div>
+              {selectedNode.definition && selectedNode.definition.trim() ? (
                 <p className="text-sm text-gray-600">{selectedNode.definition}</p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">No definition available</p>
               )}
               <div className="mt-2 text-xs text-gray-500">
                 Connected to {graphData.links.filter(link => 
