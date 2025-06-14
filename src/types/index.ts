@@ -6,6 +6,20 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 // Re-exporting the Supabase user type for consistency
 export type User = SupabaseUser;
 
+// User subscription tiers
+export type SubscriptionTier = 'standard' | 'pro';
+
+// User profile with subscription information
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  subscription_tier: SubscriptionTier;
+  daily_note_count: number;
+  last_note_date: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
 // Main data model for a Note
 export interface Note {
   id: string;
@@ -114,9 +128,11 @@ duration_seconds?: number;
 export interface GraphNode {
   id: string;
   name: string;
+  definition?: string;
   val: number; // Determines the size of the node
   color?: string;
   category?: string;
+  hasDefinition?: boolean;
   x?: number;
   y?: number;
   vx?: number;
@@ -146,4 +162,12 @@ export interface PomodoroSettings {
   longBreakDuration: number;
   cyclesBeforeLongBreak: number;
   soundEnabled: boolean;
+}
+
+// Subscription limits
+export interface SubscriptionLimits {
+  dailyNoteLimit: number;
+  aiAnalysisEnabled: boolean;
+  pdfUploadEnabled: boolean;
+  maxPdfSizeMB: number;
 }

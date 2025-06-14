@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   GraduationCap, Lightbulb, CheckCircle, XCircle, HelpCircle, ArrowRight, ArrowLeft,
   RefreshCw, Brain, Target, BookOpen, Zap, TrendingUp, Award, Play, FileText, Save,
@@ -39,6 +39,7 @@ type QuestionType = 'short' | 'mcq' | 'open';
 
 const ReviewPage: React.FC = () => {
   const { notes } = useStore();
+  const location = useLocation();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
@@ -63,6 +64,20 @@ const ReviewPage: React.FC = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
   const navigate = useNavigate();
+
+  // Check for retry session data from location state
+  useEffect(() => {
+    const retryData = location.state?.retrySessionData;
+    if (retryData) {
+      console.log('Retry session data found:', retryData);
+      setSelectedNotes(retryData.selectedNotes || []);
+      setSelectedDifficulty(retryData.selectedDifficulty || 'all');
+      setSelectedQuestionType(retryData.selectedQuestionType || 'short');
+      
+      // Clear the location state to prevent persistence
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   useEffect(() => {
     if (sessionStartTime) {
@@ -223,12 +238,13 @@ const ReviewPage: React.FC = () => {
       // 1. Create the review session record
       const now = new Date();
       
-      // --- FIX: RE-INTEGRATE SESSION NAME GENERATION ---
-      const sessionName = `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+      // Check if this is a retry session
+      const retryData = location.state?.retrySessionData;
+      const sessionName = retryData?.sessionName || `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
 
       const { data: session, error: sessionError } = await supabase.from('review_sessions').insert({
         user_id: user.id,
-        session_name: sessionName, // <-- ADDED THIS LINE BACK
+        session_name: sessionName,
         selected_notes: selectedNotes,
         selected_difficulty: selectedDifficulty,
         total_questions: shuffledQuestions.length,

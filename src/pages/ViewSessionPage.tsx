@@ -5,7 +5,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, CheckCircle, XCircle, HelpCircle, 
   BookOpen, History, Clock, Lightbulb, 
-  Award, TrendingUp, Brain, Target, Zap
+  Award, TrendingUp, Brain, Target, Zap, RefreshCw
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import PageHeader from '../components/PageHeader';
@@ -92,6 +92,22 @@ const ViewSessionPage: React.FC = () => {
     }
   };
 
+  const handleRetrySession = () => {
+    if (!session) return;
+    
+    // Navigate to review page with session data
+    navigate('/review', {
+      state: {
+        retrySessionData: {
+          selectedNotes: session.selected_notes,
+          selectedDifficulty: session.selected_difficulty,
+          selectedQuestionType: 'short', // Default to short answer
+          sessionName: `Retry: ${session.session_name || 'Review Session'}`
+        }
+      }
+    });
+  };
+
   const formatDuration = (seconds: number) => {
     if (!seconds || seconds <= 0) return '0s';
     const hours = Math.floor(seconds / 3600);
@@ -163,7 +179,16 @@ const ViewSessionPage: React.FC = () => {
             <Clock className="h-4 w-4 mr-2" />
             {formatDuration(session.duration_seconds ?? 0)}
           </div>
-        )}          
+        )}
+        
+        <button
+          onClick={handleRetrySession}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry Session
+        </button>
+        
         <button
           onClick={() => navigate('/history')}
           className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
@@ -375,6 +400,33 @@ const ViewSessionPage: React.FC = () => {
                   <span className="font-medium">{session.hard_ratings}</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Retry Session Info */}
+          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+            <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-b border-gray-200">
+              <h3 className="font-semibold text-gray-900 flex items-center">
+                <RefreshCw className="h-5 w-5 mr-2 text-green-600" />
+                Retry This Session
+              </h3>
+            </div>
+            <div className="p-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Practice with the same questions and settings to improve your understanding.
+              </p>
+              <div className="space-y-2 text-xs text-gray-500">
+                <div>• {session.selected_notes.length} notes selected</div>
+                <div>• {session.selected_difficulty} difficulty</div>
+                <div>• {session.total_questions} questions</div>
+              </div>
+              <button
+                onClick={handleRetrySession}
+                className="w-full mt-4 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Start Retry Session
+              </button>
             </div>
           </div>
         </div>

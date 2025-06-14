@@ -12,6 +12,7 @@ import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedN
 import NoteHeader from '../components/note-detail/NoteHeader';
 import NoteMainContent from '../components/note-detail/NoteMainContent';
 import StudyAssistantPanel from '../components/note-detail/StudyAssistantPanel'; 
+import Dialog from '../components/Dialog';
 import { Concept, KnowledgeGap, RelatedNote, Note as NoteType } from '../types';
 
 const NoteDetailPage: React.FC = () => {
@@ -26,6 +27,7 @@ const NoteDetailPage: React.FC = () => {
   const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [editedNote, setEditedNote] = useState(() => {
     const current = notes.find(n => n.id === id);
     return {
@@ -244,29 +246,33 @@ const NoteDetailPage: React.FC = () => {
     setEditedNote(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleDelete = async () => {
-    if (isDeleting || !note) return;
-        
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      setIsDeleting(true);
-      try {
-        addToast('Deleting note...', 'info');
-        
-        await deleteNoteFromDatabase(note.id);
-        deleteNoteFromStore(note.id);
-        
-        addToast('Note deleted successfully', 'success');
-        addNotification(`Note "${note.title}" was deleted`, 'info', 'Note Management');
-        
-        navigate('/notes');
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true);
+  };
 
-      } catch (error) {
-        console.error("Failed to delete note:", error);
-        const errorMessage = `Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`;
-        addToast(errorMessage, 'error');
-        addNotification(errorMessage, 'error', 'Note Management');
-        setIsDeleting(false); 
-      }
+  const handleDeleteConfirm = async () => {
+    if (!note) return;
+    
+    setIsDeleting(true);
+    try {
+      addToast('Deleting note...', 'info');
+      
+      await deleteNoteFromDatabase(note.id);
+      deleteNoteFromStore(note.id);
+      
+      addToast('Note deleted successfully', 'success');
+      addNotification(`Note "${note.title}" was deleted`, 'info', 'Note Management');
+      
+      navigate('/notes');
+
+    } catch (error) {
+      console.error("Failed to delete note:", error);
+      const errorMessage = `Error deleting note: ${(error as Error).message}. Your session may be invalid, please try logging in again.`;
+      addToast(errorMessage, 'error');
+      addNotification(errorMessage, 'error', 'Note Management');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
     }
   };
   
@@ -417,7 +423,7 @@ I can help with:
         viewMode={viewMode}
         onToggleViewMode={toggleViewMode}
         onEdit={() => setEditMode(true)} 
-        onDelete={handleDelete}
+        onDelete={handleDeleteClick}
         isDeleting={isDeleting}
         onSave={handleSave}
         isSaving={isSaving}
@@ -468,6 +474,19 @@ I can help with:
           />
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        title="Delete Note"
+        message={`Are you sure you want to delete "${note.title}"? This action cannot be undone and will permanently remove the note and all associated data.`}
+        onConfirm={handleDeleteConfirm}
+        confirmText="Delete Note"
+        cancelText="Cancel"
+        loading={isDeleting}
+        variant="danger"
+      />
     </div>
   );
 };

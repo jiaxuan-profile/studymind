@@ -1,6 +1,6 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User, ConceptRelationship, PomodoroSettings } from '../types'; 
+import { Note, Concept, User, ConceptRelationship, PomodoroSettings, UserProfile, SubscriptionTier } from '../types'; 
 import { 
   getAllNotes, 
   updateNoteSummary, 
@@ -8,6 +8,7 @@ import {
   getAllConcepts,
 } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
+import { getUserProfile } from '../services/subscriptionService';
 
 interface PaginationState {
   currentPage: number;
@@ -21,6 +22,7 @@ interface State {
   concepts: Concept[];
   relationships: ConceptRelationship[];
   user: User | null;
+  userProfile: UserProfile | null;
   theme: 'light' | 'dark';
   isLoading: boolean;
   error: string | null;
@@ -38,6 +40,8 @@ interface State {
   deleteConcept: (id: string) => void;
   
   setUser: (user: User | null) => void;
+  setUserProfile: (profile: UserProfile | null) => void;
+  loadUserProfile: () => Promise<void>;
   toggleTheme: () => void;
   resetStore: () => void;
   loadConcepts: () => Promise<void>;
@@ -50,6 +54,7 @@ export const useStore = create<State>((set, get) => ({
   concepts: [],
   relationships: [],
   user: null,
+  userProfile: null,
   theme: (typeof window !== 'undefined' && localStorage.getItem('studymind-theme') as 'light' | 'dark') || 'light',
   isLoading: false,
   error: null,
@@ -181,6 +186,17 @@ export const useStore = create<State>((set, get) => ({
   
   setUser: (user) => set({ user }),
   
+  setUserProfile: (profile) => set({ userProfile: profile }),
+  
+  loadUserProfile: async () => {
+    try {
+      const profile = await getUserProfile();
+      set({ userProfile: profile });
+    } catch (error) {
+      console.error('Store: Failed to load user profile:', error);
+    }
+  },
+  
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'light' ? 'dark' : 'light';
     if (typeof window !== 'undefined') {
@@ -193,6 +209,7 @@ export const useStore = create<State>((set, get) => ({
     notes: [],
     concepts: [],
     relationships: [], 
+    userProfile: null,
     isLoading: false,
     error: null,
     pagination: {

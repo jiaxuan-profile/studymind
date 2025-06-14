@@ -55,10 +55,7 @@ const LoginPage: React.FC = () => {
   const handleDemoLogin = (userType: 'power' | 'standard') => {
     setActiveDemoUser(userType); 
     if (userType === 'power') {
-      setEmail('pro_user@studymind.demo');
-      setPassword('password123');
-    } else {
-      setEmail('standard_user@studymind.demo');
+      setEmail('demo@studymindai.me');
       setPassword('password123');
     }
   };
@@ -141,7 +138,7 @@ const LoginPage: React.FC = () => {
           <div className="bg-primary/5 dark:bg-primary/10 border-l-4 border-primary dark:border-primary-light p-4 rounded-r-lg">
             <h3 className="font-bold text-gray-800 dark:text-gray-200">Demo Environment</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Sign up is disabled. Please use one of the accounts below to explore the app.
+              Sign up is disabled. Please use the account below to explore the app.
             </p>
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
               <button
@@ -150,15 +147,7 @@ const LoginPage: React.FC = () => {
                 className={activeDemoUser === 'power' ? primaryButtonClasses : secondaryButtonClasses}
               >
                 <UserCheck className="h-4 w-4 mr-2" />
-                Login as Power User
-              </button>
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('standard')}
-                className={activeDemoUser === 'standard' ? primaryButtonClasses : secondaryButtonClasses}
-              >
-                <User className="h-4 w-4 mr-2" />
-                Login as Standard User
+                Login as Demo User
               </button>
             </div>
           </div>

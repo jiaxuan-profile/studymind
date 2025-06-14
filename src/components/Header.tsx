@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../contexts/NotificationContext';
 import NotificationCenter from './NotificationCenter';
+import Dialog from './Dialog';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -15,6 +16,8 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const { theme, toggleTheme, notes } = useStore();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
@@ -51,6 +54,20 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
 
   const handleSearchBlur = () => {
     setTimeout(() => setShowSearchResults(false), 200);
+  };
+
+  const handleLogoutClick = () => {
+    setShowLogoutDialog(true);
+  };
+
+  const handleLogoutConfirm = async () => {
+    setIsLoggingOut(true);
+    try {
+      await onLogout();
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutDialog(false);
+    }
   };
   
   return (
@@ -149,6 +166,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
             <button 
               className="p-1 rounded-full text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
               onClick={toggleTheme}
+              title="Toggle theme"
             >
               {theme === 'dark' ? (
                 <Sun className="h-6 w-6" aria-hidden="true" />
@@ -160,6 +178,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
             <button 
               className="relative p-1 rounded-full text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
               onClick={() => setShowNotificationCenter(true)}
+              title="View notifications"
             >
               <span className="sr-only">View notifications</span>
               <Bell className="h-6 w-6" aria-hidden="true" />
@@ -171,12 +190,11 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
             </button>
             
             <button 
-              onClick={onLogout}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              onClick={handleLogoutClick}
+              className="p-1 rounded-full text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
               title="Sign out"
             >
-              <LogOut className="h-4 w-4 mr-1" />
-              Sign Out
+              <LogOut className="h-6 w-6" />
             </button>
           </div>
         </div>
@@ -186,6 +204,19 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
       <NotificationCenter 
         isOpen={showNotificationCenter}
         onClose={() => setShowNotificationCenter(false)}
+      />
+
+      {/* Logout Confirmation Dialog */}
+      <Dialog
+        isOpen={showLogoutDialog}
+        onClose={() => setShowLogoutDialog(false)}
+        title="Sign Out"
+        message="Are you sure you want to sign out? You will need to log in again to access your notes."
+        onConfirm={handleLogoutConfirm}
+        confirmText="Sign Out"
+        cancelText="Cancel"
+        loading={isLoggingOut}
+        variant="default"
       />
     </>
   );
