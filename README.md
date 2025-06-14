@@ -1,6 +1,29 @@
 # StudyMind - AI-Powered Study Assistant
 
-StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, integrated focus time management, and a comprehensive notification system.
+StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, integrated focus time management, and a comprehensive notification system with subscription-based access tiers.
+
+## Subscription Tiers
+
+StudyMind offers two subscription tiers to meet different user needs:
+
+### 🌟 Standard Plan
+- **Daily Note Limit**: 2 notes per day
+- **File Formats**: DOCX, MD, TXT only
+- **AI Analysis**: Not available
+- **PDF Uploads**: Not available
+- **Review Questions**: Manual creation only
+- **Concept Extraction**: Not available
+- **Price**: Free
+
+### 👑 Pro Plan
+- **Daily Note Limit**: Unlimited
+- **File Formats**: PDF, DOCX, MD, TXT
+- **AI Analysis**: Full AI-powered content analysis
+- **PDF Uploads**: Up to 50MB per file
+- **Review Questions**: AI-generated practice questions
+- **Concept Extraction**: Automatic concept mapping
+- **Knowledge Gap Analysis**: AI-powered learning recommendations
+- **Price**: Premium subscription
 
 ## Learning Approach
 
@@ -28,14 +51,16 @@ StudyMind supports both formative and summative assessment strategies:
 ### 📝 Smart Note Taking
 - Markdown support with live preview
 - Automatic tag suggestions
-- AI-powered concept extraction
-- Multi-format document import (PDF, DOCX, MD, TXT)
+- AI-powered concept extraction (Pro only)
+- Multi-format document import (PDF for Pro, DOCX/MD/TXT for all)
+- Daily upload limits based on subscription tier
 
-### 🧠 AI-Powered Analysis
+### 🧠 AI-Powered Analysis (Pro Only)
 - Automatic content summarization
 - Key concept identification and definition
 - Vector similarity search for related content
 - Intelligent question generation
+- Knowledge gap analysis with personalized recommendations
 
 ### 📊 Knowledge Graph & Mind Maps
 - **Global Concept Graph**: Shows connections between concepts across all your notes
@@ -44,7 +69,7 @@ StudyMind supports both formative and summative assessment strategies:
   - Zoom functionality to see concept names and relationships
   - Click on nodes to view detailed information and related notes
 - **Note-Specific Mind Maps**: Individual note visualization showing concept relationships within that specific document
-  - AI-powered concept extraction from note content
+  - AI-powered concept extraction from note content (Pro only)
   - Interactive visualization of how concepts relate within a single note
   - Hover over concepts to see definitions
   - Click concepts to highlight connections
@@ -88,7 +113,7 @@ StudyMind supports both formative and summative assessment strategies:
 - Performance insights and trends
 - Focus time analytics and productivity metrics
 
-### 🎯 Concept Mastery System
+### 🎯 Concept Mastery System (Pro Only)
 - **3-Tier Mastery Classification**:
   - 🟢 Mastered (≥70%): Used as foundation for new questions
   - 🟡 Developing (30-70%): Targeted with focused practice
@@ -101,6 +126,12 @@ StudyMind supports both formative and summative assessment strategies:
 - **Light/Dark Mode**: Toggle between light and dark themes
 - **Persistent Settings**: Theme preference saved across sessions
 - **Comprehensive Coverage**: Dark mode support for all components and pages
+
+### 💎 Subscription Management
+- **Tier-Based Access Control**: Features automatically enabled/disabled based on subscription
+- **Usage Tracking**: Daily note count monitoring for Standard users
+- **Upgrade Prompts**: Contextual suggestions to upgrade when limits are reached
+- **Visual Indicators**: Clear subscription status display throughout the app
 
 ## Database Setup
 
@@ -140,9 +171,33 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - Global concept sharing and mastery tracking
    - User-specific mastery levels
 
+9. **Subscription System** (New Migration Required)
+   - User profiles table with subscription tiers
+   - Daily usage tracking
+   - Subscription limits enforcement
+
 ## Recent Updates
 
-### ✅ Toast & Notification System (Latest)
+### ✅ Two-Tier Subscription System (Latest)
+- **Standard Plan**: 2 notes per day, basic text formats only, no AI features
+- **Pro Plan**: Unlimited notes, PDF uploads, full AI analysis and question generation
+- **Usage Tracking**: Daily note count monitoring with automatic reset
+- **Access Control**: Feature-based restrictions based on subscription tier
+- **Upgrade Prompts**: Contextual suggestions when limits are reached
+- **Subscription Banners**: Visual status indicators throughout the app
+
+### ✅ Enhanced Dialog System
+- **Reusable Dialog Component**: Beautiful, themed confirmation dialogs
+- **Icon-Based Sign Out**: Consistent header icon styling
+- **Improved UX**: Professional confirmation dialogs replace browser alerts
+- **Dark Mode Support**: Full theme integration for all dialogs
+
+### ✅ Mind Map Consistency
+- **Tooltip Standardization**: Consistent hover tooltips across concept graph and mind maps
+- **Visual Indicators**: Clear icons showing which concepts have definitions
+- **Improved Instructions**: Updated help text for better user guidance
+
+### ✅ Toast & Notification System
 - **Real-time Feedback**: Comprehensive toast notification system for immediate user feedback
 - **Notification Center**: Centralized hub accessible via bell icon in header
 - **Smart Indicators**: Unread count badges and visual alerts
@@ -175,7 +230,7 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
 - **Review History**: View past sessions and performance over time
 - **Self-Assessment**: Optional difficulty ratings for each question
 
-### ✅ AI-Powered Question Generation
+### ✅ AI-Powered Question Generation (Pro Only)
 - **Automatic Question Creation**: Generate review questions from uploaded documents
 - **Mastery-Aware Questions**:
 - - Personalize difficulty based on concept mastery tiers
@@ -185,8 +240,8 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
 - **Contextual Hints**: AI-generated hints to guide learning
 
 ### ✅ Document Processing & Analysis
-- **Multi-Format Support**: PDF, DOCX, MD, TXT file uploads
-- **AI Content Analysis**: Automatic concept extraction and relationship mapping
+- **Multi-Format Support**: PDF (Pro), DOCX, MD, TXT file uploads
+- **AI Content Analysis**: Automatic concept extraction and relationship mapping (Pro only)
 - **Vector Embeddings**: Semantic search and content similarity
 - **Knowledge Graph**: Visual concept relationships and connections
 
@@ -236,9 +291,14 @@ npm run dev
 - **Netlify Functions**: Serverless API endpoints
 
 ### AI Integration
-- **Google Gemini**: Content analysis and question generation
+- **Google Gemini**: Content analysis and question generation (Pro only)
 - **Vector Embeddings**: Semantic content understanding
-- **Concept Extraction**: Automatic knowledge mapping
+- **Concept Extraction**: Automatic knowledge mapping (Pro only)
+
+### Subscription System
+- **Tier-Based Access**: Feature restrictions based on subscription level
+- **Usage Tracking**: Daily limits and usage monitoring
+- **Upgrade Flow**: Seamless subscription management
 
 ## Deployment
 
@@ -254,7 +314,8 @@ The project is configured for deployment on Netlify with serverless functions fo
 - **Styling**: Tailwind CSS with custom design system and dark mode
 - **State Management**: Zustand
 - **Database**: Supabase (PostgreSQL + Vector)
-- **AI**: Google Gemini Pro
+- **AI**: Google Gemini Pro (Pro tier only)
 - **Deployment**: Netlify with serverless functions
 - **File Processing**: PDF.js, Mammoth.js for document parsing
 - **Notifications**: Custom toast and notification system
+- **Subscriptions**: Custom tier-based access control system

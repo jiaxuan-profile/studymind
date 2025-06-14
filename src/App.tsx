@@ -34,7 +34,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { loadNotes: storeLoadNotes, resetStore: storeResetStore, theme } = useStore();
+  const { loadNotes: storeLoadNotes, resetStore: storeResetStore, theme, setUser, loadUserProfile } = useStore();
   const { user, signOut } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -57,7 +57,6 @@ function AppRoutes() {
   }, [storeResetStore]);
 
   const handleLogout = useCallback(async () => {
-    if (!window.confirm('Are you sure you want to logout?')) return;
     try {
       await signOut();
       resetStore();
@@ -72,12 +71,14 @@ function AppRoutes() {
   useEffect(() => {
     if (user) {
       console.log("AppRoutes: User detected, triggering initial data load.");
+      setUser(user);
+      loadUserProfile(); // Load user profile including subscription tier
       loadNotes(); 
     } else {
       console.log("AppRoutes: No user detected, resetting store.");
       resetStore();
     }
-  }, [user, loadNotes, resetStore]);
+  }, [user, loadNotes, resetStore, setUser, loadUserProfile]);
 
   return (
     <>
