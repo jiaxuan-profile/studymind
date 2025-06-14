@@ -1,14 +1,13 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User } from '../types';
+import { Note, Concept, User, ConceptRelationship, PomodoroSettings } from '../types'; 
 import { 
   getAllNotes, 
-  getAllUserTags,
   updateNoteSummary, 
   deleteNoteFromDatabase,
+  getAllConcepts,
 } from '../services/databaseServiceClient';
 import { generateNoteSummary } from '../services/aiService';
-import { supabase } from '../services/supabase';
 
 interface PaginationState {
   currentPage: number;
@@ -17,45 +16,21 @@ interface PaginationState {
   totalNotes: number;
 }
 
-interface ConceptRelationship {
-  source_id: string;
-  target_id: string;
-  strength: number;
-}
-
-interface PomodoroSettings {
-  workDuration: number;
-  shortBreakDuration: number;
-  longBreakDuration: number;
-  cyclesBeforeLongBreak: number;
-  soundEnabled: boolean;
-}
-
 interface State {
   notes: Note[];
   concepts: Concept[];
   relationships: ConceptRelationship[];
-  linkedConcepts: Concept[];
-  allTags: string[];
-
-  currentNote: Note | null;
   user: User | null;
   theme: 'light' | 'dark';
   isLoading: boolean;
   error: string | null;
   pagination: PaginationState;
-  
-  // Pomodoro settings
   pomodoroSettings: PomodoroSettings;
   
-  addNote: (note: Note) => Promise<Note>;
+  addNote: (note: Partial<Note>) => void; 
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => Promise<void>;
-  setCurrentNote: (note: Note | null) => void;
-  loadNotes: (page?: number, pageSize?: number, options?: { searchTerm?: string; tags?: string[] }) => Promise<void>;
-  loadAllTags: () => Promise<void>;
-  setPage: (page: number) => void;
-  setPageSize: (size: number) => void;
+  loadNotes: (page?: number, pageSize?: number, options?: { searchTerm?: string }) => Promise<void>;
   summarizeNote: (id: string) => Promise<void>;
   
   addConcept: (concept: Concept) => void;
@@ -67,17 +42,13 @@ interface State {
   resetStore: () => void;
   loadConcepts: () => Promise<void>;
   
-  // Pomodoro actions
   updatePomodoroSettings: (updates: Partial<PomodoroSettings>) => void;
 }
 
 export const useStore = create<State>((set, get) => ({
   notes: [],
-  linkedConcepts: [],
   concepts: [],
   relationships: [],
-  allTags: [],
-  currentNote: null,
   user: null,
   theme: (typeof window !== 'undefined' && localStorage.getItem('studymind-theme') as 'light' | 'dark') || 'light',
   isLoading: false,
@@ -88,8 +59,6 @@ export const useStore = create<State>((set, get) => ({
     pageSize: 12,
     totalNotes: 0,
   },
-  
-  // Default Pomodoro settings
   pomodoroSettings: {
     workDuration: 25,
     shortBreakDuration: 5,
@@ -100,23 +69,27 @@ export const useStore = create<State>((set, get) => ({
   
   loadNotes: async (page = 1, pageSize = 12, options = {}) => {
     set({ isLoading: true, error: null });
-
     try {
-      const { data, count } = await getAllNotes(page, pageSize, options);
+      const { data, count } = await getAllNotes(page, pageSize, { searchTerm: options.searchTerm });
       const totalPages = Math.ceil((count ?? 0) / pageSize);
       
+      const formattedNotes: Note[] = data.map(noteFromDb => ({
+        id: noteFromDb.id,
+        user_id: noteFromDb.user_id,
+        title: noteFromDb.title,
+        content: noteFromDb.content,
+        tags: noteFromDb.tags || [],
+        summary: noteFromDb.summary,
+        createdAt: new Date(noteFromDb.created_at),
+        updatedAt: new Date(noteFromDb.updated_at),
+        pdfStoragePath: noteFromDb.pdf_storage_path,
+        pdfPublicUrl: noteFromDb.pdf_public_url,
+        originalFilename: noteFromDb.original_filename,
+        analysis_status: noteFromDb.analysis_status
+      }));
+
       set({ 
-        notes: data.map(note => ({
-          ...note,
-          createdAt: new Date(note.created_at),
-          updatedAt: new Date(note.updated_at),
-          tags: note.tags || [],
-          summary: note.summary,
-          // Map PDF storage fields
-          pdfStoragePath: note.pdf_storage_path,
-          pdfPublicUrl: note.pdf_public_url,
-          originalFilename: note.original_filename
-        })),
+        notes: formattedNotes,
         isLoading: false,
         pagination: {
           currentPage: page,
@@ -134,31 +107,19 @@ export const useStore = create<State>((set, get) => ({
     }
   },
   
-  loadAllTags: async () => {
-    try {
-        const tags = await getAllUserTags();
-        set({ allTags: tags });
-    } catch(error) {
-        console.error("Store: Failed to load all tags", error);
-    }
-  },
-  
-  setPage: (page) => {
-    const { pagination: { pageSize } } = get();
-    get().loadNotes(page, pageSize);
-  },
-  
-  setPageSize: (size) => {
-    set(state => ({
-      pagination: { ...state.pagination, pageSize: size }
-    }));
-    get().loadNotes(1, size);
-  },
-  
   addNote: async (note) => {
-    set((state) => ({ notes: [note, ...state.notes] }));
-    set({ currentNote: note });
-    return note;
+    const newNote = {
+      ...note,
+      user_id: get().user?.id || '',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      tags: note.tags || [],
+      analysis_status: 'not_started'
+    } as Note;
+    set((state) => ({
+      notes: [newNote, ...state.notes],
+      totalNotes: state.pagination.totalNotes + 1,
+    }));
   },
   
   updateNote: (id, updates) => set((state) => ({
@@ -168,19 +129,15 @@ export const useStore = create<State>((set, get) => ({
   deleteNote: async (id) => {
     try {
       await deleteNoteFromDatabase(id);
-
       console.log("Store: Note deleted from DB. Reloading notes list.");
       const { pagination } = get();
       await get().loadNotes(pagination.currentPage, pagination.pageSize);
-
     } catch (error) {
       console.error("Store: Error during deleteNote action:", error);
       set({ error: error instanceof Error ? error.message : 'Failed to delete note' });
       throw error; 
     }
   },
-  
-  setCurrentNote: (note) => set({ currentNote: note }),
 
   summarizeNote: async (id) => {
     const note = get().notes.find(n => n.id === id);
@@ -226,7 +183,6 @@ export const useStore = create<State>((set, get) => ({
   
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'light' ? 'dark' : 'light';
-    // Save to localStorage
     if (typeof window !== 'undefined') {
       localStorage.setItem('studymind-theme', newTheme);
     }
@@ -237,8 +193,6 @@ export const useStore = create<State>((set, get) => ({
     notes: [],
     concepts: [],
     relationships: [], 
-    linkedConcepts: [],
-    currentNote: null,
     isLoading: false,
     error: null,
     pagination: {
@@ -250,35 +204,19 @@ export const useStore = create<State>((set, get) => ({
   }),
 
   loadConcepts: async () => {
-    if (get().concepts.length > 0) return;
+    if (get().concepts.length > 0) {
+      console.log("Store: Concepts already loaded, skipping fetch.");
+      return;
+    }
 
     set({ isLoading: true, error: null });
     try {
-      const [conceptsResult, relationshipsResult] = await Promise.all([
-        supabase.from('concepts').select('*'),
-        supabase.from('concept_relationships').select('*')
-      ]);
-
-      if (conceptsResult.error) throw conceptsResult.error;
-      if (relationshipsResult.error) throw relationshipsResult.error;
-
-      const concepts: Concept[] = conceptsResult.data || [];
-      const relationships: ConceptRelationship[] = relationshipsResult.data || [];
-
-      const linkedConceptIds = new Set<string>();
-      relationships.forEach(rel => {
-        linkedConceptIds.add(rel.source_id);
-        linkedConceptIds.add(rel.target_id);
-      });
-
-      const linkedConcepts = concepts.filter(concept => linkedConceptIds.has(concept.id));
+      const { concepts, relationships } = await getAllConcepts();
       set({
-        concepts,          
-        relationships,     
-        linkedConcepts,    
+        concepts: concepts as Concept[],          
+        relationships: relationships as ConceptRelationship[],     
         isLoading: false
       });
-
     } catch (error) {
       console.error('Store: Failed to load concepts:', error);
       set({

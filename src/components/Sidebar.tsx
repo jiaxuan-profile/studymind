@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Book, BookOpen, BrainCircuit, Home, X, PenTool, TextQuote as NotebookText, GraduationCap, Clock, Lightbulb, HelpCircle } from 'lucide-react';
+import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle } from 'lucide-react';
 import { useStore } from '../store';
 
 interface SidebarProps {
@@ -11,7 +11,6 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
   const { notes } = useStore();
   
-  // Get recent notes (last 2)
   const recentNotes = [...notes]
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
     .slice(0, 2);
@@ -31,16 +30,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
         </div>
       )}
       
-      {/* Logo with Badge */}
+      {/* Logo */}
       <div className="flex items-center h-16 px-4">
         <div className="flex items-center">
           <Book className="h-8 w-8 text-primary" />
-          <span className="ml-2 text-xl font-bold text-gray-900 dark:text-gray-100">StudyMind</span>
-          <img 
-            src="/white_circle_360x360.png" 
-            alt="StudyMind Badge" 
-            className="w-8 h-8 ml-2 rounded-full border-2 border-primary/20" 
-          />
+          <span className="ml-2 text-xl font-bold text-gray-900 dark:text-gray-100">StudyMind</span>          
         </div>
       </div>
       

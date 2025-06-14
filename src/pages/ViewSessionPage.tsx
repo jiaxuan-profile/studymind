@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   ArrowLeft, ArrowRight, CheckCircle, XCircle, HelpCircle, 
-  BookOpen, History, Clock, Lightbulb, GraduationCap, 
+  BookOpen, History, Clock, Lightbulb, 
   Award, TrendingUp, Brain, Target, Zap
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import PageHeader from '../components/PageHeader';
 
 interface ReviewSession {
   id: string;
@@ -49,7 +50,6 @@ const ViewSessionPage: React.FC = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showHint, setShowHint] = useState(false);
-  const [notesInfo, setNotesInfo] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (sessionId) {
@@ -57,54 +57,36 @@ const ViewSessionPage: React.FC = () => {
     }
   }, [sessionId]);
 
+  useEffect(() => {
+    setShowHint(false);
+  }, [currentQuestionIndex]);
+
   const loadSessionData = async () => {
     setLoading(true);
     try {
-      // First fetch the session
-      const { data: sessionData, error: sessionError } = await supabase
-        .from('review_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
+      // Fetch session and its answers in parallel for speed
+      const [sessionResult, answersResult] = await Promise.all([
+        supabase
+          .from('review_sessions')
+          .select('*')
+          .eq('id', sessionId)
+          .single(),
+        supabase
+          .from('review_answers')
+          .select('*')
+          .eq('session_id', sessionId)
+          .order('question_index', { ascending: true })
+      ]);
 
-      if (sessionError) throw sessionError;
-      setSession(sessionData as ReviewSession);
+      if (sessionResult.error) throw sessionResult.error;
+      if (answersResult.error) throw answersResult.error;
 
-      // Then fetch all notes referenced in selected_notes
-      const { data: notesData, error: notesError } = await supabase
-        .from('notes')
-        .select('id, title')
-        .in('id', sessionData.selected_notes);
-
-      if (notesError) throw notesError;
-    
-      // Create mapping of note IDs to titles
-      const notesMap = (sessionData.notes || []).reduce((acc: Record<string, string>, note: any) => {
-        acc[note.id] = note.title;
-        return acc;
-      }, {});
-
-      setNotesInfo(notesMap);
-
-      // Then fetch answers
-      const { data: answersData, error: answersError } = await supabase
-        .from('review_answers')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('question_index', { ascending: true });
-
-      if (answersError) throw answersError;
-      
-      // Enhance answers with note titles
-      const enhancedAnswers = (answersData as ReviewAnswer[]).map(answer => ({
-        ...answer,
-        note_title: answer.note_title || notesMap[answer.note_id] || 'Unknown note'
-      }));
-  
-      setAnswers(enhancedAnswers);
+      setSession(sessionResult.data as ReviewSession);
+      setAnswers(answersResult.data as ReviewAnswer[]);
 
     } catch (error) {
       console.error('Error loading session data:', error);
+      setSession(null); // Clear session on error
     } finally {
       setLoading(false);
     }
@@ -168,51 +150,32 @@ const ViewSessionPage: React.FC = () => {
   }
 
   const currentAnswer = answers[currentQuestionIndex];
-  const noteTitle = currentAnswer?.note_title || 
-                    notesInfo[currentAnswer?.note_id] || 
-                    'Unknown note';
-
-  // Calculate accurate stats based on answers
-  const calculatedStats = answers.reduce((acc, answer) => {
-    if (answer.difficulty_rating) {
-      acc[answer.difficulty_rating]++;
-      acc.rated++;
-    }
-    return acc;
-  }, { easy: 0, medium: 0, hard: 0, rated: 0 });
+  const noteTitle = currentAnswer?.note_title || 'Unknown note';
 
   return (
     <div className="fade-in">
-      <div className="mb-6 flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <GraduationCap className="h-8 w-8 text-primary mr-3" />
-            {session.session_name || `Session ${new Date(session.started_at).toLocaleDateString()} ${new Date(session.started_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`}
-          </h1>
-          <p className="mt-2 text-gray-600">
-            Reviewing your past session - {new Date(session.started_at).toLocaleDateString()}
-          </p>
-        </div>
-
-        <div className="flex items-center space-x-4">
-          {(session.duration_seconds ?? 0) > 0 && (
-            <div className="bg-primary/10 text-primary px-3 py-1 rounded-lg font-medium flex items-center">
-              <Clock className="h-4 w-4 mr-2" />
-              {formatDuration(session.duration_seconds ?? 0)}
-            </div>
-          )}          
-          <button
-            onClick={() => navigate('/history')}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to History
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title={session.session_name || `Session from ${new Date(session.started_at).toLocaleDateString()}`}
+        subtitle={`Reviewed on ${new Date(session.completed_at || session.started_at).toLocaleString()}`}
+      >
+        {(session.duration_seconds ?? 0) > 0 && (
+          <div className="bg-primary/10 text-primary px-3 py-1 rounded-lg font-medium flex items-center">
+            <Clock className="h-4 w-4 mr-2" />
+            {formatDuration(session.duration_seconds ?? 0)}
+          </div>
+        )}          
+        <button
+          onClick={() => navigate('/history')}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to History
+        </button>
+      </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
+          {/* Main Content Area */}
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
             <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-4 border-b border-gray-200">
               <div className="flex justify-between items-center mb-3">
@@ -365,6 +328,7 @@ const ViewSessionPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Stats Side Panel */}
         <div className="space-y-6">
           <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
             <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-gray-200">
@@ -376,14 +340,14 @@ const ViewSessionPage: React.FC = () => {
             <div className="p-4 space-y-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary">
-                    {calculatedStats.rated}
+                  {session.questions_rated}
                 </div>
                 <div className="text-sm text-gray-600">Questions Rated</div>
               </div>
               
               <div className="text-center">
                 <div className="text-lg font-bold text-secondary">
-                    {answers.length}
+                  {session.questions_answered}
                 </div>
                 <div className="text-sm text-gray-600">Questions Answered</div>
               </div>
@@ -394,21 +358,21 @@ const ViewSessionPage: React.FC = () => {
                     {getDifficultyIcon('easy')}
                     <span className="ml-1">Easy</span>
                   </span>
-                  <span className="font-medium">{calculatedStats.easy}</span>
+                  <span className="font-medium">{session.easy_ratings}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-yellow-600 flex items-center">
                     {getDifficultyIcon('medium')}
                     <span className="ml-1">Medium</span>
                   </span>
-                  <span className="font-medium">{calculatedStats.medium}</span>
+                  <span className="font-medium">{session.medium_ratings}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-red-600 flex items-center">
                     {getDifficultyIcon('hard')}
                     <span className="ml-1">Hard</span>
                   </span>
-                  <span className="font-medium">{calculatedStats.hard}</span>
+                  <span className="font-medium">{session.hard_ratings}</span>
                 </div>
               </div>
             </div>

@@ -2,14 +2,16 @@
 import typography from '@tailwindcss/typography';
 
 export default {
+  darkMode: 'class',
+  
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
         primary: {
-          light: '#818CF8',
-          DEFAULT: '#6366F1',
-          dark: '#4F46E5',
+          light: '#818CF8',    
+          DEFAULT: '#6366F1',  
+          dark: '#4F46E5',     
         },
         secondary: {
           light: '#34D399',
@@ -21,86 +23,114 @@ export default {
           DEFAULT: '#F59E0B',
           dark: '#D97706',
         },
-        success: {
-          DEFAULT: '#059669',
+        gray: { 
+          50: '#F9FAFB',
+          100: '#F3F4F6',
+          200: '#E5E7EB',
+          300: '#D1D5DB',
+          400: '#9CA3AF',
+          500: '#6B7280',
+          600: '#4B5563',
+          700: '#374151',
+          800: '#1F2937',
+          900: '#111827',
         },
-        warning: {
-          DEFAULT: '#FBBF24',
-        },
-        error: {
-          DEFAULT: '#EF4444',
-        },
+        success: { DEFAULT: '#059669' },
+        warning: { DEFAULT: '#FBBF24' },
+        error: { DEFAULT: '#EF4444' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
-      typography: {
+      typography: (theme) => ({
         DEFAULT: {
           css: {
             maxWidth: 'none',
-            color: '#374151',
+            color: theme('colors.gray.700'), 
             a: {
-              color: '#6366F1',
+              color: theme('colors.primary.DEFAULT'),
               '&:hover': {
-                color: '#4F46E5',
+                color: theme('colors.primary.dark'),
               },
+              textDecoration: 'none', 
             },
-            h1: {
-              color: '#111827',
-              fontWeight: '700',
-            },
-            h2: {
-              color: '#1F2937',
-              fontWeight: '700',
-            },
-            h3: {
-              color: '#1F2937',
-              fontWeight: '600',
-            },
-            h4: {
-              color: '#1F2937',
-              fontWeight: '600',
-            },
+            h1: { color: theme('colors.gray.900'), fontWeight: '700' },
+            h2: { color: theme('colors.gray.800'), fontWeight: '700' }, 
+            h3: { color: theme('colors.gray.800'), fontWeight: '600' },
+            h4: { color: theme('colors.gray.800'), fontWeight: '600' },
+            strong: { color: theme('colors.gray.900') },
             code: {
-              color: '#F3F4F6', // Lighter text for better contrast
-              backgroundColor: '#1F2937', // Dark background
-              padding: '0.25rem 0.5rem',
-              borderRadius: '0.375rem',
+              color: theme('colors.primary.dark'), 
+              backgroundColor: theme('colors.gray.100'),
+              padding: '0.2em 0.4em',
+              borderRadius: '0.25rem',
               fontWeight: '500',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              fontSize: '0.875em',
             },
-            'pre code': {
+            'code::before': { content: '""' }, 
+            'code::after': { content: '""' },  
+            pre: {
+              backgroundColor: theme('colors.gray.100'), 
+              color: theme('colors.gray.800'),  
+              padding: theme('spacing.4'),   
+              borderRadius: theme('borderRadius.md'),
+              border: `1px solid ${theme('colors.gray.200')}`,
+              overflowX: 'auto',
+            },
+            'pre code': { 
               backgroundColor: 'transparent',
-              color: '#F3F4F6',
+              color: 'inherit',
               padding: '0',
               borderRadius: '0',
-              fontFamily: 'inherit',
+              fontWeight: 'normal',
+              fontSize: 'inherit',
             },
-            pre: {
-              backgroundColor: '#1F2937',
-              color: '#F3F4F6',
-              padding: '1.25rem',
-              borderRadius: '0.5rem',
-              border: '1px solid #374151',
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-              fontSize: '0.875rem',
-              lineHeight: '1.5',
-              margin: '1.5rem 0',
-              overflowX: 'auto',
+            blockquote: {
+              color: theme('colors.gray.600'),
+              borderLeftColor: theme('colors.gray.300'),
             }
           },
         },
-      },
-      backgroundImage: {
+        invert: { 
+          css: {
+            color: theme('colors.gray.300'), 
+            a: {
+              color: theme('colors.primary.light'), 
+              '&:hover': {
+                color: theme('colors.primary.DEFAULT'),
+              },
+            },
+            h1: { color: theme('colors.gray.100') },
+            h2: { color: theme('colors.gray.200') },
+            h3: { color: theme('colors.gray.200') },
+            h4: { color: theme('colors.gray.200') },
+            strong: { color: theme('colors.gray.100') },
+            code: { 
+              color: theme('colors.secondary.light'),
+              backgroundColor: theme('colors.gray.700'), 
+            },
+            pre: { 
+              backgroundColor: theme('colors.gray.800'), 
+              color: theme('colors.gray.200'),     
+              border: `1px solid ${theme('colors.gray.700')}`,
+            },
+            blockquote: {
+              color: theme('colors.gray.400'),
+              borderLeftColor: theme('colors.gray.600'),
+            },
+          },
+        },
+      }),
+      backgroundImage: { 
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
         'gradient-conic': 'conic-gradient(var(--tw-gradient-stops))',
       },
-      keyframes: {
+      keyframes: { 
         shimmer: {
           '100%': { transform: 'translateX(100%)' },
         },
       },
-      animation: {
+      animation: { 
         shimmer: 'shimmer 2s infinite',
       },
     },

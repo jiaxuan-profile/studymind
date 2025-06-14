@@ -1,3 +1,4 @@
+/* src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -287,3 +288,20 @@
 .glass-card:hover::before {
   left: 100%;
 }
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.quick-action-btn { @apply inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100; }

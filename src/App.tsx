@@ -1,7 +1,8 @@
-import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+// src/AppRoutes.tsx
+import React, { useEffect, useCallback } from 'react';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ToastProvider } from './contexts/ToastContext';
+import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -29,12 +30,14 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     );
   }
   
-  return user ? <>{children}</> : <Navigate to="/login" />;
+  return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function AppRoutes() {
-  const { loadNotes, resetStore, theme } = useStore();
-  const { user } = useAuth();
+  const { loadNotes: storeLoadNotes, resetStore: storeResetStore, theme } = useStore();
+  const { user, signOut } = useAuth();
+  const { addToast } = useToast();
+  const navigate = useNavigate();
 
   // Apply theme to document
   useEffect(() => {
@@ -44,14 +47,33 @@ function AppRoutes() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
+    
+  const loadNotes = useCallback(() => {
+    storeLoadNotes();
+  }, [storeLoadNotes]);
+
+  const resetStore = useCallback(() => {
+    storeResetStore();
+  }, [storeResetStore]);
+
+  const handleLogout = useCallback(async () => {
+    if (!window.confirm('Are you sure you want to logout?')) return;
+    try {
+      await signOut();
+      resetStore();
+      addToast('Logged out successfully', 'success');
+      navigate('/login');
+    } catch (error) {
+      addToast('Failed to logout', 'error');
+      console.error('Logout error:', error);
+    }
+  }, [signOut, resetStore, addToast, navigate]);
 
   useEffect(() => {
     if (user) {
-      // User is logged in, so load their essential data immediately.
       console.log("AppRoutes: User detected, triggering initial data load.");
-      loadNotes(); // <-- THIS IS THE KEY FIX
+      loadNotes(); 
     } else {
-      // User is logged out, clear any lingering data.
       console.log("AppRoutes: No user detected, resetting store.");
       resetStore();
     }
@@ -65,7 +87,7 @@ function AppRoutes() {
         
         <Route path="/" element={
           <PrivateRoute>
-            <Layout />
+            <Layout onLogout={handleLogout} />
           </PrivateRoute>
         }>
           <Route index element={<HomePage />} />
@@ -80,7 +102,6 @@ function AppRoutes() {
         </Route>
       </Routes>
       
-      {/* Toast Container - positioned globally */}
       <ToastContainer />
     </>
   );

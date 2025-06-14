@@ -9,14 +9,13 @@ interface NotePayload {
   user_id: string;
   title: string;
   content: string;
-  summary?: string;
+  summary?: string | null;
   tags: string[];
   embedding?: number[]; 
   updatedAt: string;
   createdAt?: string;
   contentHash?: string;
   analysis_status?: string;
-  // PDF storage fields
   pdf_storage_path?: string;
   pdf_public_url?: string;
   original_filename?: string;
@@ -302,39 +301,6 @@ export async function updateNoteSummary(id: string, summary: string) {
   }
 }
 
-export async function getAllConcepts() {
-  try {
-    console.log("Database Service: Fetching all concepts");
-    
-    // 'concepts' and 'concept_relationships' are global and publicly readable per 'global_concepts.sql'
-    const { data: concepts, error: conceptsError } = await supabase
-      .from('concepts')
-      .select('*');
-
-    if (conceptsError) throw conceptsError;
-
-    const { data: relationships, error: relError } = await supabase
-      .from('concept_relationships')
-      .select('*');
-
-    if (relError) throw relError;
-
-    // 'note_concepts' is protected by RLS based on the current user's notes.
-    // This query will correctly and safely return only the concepts linked to the user's notes.
-    const { data: noteConcepts, error: ncError } = await supabase
-      .from('note_concepts')
-      .select('*');
-
-    if (ncError) throw ncError;
-
-    return { concepts, relationships, noteConcepts };
-
-  } catch (error) {
-    console.error('Database Service: Error fetching concepts:', error);
-    throw error;
-  }
-}
-
 export async function getConceptCategories() {
   try {
     // Get current user
@@ -424,4 +390,34 @@ export async function getAllUserTags() {
       return [];
   }
   return data;
+}
+
+export async function getAllConcepts() {
+  try {
+    console.log("Database Service: Fetching all concepts");
+    
+    const { data: concepts, error: conceptsError } = await supabase
+      .from('concepts')
+      .select('*');
+
+    if (conceptsError) throw conceptsError;
+
+    const { data: relationships, error: relError } = await supabase
+      .from('concept_relationships')
+      .select('*');
+
+    if (relError) throw relError;
+
+    const { data: noteConcepts, error: ncError } = await supabase
+      .from('note_concepts')
+      .select('*');
+
+    if (ncError) throw ncError;
+
+    return { concepts, relationships, noteConcepts };
+
+  } catch (error) {
+    console.error('Database Service: Error fetching concepts:', error);
+    throw error;
+  }
 }

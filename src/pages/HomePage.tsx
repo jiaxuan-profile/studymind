@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { PlusCircle, Clock, BookOpen, BrainCircuit } from 'lucide-react';
+import BoltBadge from '../components/BoltBadge';
 
 const HomePage: React.FC = () => {
   const { notes, concepts, isLoading, error } = useStore();
@@ -65,11 +66,14 @@ const HomePage: React.FC = () => {
   
   return (
     <div className="fade-in">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome to StudyMind</h1>
-        <p className="mt-2 text-gray-600 dark:text-gray-300">
-          Your AI-powered study assistant that helps you understand and connect information
-        </p>
+      <div className="mb-6 flex items-center gap-4">
+        <BoltBadge className="w-20 h-20" /> 
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome to StudyMind</h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-300">
+            Your AI-powered study assistant that helps you understand and connect information
+          </p>
+        </div>
       </div>
       
       {/* Quick Actions */}

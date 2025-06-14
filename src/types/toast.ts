@@ -1,3 +1,4 @@
+// src/types/toast.ts
 export interface Toast {
   id: string;
   message: string;

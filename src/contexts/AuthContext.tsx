@@ -1,5 +1,4 @@
-// src/contexts/AuthContext.tsx:
-
+// src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase, getCurrentUser, resetPassword, updatePassword, updateEmail } from '../services/supabase';
 import type { User } from '@supabase/supabase-js';
@@ -14,6 +13,7 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<void>;
   changePassword: (newPassword: string) => Promise<void>;
   changeEmail: (newEmail: string) => Promise<void>;
+  clearError: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,8 +23,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
+  const clearError = () => setError(null);
+
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    getCurrentUser().then((user) => {
+      setUser(user);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state changed:', event);
       setUser(session?.user ?? null);
       setLoading(false);
     });
@@ -34,61 +42,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const handleAuthOperation = async (operation: () => Promise<void>) => {
+    setLoading(true);
+    clearError();
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      await operation();
     } catch (error) {
       setError(error as Error);
       throw error;
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    return handleAuthOperation(async () => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    });
   };
 
   const signUp = async (email: string, password: string) => {
-    try {
+    return handleAuthOperation(async () => {
       const { error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
-    } catch (error) {
-      setError(error as Error);
-      throw error;
-    }
+    });
   };
 
   const signOut = async () => {
-    try {
+    return handleAuthOperation(async () => {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
-    } catch (error) {
-      setError(error as Error);
-      throw error;
-    }
+      setUser(null);
+    });
   };
 
   const forgotPassword = async (email: string) => {
-    try {
+    return handleAuthOperation(async () => {
       await resetPassword(email);
-    } catch (error) {
-      setError(error as Error);
-      throw error;
-    }
+    });
   };
 
   const changePassword = async (newPassword: string) => {
-    try {
+    return handleAuthOperation(async () => {
       await updatePassword(newPassword);
-    } catch (error) {
-      setError(error as Error);
-      throw error;
-    }
+    });
   };
 
   const changeEmail = async (newEmail: string) => {
-    try {
+    return handleAuthOperation(async () => {
       await updateEmail(newEmail);
-    } catch (error) {
-      setError(error as Error);
-      throw error;
-    }
+    });
   };
 
   return (
@@ -102,7 +106,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signOut,
         forgotPassword,
         changePassword,
-        changeEmail
+        changeEmail,
+        clearError
       }}
     >
       {children}

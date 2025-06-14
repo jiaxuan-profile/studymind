@@ -1,21 +1,21 @@
+// src/components/Header.tsx
 import React, { useState } from 'react';
 import { Menu, Search, Bell, Moon, Sun, LogOut } from 'lucide-react';
 import { useStore } from '../store';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import NotificationCenter from './NotificationCenter';
 
 interface HeaderProps {
   toggleSidebar: () => void;
+  onLogout: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
+const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [showNotificationCenter, setShowNotificationCenter] = useState(false);
   const { theme, toggleTheme, notes } = useStore();
-  const { signOut } = useAuth();
   const { unreadCount } = useNotifications();
   const navigate = useNavigate();
   
@@ -25,7 +25,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         note.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         note.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
         note.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-      ).slice(0, 5) // Limit to 5 results
+      ).slice(0, 5) 
     : [];
 
   const handleSearchSubmit = (e: React.FormEvent) => {
@@ -50,17 +50,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   };
 
   const handleSearchBlur = () => {
-    // Delay hiding results to allow clicking on them
     setTimeout(() => setShowSearchResults(false), 200);
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      navigate('/login');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
   };
   
   return (
@@ -181,7 +171,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
             </button>
             
             <button 
-              onClick={handleSignOut}
+              onClick={onLogout}
               className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
               title="Sign out"
             >

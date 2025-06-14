@@ -9,6 +9,7 @@ import {
   Edit3, History, Clock, List, MessageSquare, FileQuestion
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
+import PageHeader from '../components/PageHeader';
 
 // Interfaces specific to the review process
 interface Question {
@@ -386,15 +387,14 @@ const ReviewPage: React.FC = () => {
   if (currentStep === 'select') {
     return (
       <div className="fade-in">
-        <div className="mb-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center"><GraduationCap className="h-8 w-8 text-primary mr-3" />Review Session Setup</h1>
-            <p className="mt-2 text-gray-600">Select notes, difficulty level, and question type to start your review session</p>
-          </div>
+        <PageHeader 
+          title="Review Session Setup"
+          subtitle="Select notes, difficulty level, and question type to start your review session"
+        >
           <Link to="/history" className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
             <History className="h-4 w-4 mr-2" /> View History
           </Link>
-        </div>
+        </PageHeader>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">

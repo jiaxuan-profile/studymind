@@ -1,3 +1,4 @@
+// src/components/note-detail/NoteMindMap.tsx
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { 
@@ -9,8 +10,8 @@ import {
   Brain,
   Loader2
 } from 'lucide-react';
-import { GraphData, GraphNode, GraphLink } from '../types';
-import { getNoteConceptsForMindMap } from '../services/aiService';
+import { GraphData, GraphNode, GraphLink } from '../../types';
+import { getNoteConceptsForMindMap } from '../../services/aiService';
 
 interface NoteMindMapProps {
   noteId: string;
