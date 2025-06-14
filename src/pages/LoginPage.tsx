@@ -147,7 +147,7 @@ const LoginPage: React.FC = () => {
                 className={activeDemoUser === 'power' ? primaryButtonClasses : secondaryButtonClasses}
               >
                 <UserCheck className="h-4 w-4 mr-2" />
-                Login as Power User
+                Login as Demo User
               </button>
             </div>
           </div>
