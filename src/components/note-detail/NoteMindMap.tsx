@@ -85,7 +85,42 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
       if (relationshipsError) throw relationshipsError;
 
-      const nodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
+      // Filter out orphan nodes - only include concepts that have relationships
+      const connectedConceptIds = new Set<string>();
+      const validRelationships = (relationshipsData || []).filter(rel => 
+        conceptIds.includes(rel.source_id) && conceptIds.includes(rel.target_id)
+      );
+
+      validRelationships.forEach(rel => {
+        connectedConceptIds.add(rel.source_id);
+        connectedConceptIds.add(rel.target_id);
+      });
+
+      // Only include concepts that are connected to other concepts
+      const connectedConcepts = noteConceptsData.filter(nc => 
+        connectedConceptIds.has(nc.concepts.id)
+      );
+
+      // If no connected concepts, don't show the mind map
+      if (connectedConcepts.length === 0) {
+        setGraphData({ nodes: [], links: [] });
+        return;
+      }
+
+      // Create the central note node
+      const noteNode: GraphNode = {
+        id: `note-${noteId}`,
+        name: noteTitle,
+        definition: 'This note contains the concepts shown below',
+        val: 3, // Larger than concept nodes
+        color: '#4F46E5', // Primary color for the note node
+        category: 'note',
+        hasDefinition: true,
+        isNoteNode: true
+      };
+
+      // Create concept nodes
+      const conceptNodes: GraphNode[] = connectedConcepts.map((nc, index) => ({
         id: nc.concepts.id,
         name: nc.concepts.name,
         definition: nc.concepts.definition,
@@ -94,17 +129,27 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim())
       }));
 
-      const links: GraphLink[] = (relationshipsData || [])
-        .filter(rel => 
-          conceptIds.includes(rel.source_id) && 
-          conceptIds.includes(rel.target_id)
-        )
-        .map(rel => ({
-          source: rel.source_id,
-          target: rel.target_id,
-          value: rel.strength || 0.5,
-          relationshipType: rel.relationship_type
-        }));
+      // Combine all nodes
+      const nodes: GraphNode[] = [noteNode, ...conceptNodes];
+
+      // Create links from note to each concept
+      const noteToConceptLinks: GraphLink[] = connectedConcepts.map(nc => ({
+        source: `note-${noteId}`,
+        target: nc.concepts.id,
+        value: 0.8,
+        relationshipType: 'contains'
+      }));
+
+      // Create concept-to-concept links
+      const conceptLinks: GraphLink[] = validRelationships.map(rel => ({
+        source: rel.source_id,
+        target: rel.target_id,
+        value: rel.strength || 0.5,
+        relationshipType: rel.relationship_type
+      }));
+
+      // Combine all links
+      const links: GraphLink[] = [...noteToConceptLinks, ...conceptLinks];
 
       setGraphData({ nodes, links });
 
@@ -118,8 +163,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
   const getConceptColor = (index: number, relevance: number): string => {
     const baseColors = [
-      '#6366F1', '#10B981', '#F59E0B', '#EF4444', 
-      '#8B5CF6', '#06B6D4', '#84CC16', '#F97316',
+      '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', 
+      '#06B6D4', '#84CC16', '#F97316', '#EC4899',
     ];
     const baseColor = baseColors[index % baseColors.length];
     const opacity = Math.max(0.6, relevance);
@@ -135,6 +180,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
       case 'prerequisite': return '#EF4444';
       case 'builds-upon': return '#10B981';
       case 'related': return '#6366F1';
+      case 'contains': return '#9CA3AF'; // Gray for note-to-concept links
       default: return '#9CA3AF';
     }
   };
@@ -257,6 +303,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               <div className="flex items-center"><div className="w-3 h-0.5 bg-red-500 mr-1"></div>Prerequisite</div>
               <div className="flex items-center"><div className="w-3 h-0.5 bg-green-500 mr-1"></div>Builds Upon</div>
               <div className="flex items-center"><div className="w-3 h-0.5 bg-blue-500 mr-1"></div>Related</div>
+              <div className="flex items-center"><div className="w-3 h-0.5 bg-gray-400 mr-1"></div>Contains</div>
             </div>
             <label className="flex items-center cursor-pointer">
               <input
@@ -305,23 +352,6 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
         )}
 
-        {!loading && !error && graphData.nodes.length > 0 && graphData.links.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center max-w-md mx-auto p-6">
-              <Brain className="h-12 w-12 text-amber-400 dark:text-amber-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Concepts Found, No Connections</h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                This note has {graphData.nodes.length} concept(s), but no relationships were identified between them. 
-                This could mean the concepts are independent or more content analysis is needed to establish connections.
-              </p>
-              <button
-                onClick={loadConceptsFromDatabase}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
-              ><Database className="h-4 w-4 mr-2" />Refresh Analysis</button>
-            </div>
-          </div>
-        )}
-
         {!loading && !error && graphData.nodes.length > 0 && graphData.links.length > 0 && (
           <ForceGraph2D
             ref={graphRef}
@@ -348,40 +378,59 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
               ctx.globalAlpha = isDimmed ? 0.3 : 1.0;
               
-              ctx.beginPath();
-              ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
-              ctx.fillStyle = color;
-              ctx.fill();
+              // Special rendering for note node
+              if (n.isNoteNode) {
+                // Draw a larger, distinct shape for the note node
+                ctx.beginPath();
+                ctx.roundRect(n.x! - nodeRadius * 1.2, n.y! - nodeRadius * 0.8, nodeRadius * 2.4, nodeRadius * 1.6, 8);
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                if (isSelected || isConnected) {
+                  ctx.strokeStyle = '#4338CA';
+                  ctx.lineWidth = 3 / globalScale;
+                  ctx.stroke();
+                }
+              } else {
+                // Regular circular nodes for concepts
+                ctx.beginPath();
+                ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
+                ctx.fillStyle = color;
+                ctx.fill();
 
-              if (isSelected || isConnected) {
-                ctx.strokeStyle = isSelected ? '#4338CA' : '#818CF8';
-                ctx.lineWidth = 2 / globalScale;
-                ctx.stroke();
+                if (isSelected || isConnected) {
+                  ctx.strokeStyle = isSelected ? '#4338CA' : '#818CF8';
+                  ctx.lineWidth = 2 / globalScale;
+                  ctx.stroke();
+                }
               }
 
+              // Add definition indicator
               if (n.hasDefinition) {
                 const iconSize = Math.max(1, 3 / globalScale);
                 const iconX = n.x! + nodeRadius - iconSize * 0.9;
                 const iconY = n.y! - nodeRadius + iconSize * 0.9;
-                ctx.beginPath(); ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
-                ctx.fillStyle = '#3B82F6'; ctx.fill();
-                ctx.fillStyle = 'white'; ctx.font = `${iconSize * 1.2}px Arial`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('i', iconX, iconY);
-              } else {
-                const iconSize = Math.max(0.8, 2 / globalScale);
-                const iconX = n.x! + nodeRadius - iconSize * 0.9;
-                const iconY = n.y! - nodeRadius + iconSize * 0.9;
-                ctx.beginPath(); ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
-                ctx.fillStyle = '#9CA3AF'; ctx.fill();
+                ctx.beginPath(); 
+                ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
+                ctx.fillStyle = '#3B82F6'; 
+                ctx.fill();
+                ctx.fillStyle = 'white'; 
+                ctx.font = `${iconSize * 1.2}px Arial`;
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle'; 
+                ctx.fillText('i', iconX, iconY);
               }
 
+              // Add labels if enabled and zoom is sufficient
               if (labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
                 ctx.font = `${12 / globalScale}px Sans-Serif`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
                 const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
                 ctx.fillStyle = isDarkMode ? '#E5E7EB' : '#1f2937';
                 ctx.fillText(n.name, n.x!, n.y! + nodeRadius + 8 / globalScale);
               }
+              
               ctx.globalAlpha = 1.0;
             }}
             linkWidth={(link: any) => { 
@@ -409,7 +458,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 const midY = (sourceNode.y + targetNode.y) / 2;
                 
                 ctx.font = `${8 / globalScale}px Sans-Serif`;
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.textAlign = 'center'; 
+                ctx.textBaseline = 'middle';
                 const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
                 ctx.fillStyle = getLinkColor(l.relationshipType);
                 ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; 
@@ -435,6 +485,9 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 {selectedNode.hasDefinition && (
                   <Info className="h-4 w-4 text-blue-500 dark:text-blue-400 ml-2" title="Has definition" />
                 )}
+                {selectedNode.isNoteNode && (
+                  <span className="ml-2 px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full">Note</span>
+                )}
               </div>
               {selectedNode.definition && selectedNode.definition.trim() ? (
                 <p className="text-sm text-gray-600 dark:text-gray-300">{selectedNode.definition}</p>
@@ -445,7 +498,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 Connected to {graphData.links.filter(link => { 
                     return link.source === selectedNode.id || link.target === selectedNode.id;
                   }
-                ).length} other concepts
+                ).length} other {selectedNode.isNoteNode ? 'concepts' : 'nodes'}
               </div>
             </div>
             <button
