@@ -8,7 +8,7 @@ import { Note } from '../types';
 import { generateEmbeddingOnClient } from './embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from './databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from './aiService';
-import { uploadPDFToStorage, PDFStorageInfo } from './pdfStorageService';
+import { uploadPDFToStorage, PDFUploadResult } from './pdfStorageService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.mjs';
 
@@ -101,7 +101,7 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
     const noteId = Math.random().toString(36).substring(2, 11);
     const title = file.name.replace(/\.[^/.]+$/, "");
   
-    let pdfStorageInfo: PDFStorageInfo | null = null;
+    let pdfStorageInfo: PDFUploadResult | null = null; 
     if (fileType === 'pdf') {
       onProgress('Uploading PDF file...', 'info');
       try {
