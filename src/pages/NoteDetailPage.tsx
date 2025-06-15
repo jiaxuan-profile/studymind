@@ -68,20 +68,26 @@ const NoteDetailPage: React.FC = () => {
   }, [location.state, navigate, location.pathname]);
   
   useEffect(() => {
-    setRelatedNotes([]);
-    setIsFindingRelated(false);
-    setViewMode('text');
-    setActiveTab('content');
+    const currentNoteId = id;
+    const foundNote = notes.find((n) => n.id === currentNoteId);
 
-    const foundNote = notes.find((n) => n.id === id);
-
-    if (id && !foundNote && notes.length > 0) {
-      addToast(`Note with ID ${id} could not be found.`, 'error');
+    if (currentNoteId && !foundNote && notes.length > 0) {
+      addToast(`Note with ID ${currentNoteId} could not be found.`, 'error');
       navigate('/notes', { replace: true });
       return;
     }
 
     if (foundNote) {
+      // Only reset state if we're switching to a different note
+      const isNewNote = !note || note.id !== foundNote.id;
+      
+      if (isNewNote) {
+        setRelatedNotes([]);
+        setIsFindingRelated(false);
+        setViewMode('text');
+        setActiveTab('content'); // Only reset tab when switching notes
+      }
+
       setNote(foundNote);
       setEditedNote({
         title: foundNote.title,
