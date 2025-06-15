@@ -24,12 +24,14 @@ interface ReviewSessionListProps {
   sessions: ReviewSession[];
   loading: boolean;
   searchTerm: string;
+  onDelete: (sessionId: string, e: React.MouseEvent) => void;
 }
 
 const ReviewSessionList: React.FC<ReviewSessionListProps> = ({
   sessions,
   loading,
   searchTerm,
+  onDelete,
 }) => {
   if (loading) {
     return (
@@ -47,7 +49,11 @@ const ReviewSessionList: React.FC<ReviewSessionListProps> = ({
   return (
     <ul className="divide-y divide-gray-200 dark:divide-gray-700">
       {sessions.map((session) => (
-        <ReviewSessionCard key={session.id} session={session} />
+        <ReviewSessionCard 
+          key={session.id} 
+          session={session} 
+          onDelete={onDelete}
+        />
       ))}
     </ul>
   );

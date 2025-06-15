@@ -1,7 +1,7 @@
 // src/components/review-history/ReviewSessionCard.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, ChevronRight } from 'lucide-react';
+import { Clock, ChevronRight, Trash2 } from 'lucide-react';
 import RatingBubble from './RatingBubble';
 
 interface ReviewSession {
@@ -23,14 +23,21 @@ interface ReviewSession {
 
 interface ReviewSessionCardProps {
   session: ReviewSession;
+  onDelete: (sessionId: string, e: React.MouseEvent) => void;
 }
 
-const ReviewSessionCard: React.FC<ReviewSessionCardProps> = ({ session }) => {
+const ReviewSessionCard: React.FC<ReviewSessionCardProps> = ({ session, onDelete }) => {
   const formatDuration = (seconds: number | undefined) => {
     if (seconds === undefined || seconds <= 0) return null;
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}m ${s}s`;
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDelete(session.id, e);
   };
 
   return (
@@ -51,6 +58,8 @@ const ReviewSessionCard: React.FC<ReviewSessionCardProps> = ({ session }) => {
                   className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     session.session_status === 'completed' 
                       ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
+                      : session.session_status === 'in_progress'
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
                       : 'bg-gray-100 dark:bg-gray-600 text-gray-800 dark:text-gray-200'
                   }`}
                 >
@@ -70,14 +79,23 @@ const ReviewSessionCard: React.FC<ReviewSessionCardProps> = ({ session }) => {
           </div>
           <div className="ml-4 flex-shrink-0 flex items-center">
             <div 
-              className="flex -space-x-2 overflow-hidden" 
+              className="flex -space-x-2 overflow-hidden mr-4" 
               title="Your difficulty ratings for this session (Easy, Medium, Hard)"
             >
               <RatingBubble type="easy" count={session.easy_ratings} />
               <RatingBubble type="medium" count={session.medium_ratings} />
               <RatingBubble type="hard" count={session.hard_ratings} />
             </div>
-            <ChevronRight className="h-5 w-5 text-gray-400 ml-4 group-hover:text-primary transition-colors" />
+            
+            <button
+              onClick={handleDeleteClick}
+              className="p-2 rounded-full hover:bg-red-100 dark:hover:bg-red-900/50 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors mr-2"
+              title="Delete session"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+            
+            <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-primary transition-colors" />
           </div>
         </div>
       </Link>

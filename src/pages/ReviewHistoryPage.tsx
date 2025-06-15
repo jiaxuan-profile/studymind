@@ -4,12 +4,15 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { useDebounce } from '../hooks/useDebounce';
+import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../contexts/NotificationContext';
 
 // Import the new components
 import ReviewHistoryHeader from '../components/review-history/ReviewHistoryHeader';
 import ReviewHistoryFilterBar from '../components/review-history/ReviewHistoryFilterBar';
 import ReviewSessionList from '../components/review-history/ReviewSessionList';
 import ReviewHistoryPagination from '../components/review-history/ReviewHistoryPagination';
+import Dialog from '../components/Dialog';
 
 interface ReviewSession {
   id: string;
@@ -39,8 +42,15 @@ const ReviewHistoryPage: React.FC = () => {
     totalSessions: 0 
   });
   
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [sessionToDeleteId, setSessionToDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const navigate = useNavigate();
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const { addToast } = useToast();
+  const { addNotification } = useNotifications();
 
   useEffect(() => {
     loadReviewSessions(pagination.currentPage, pagination.pageSize, debouncedSearchTerm);
@@ -83,6 +93,7 @@ const ReviewHistoryPage: React.FC = () => {
       }));
     } catch (error) {
       console.error('Error loading review sessions:', error);
+      addToast('Failed to load review sessions', 'error');
     } finally {
       setLoading(false);
     }
@@ -107,6 +118,62 @@ const ReviewHistoryPage: React.FC = () => {
     navigate('/review');
   };
 
+  const handleDeleteClick = (sessionId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSessionToDeleteId(sessionId);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!sessionToDeleteId) return;
+
+    setIsDeleting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Get session name for notification
+      const sessionToDelete = reviewSessions.find(s => s.id === sessionToDeleteId);
+      const sessionName = sessionToDelete?.session_name || 
+        `Review ${sessionToDelete ? new Date(sessionToDelete.started_at).toLocaleString() : 'Session'}`;
+
+      // Delete the session (this will cascade delete all associated review_answers)
+      const { error } = await supabase
+        .from('review_sessions')
+        .delete()
+        .eq('id', sessionToDeleteId)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      // Close dialog and reset state
+      setShowDeleteDialog(false);
+      setSessionToDeleteId(null);
+
+      // Show success messages
+      addToast('Review session deleted successfully', 'success');
+      addNotification(`Review session "${sessionName}" was deleted`, 'info', 'Review Management');
+
+      // Reload the sessions list
+      await loadReviewSessions(pagination.currentPage, pagination.pageSize, debouncedSearchTerm);
+
+    } catch (error) {
+      console.error('Error deleting review session:', error);
+      addToast('Failed to delete review session', 'error');
+      addNotification('Failed to delete review session', 'error', 'Review Management');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
+    setSessionToDeleteId(null);
+  };
+
+  const sessionToDelete = reviewSessions.find(s => s.id === sessionToDeleteId);
+
   return (
     <div className="fade-in">
       <ReviewHistoryHeader
@@ -126,6 +193,7 @@ const ReviewHistoryPage: React.FC = () => {
           sessions={reviewSessions}
           loading={loading}
           searchTerm={debouncedSearchTerm}
+          onDelete={handleDeleteClick}
         />
 
         <ReviewHistoryPagination
@@ -133,6 +201,19 @@ const ReviewHistoryPage: React.FC = () => {
           onPageChange={handlePageChange}
         />
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        isOpen={showDeleteDialog}
+        onClose={handleDeleteCancel}
+        title="Delete Review Session"
+        message={`Are you sure you want to delete "${sessionToDelete?.session_name || 'this review session'}"? This will permanently remove the session and all associated answers. This action cannot be undone.`}
+        onConfirm={handleDeleteConfirm}
+        confirmText={isDeleting ? 'Deleting...' : 'Delete Session'}
+        cancelText="Cancel"
+        loading={isDeleting}
+        variant="danger"
+      />
     </div>
   );
 };
