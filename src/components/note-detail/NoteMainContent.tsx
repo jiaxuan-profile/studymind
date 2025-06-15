@@ -40,7 +40,7 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
   }
 
   return (
-    <div>
+    <div className="flex flex-col flex-1">
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 dark:border-gray-700">
         <nav className="flex space-x-8 px-6 pt-4" aria-label="Tabs">
@@ -81,7 +81,7 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
           isPdfAvailable={isPdfAvailable}
         />
       ) : (
-        <div className="h-[600px] p-1"> 
+        <div className="flex-1 p-1"> 
           <NoteMindMap 
             noteId={note.id}
             noteTitle={note.title}

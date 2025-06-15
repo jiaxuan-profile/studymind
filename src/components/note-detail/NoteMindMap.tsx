@@ -188,63 +188,72 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     loadConceptsFromDatabase();
   }, [noteId, noteContent]);
 
+  // Don't show mind map if there are no concepts at all
+  if (!loading && !error && graphData.nodes.length === 0) {
+    return null;
+  }
+
   return (
     <div className="h-full flex flex-col bg-white dark:bg-gray-900">
       {/* Controls */}
-      <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
-              <Brain className="h-5 w-5 mr-2 text-primary-600 dark:text-primary-400" />
-              Mind Map for "{noteTitle}"
+      <div className="p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 space-y-2 sm:space-y-0">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
+              <Brain className="h-4 w-4 sm:h-5 sm:w-5 mr-2 text-primary-600 dark:text-primary-400" />
+              <span className="hidden sm:inline">Mind Map for "{noteTitle}"</span>
+              <span className="sm:hidden">Mind Map</span>
             </h3>
             {graphData.nodes.length > 0 && (
-              <span className="text-sm text-gray-600 dark:text-gray-400">
+              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 {graphData.nodes.length} concepts, {graphData.links.length} connections
               </span>
             )}
           </div>
           
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-end sm:justify-start space-x-2">
             <button
               onClick={() => setLabelsEnabled(!labelsEnabled)}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              className="inline-flex items-center px-2 sm:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
             >
-              {labelsEnabled ? <Eye className="h-4 w-4 mr-1" /> : <EyeOff className="h-4 w-4 mr-1" />}
-              {labelsEnabled ? 'Hide Labels' : 'Show Labels'}
+              {labelsEnabled ? <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> : <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />}
+              <span className="hidden sm:inline">{labelsEnabled ? 'Hide Labels' : 'Show Labels'}</span>
+              <span className="sm:hidden">Labels</span>
             </button>
             
             <button
               onClick={handleResetView}
-              className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
+              className="inline-flex items-center px-2 sm:px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
             >
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Reset View
+              <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+              <span className="hidden sm:inline">Reset View</span>
+              <span className="sm:hidden">Reset</span>
             </button>
             
             <button
               onClick={loadConceptsFromDatabase}
               disabled={loading}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent rounded-md text-sm font-medium text-white bg-primary hover:bg-primary-dark disabled:opacity-50 transition-colors"
+              className="inline-flex items-center px-2 sm:px-3 py-1.5 border border-transparent rounded-md text-xs sm:text-sm font-medium text-white bg-primary hover:bg-primary-dark disabled:opacity-50 transition-colors"
             >
               {loading ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 animate-spin" />
               ) : (
-                <Database className="h-4 w-4 mr-1" />
+                <Database className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               )}
-              {loading ? 'Loading...' : 'Refresh'}
+              <span className="hidden sm:inline">{loading ? 'Loading...' : 'Refresh'}</span>
+              <span className="sm:hidden">{loading ? '...' : 'Refresh'}</span>
             </button>
           </div>
         </div>
         
-        <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center justify-between">
-          <div>
-            <span className="mr-4">💡 Hover over concepts to see definitions</span>
-            <span className="mr-4">🔍 Click concepts to highlight connections</span>
-            <span className="mr-4">⚡ Zoom: {zoomLevel.toFixed(1)}x</span>
+        <div className="text-xs text-gray-500 dark:text-gray-400 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-1 sm:space-y-0">
+          <div className="flex flex-wrap gap-2 sm:gap-4">
+            <span className="mr-2 sm:mr-4">💡 Hover over concepts to see definitions</span>
+            <span className="mr-2 sm:mr-4">🔍 Click concepts to highlight connections</span>
+            <span className="mr-2 sm:mr-4">⚡ Zoom: {zoomLevel.toFixed(1)}x</span>
           </div>
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2 text-xs">
+          <div className="flex flex-wrap items-center space-x-2 sm:space-x-3 text-xs">
+            <div className="flex items-center space-x-1 sm:space-x-2">
               <div className="flex items-center"><div className="w-3 h-0.5 bg-red-500 mr-1"></div>Prerequisite</div>
               <div className="flex items-center"><div className="w-3 h-0.5 bg-green-500 mr-1"></div>Builds Upon</div>
               <div className="flex items-center"><div className="w-3 h-0.5 bg-blue-500 mr-1"></div>Related</div>
@@ -256,12 +265,12 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 onChange={(e) => setLabelsEnabled(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+              <div className={`relative inline-flex h-4 w-7 sm:h-5 sm:w-9 items-center rounded-full transition-colors ${
                 labelsEnabled ? 'bg-primary dark:bg-primary-500' : 'bg-gray-200 dark:bg-gray-600'
               }`}>
                 <span
-                  className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                    labelsEnabled ? 'translate-x-5' : 'translate-x-1'
+                  className={`inline-block h-2 w-2 sm:h-3 sm:w-3 transform rounded-full bg-white transition-transform ${
+                    labelsEnabled ? 'translate-x-4 sm:translate-x-5' : 'translate-x-1'
                   }`}
                 />
               </div>
@@ -296,24 +305,24 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
         )}
 
-        {!loading && !error && graphData.nodes.length === 0 && (
+        {!loading && !error && graphData.nodes.length > 0 && graphData.links.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center max-w-md mx-auto p-6">
-              <Brain className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Concepts Found</h3>
+              <Brain className="h-12 w-12 text-amber-400 dark:text-amber-500 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Concepts Found, No Connections</h3>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
-                This note doesn't have any analyzed concepts yet. 
-                Upload the document with AI analysis enabled to generate concepts and relationships.
+                This note has {graphData.nodes.length} concept(s), but no relationships were identified between them. 
+                This could mean the concepts are independent or more content analysis is needed to establish connections.
               </p>
               <button
                 onClick={loadConceptsFromDatabase}
                 className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
-              ><Database className="h-4 w-4 mr-2" />Check Again</button>
+              ><Database className="h-4 w-4 mr-2" />Refresh Analysis</button>
             </div>
           </div>
         )}
 
-        {!loading && !error && graphData.nodes.length > 0 && (
+        {!loading && !error && graphData.nodes.length > 0 && graphData.links.length > 0 && (
           <ForceGraph2D
             ref={graphRef}
             graphData={graphData}
