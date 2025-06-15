@@ -11,7 +11,7 @@ import {
   Database,
   Info
 } from 'lucide-react';
-import { GraphData, GraphNode, GraphLink } from '../../types';
+import { GraphData, GraphNode, GraphLink } from '../../types'; // Assuming GraphNode has isRoot?: boolean
 import { supabase } from '../../services/supabase';
 
 interface NoteMindMapProps {
@@ -19,6 +19,57 @@ interface NoteMindMapProps {
   noteTitle: string;
   noteContent: string;
 }
+
+const ROOT_NODE_ID = '---CENTRAL-THEME-ROOT---';
+
+// Helper function to find connected components
+function findConnectedComponents(nodes: GraphNode[], links: GraphLink[]): GraphNode[][] {
+  const adj = new Map<string, string[]>();
+  const nodeMap = new Map(nodes.map(node => [node.id, node]));
+
+  nodes.forEach(node => adj.set(node.id, []));
+  links.forEach(link => {
+    const sourceId = link.source as string;
+    const targetId = link.target as string;
+    
+    if (nodeMap.has(sourceId) && nodeMap.has(targetId)) {
+        adj.get(sourceId)!.push(targetId);
+        adj.get(targetId)!.push(sourceId);
+    }
+  });
+
+  const visited = new Set<string>();
+  const components: GraphNode[][] = [];
+
+  nodes.forEach(node => {
+    if (!visited.has(node.id) && nodeMap.has(node.id)) {
+      const currentComponentNodes: GraphNode[] = [];
+      const q: string[] = [node.id];
+      visited.add(node.id);
+      
+      let head = 0;
+      while(head < q.length) {
+        const u = q[head++];
+        const actualNode = nodeMap.get(u);
+        if (actualNode) {
+          currentComponentNodes.push(actualNode);
+        }
+
+        (adj.get(u) || []).forEach(v => {
+          if (!visited.has(v) && nodeMap.has(v)) {
+            visited.add(v);
+            q.push(v);
+          }
+        });
+      }
+      if (currentComponentNodes.length > 0) {
+        components.push(currentComponentNodes);
+      }
+    }
+  });
+  return components;
+}
+
 
 const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteContent }) => {
   const [graphData, setGraphData] = useState<GraphData>({ nodes: [], links: [] });
@@ -37,11 +88,11 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     setZoomLevel(transform.k);
   }, []);
 
-  const loadConceptsFromDatabase = async () => {
+  const loadConceptsFromDatabase = useCallback(async () => {
     if (!noteContent.trim()) {
       setError('Note content is empty. Add some content to generate a mind map.');
       setGraphData({ nodes: [], links: [] });
-      setLoading(false); // Ensure loading is false if we abort early
+      setLoading(false);
       return;
     }
 
@@ -67,7 +118,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
       if (!noteConceptsData || noteConceptsData.length === 0) {
         setError('No concepts found for this note. Upload the document with AI analysis enabled to generate concepts.');
         setGraphData({ nodes: [], links: [] });
-        // setLoading(false) will be handled by the finally block
+        setLoading(false);
         return;
       }
 
@@ -81,50 +132,77 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           relationship_type,
           strength
         `)
-        // Ensure links are strictly between concepts of the current note
         .in('source_id', conceptIds)
         .in('target_id', conceptIds);
 
       if (relationshipsError) throw relationshipsError;
 
-      const allFetchedNodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
+      const initialNodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
         id: nc.concepts.id,
         name: nc.concepts.name,
         definition: nc.concepts.definition,
         val: 1 + (nc.relevance_score || 0.5) * 2,
         color: getConceptColor(index, nc.relevance_score || 0.5),
-        hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim())
+        hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim()),
+        isRoot: false,
       }));
 
-      const allFetchedLinks: GraphLink[] = (relationshipsData || [])
-        // This filter is a safeguard, Supabase query should already ensure this
-        .filter(rel => 
-          conceptIds.includes(rel.source_id) && 
-          conceptIds.includes(rel.target_id)
-        )
-        .map(rel => ({
-          source: rel.source_id,
-          target: rel.target_id,
-          value: rel.strength || 0.5,
-          relationshipType: rel.relationship_type
-        }));
+      const initialLinks: GraphLink[] = (relationshipsData || []).map(rel => ({
+        source: rel.source_id,
+        target: rel.target_id,
+        value: rel.strength || 0.5,
+        relationshipType: rel.relationship_type
+      }));
 
-      if (allFetchedLinks.length === 0) {
-        // No links, so by definition, no connected graph to show. All nodes would be orphans.
-        setGraphData({ nodes: [], links: [] });
+      const rootNode: GraphNode = {
+        id: ROOT_NODE_ID,
+        name: noteTitle,
+        definition: `Central theme of the note: "${noteTitle}"`,
+        val: 6, // Adjusted: Fixed value for root node's val for more predictable sizing
+        color: '#FFBF00', 
+        hasDefinition: true,
+        isRoot: true,
+      };
+
+      let processedNodes: GraphNode[];
+      let processedLinks: GraphLink[] = [...initialLinks]; // Start with existing links between concepts
+
+      if (initialNodes.length === 0) {
+        processedNodes = [];
+        processedLinks = []; // No concepts, so no links either
       } else {
-        const connectedNodeIds = new Set<string>();
-        allFetchedLinks.forEach(link => {
-          connectedNodeIds.add(link.source as string);
-          connectedNodeIds.add(link.target as string);
-        });
+        processedNodes = [rootNode, ...initialNodes]; // Include root and all concepts
 
-        const connectedNodes = allFetchedNodes.filter(node => connectedNodeIds.has(node.id));
-        
-        // Use allFetchedLinks as they are already filtered to be between known conceptIds
-        // and connectedNodes will contain all nodes participating in these links.
-        setGraphData({ nodes: connectedNodes, links: allFetchedLinks });
+        if (initialLinks.length === 0) {
+          // All concepts are orphans, link them all to the root
+          initialNodes.forEach(node => {
+            processedLinks.push({
+              source: ROOT_NODE_ID,
+              target: node.id,
+              relationshipType: 'isolated-concept',
+              value: 0.3
+            });
+          });
+        } else {
+          // Find connected components and link root to a representative of each
+          const components = findConnectedComponents(initialNodes, initialLinks);
+          components.forEach(component => {
+            if (component.length > 0) {
+              const representativeNode = component.reduce((prev, curr) => 
+                ((prev.val || 0) > (curr.val || 0)) ? prev : curr, component[0]);
+              
+              processedLinks.push({
+                source: ROOT_NODE_ID,
+                target: representativeNode.id,
+                relationshipType: 'sub-theme',
+                value: 0.8 
+              });
+            }
+          });
+        }
       }
+      
+      setGraphData({ nodes: processedNodes, links: processedLinks });
 
     } catch (err) {
       console.error('Error loading concepts from database:', err);
@@ -133,7 +211,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     } finally {
       setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [noteId, noteContent, noteTitle]); 
 
   const getConceptColor = (index: number, relevance: number): string => {
     const baseColors = [
@@ -149,12 +228,14 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
   };
 
-  const getLinkColor = (relationshipType: string): string => {
+  const getLinkColor = (relationshipType: string = 'related'): string => {
     switch (relationshipType) {
-      case 'prerequisite': return '#EF4444';
-      case 'builds-upon': return '#10B981';
-      case 'related': return '#6366F1';
-      default: return '#9CA3AF';
+      case 'prerequisite': return '#EF4444'; 
+      case 'builds-upon': return '#10B981'; 
+      case 'related': return '#6366F1'; 
+      case 'sub-theme': return '#F59E0B'; 
+      case 'isolated-concept': return '#6B7280'; 
+      default: return '#9CA3AF'; 
     }
   };
 
@@ -205,12 +286,9 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
   useEffect(() => {
     loadConceptsFromDatabase();
-  }, [noteId, noteContent]); // loadConceptsFromDatabase is stable enough w.r.t these deps
+  }, [loadConceptsFromDatabase]);
 
-  // Don't show mind map if there are no concepts (nodes) to display.
-  // This will be true if:
-  // 1. No concepts were found initially.
-  // 2. Concepts were found, but none of them had any links (all were orphans).
+
   if (!loading && !error && graphData.nodes.length === 0) {
     return null;
   }
@@ -226,9 +304,9 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               <span className="hidden sm:inline">Mind Map for "{noteTitle}"</span>
               <span className="sm:hidden">Mind Map</span>
             </h3>
-            {graphData.nodes.length > 0 && ( // This condition remains valid
+            {graphData.nodes.length > 0 && (
               <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                {graphData.nodes.length} concepts, {graphData.links.length} connections
+                {graphData.nodes.filter(n => n.id !== ROOT_NODE_ID).length} concepts, {graphData.links.length} connections
               </span>
             )}
           </div>
@@ -276,9 +354,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
           <div className="flex flex-wrap items-center space-x-2 sm:space-x-3 text-xs">
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <div className="flex items-center"><div className="w-3 h-0.5 bg-red-500 mr-1"></div>Prerequisite</div>
-              <div className="flex items-center"><div className="w-3 h-0.5 bg-green-500 mr-1"></div>Builds Upon</div>
-              <div className="flex items-center"><div className="w-3 h-0.5 bg-blue-500 mr-1"></div>Related</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('prerequisite')}} /> Prerequisite</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('builds-upon')}} /> Builds Upon</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('related')}} /> Related</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('sub-theme')}} /> Sub-theme</div>
             </div>
             <label className="flex items-center cursor-pointer">
               <input
@@ -304,7 +383,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
       {/* Mind Map Content */}
       <div className="flex-1 relative bg-gray-50 dark:bg-gray-900">
-        {loading && (
+        {loading && ( 
           <div className="absolute inset-0 flex items-center justify-center bg-white/75 dark:bg-gray-900/75 z-10">
             <div className="text-center">
               <Loader2 className="h-8 w-8 animate-spin text-primary-600 dark:text-primary-400 mx-auto mb-2" />
@@ -313,7 +392,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
         )}
 
-        {error && (
+        {error && ( 
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center max-w-md mx-auto p-6">
               <AlertCircle className="h-12 w-12 text-red-500 dark:text-red-400 mx-auto mb-4" />
@@ -326,13 +405,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             </div>
           </div>
         )}
-
-        {/* The "Concepts Found, No Connections" message block is removed.
-            If nodes.length > 0 and links.length > 0, the ForceGraph2D will render.
-            If nodes.length is 0 (because no concepts, or all were orphans), the component returns null earlier.
-        */}
-
-        {!loading && !error && graphData.nodes.length > 0 && graphData.links.length > 0 && (
+        
+        {!loading && !error && graphData.nodes.length > 0 && (
           <ForceGraph2D
             ref={graphRef}
             graphData={graphData}
@@ -342,30 +416,47 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             onZoom={handleZoom}            
             linkDirectionalArrowLength={6}
             linkDirectionalArrowRelPos={1}
-            linkDirectionalParticles={1}
+            linkDirectionalParticles={(link: any) => (link.source === ROOT_NODE_ID || (link.source as GraphNode)?.id === ROOT_NODE_ID) ? 0 : 1} 
             linkDirectionalParticleSpeed={0.01}
             nodeCanvasObject={(node, ctx, globalScale) => {
               const n = node as GraphNode; 
               const isSelected = selectedNode?.id === n.id;
-              const isConnected = selectedNode && graphData.links.some(link => 
-                (link.source === selectedNode.id && link.target === n.id) ||
-                (link.target === selectedNode.id && link.source === n.id)
-              );
-              const isDimmed = selectedNode && !isSelected && !isConnected;
+              const isConnectedToSelected = selectedNode && graphData.links.some(link => {
+                  const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
+                  const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
+                  return (sourceId === selectedNode.id && targetId === n.id) ||
+                         (targetId === selectedNode.id && sourceId === n.id);
+              });
+              const isDimmed = selectedNode && !isSelected && !isConnectedToSelected;
               
-              const nodeRadius = Math.sqrt(Math.max(0, n.val || 1)) * 4;
+              // Adjusted radius calculation
+              const baseMultiplier = 4;
+              const rootBoost = 1.25; // Root node radius will be 1.25x that of a normal node with same val
+              const effectiveMultiplier = n.isRoot ? baseMultiplier * rootBoost : baseMultiplier;
+              const nodeRadius = Math.sqrt(Math.max(0, n.val || 1)) * effectiveMultiplier;
+              
               const color = n.color || '#94A3B8';
 
               ctx.globalAlpha = isDimmed ? 0.3 : 1.0;
               
-              ctx.beginPath();
-              ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
-              ctx.fillStyle = color;
-              ctx.fill();
+              if (n.isRoot) {
+                ctx.beginPath();
+                ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
+                ctx.fillStyle = color;
+                ctx.fill();
+                ctx.strokeStyle = '#A0522D'; 
+                ctx.lineWidth = 3 / globalScale;
+                ctx.stroke();
+              } else {
+                ctx.beginPath();
+                ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
+                ctx.fillStyle = color;
+                ctx.fill();
+              }
 
-              if (isSelected || isConnected) {
-                ctx.strokeStyle = isSelected ? '#4338CA' : '#818CF8';
-                ctx.lineWidth = 2 / globalScale;
+              if (isSelected || (isConnectedToSelected && !n.isRoot)) { 
+                ctx.strokeStyle = isSelected ? '#4338CA' : '#818CF8'; 
+                ctx.lineWidth = (isSelected ? 3 : 2) / globalScale;
                 ctx.stroke();
               }
 
@@ -377,7 +468,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 ctx.fillStyle = '#3B82F6'; ctx.fill();
                 ctx.fillStyle = 'white'; ctx.font = `${iconSize * 1.2}px Arial`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('i', iconX, iconY);
-              } else {
+
+              } else if (!n.isRoot) { 
                 const iconSize = Math.max(0.8, 2 / globalScale);
                 const iconX = n.x! + nodeRadius - iconSize * 0.9;
                 const iconY = n.y! - nodeRadius + iconSize * 0.9;
@@ -386,45 +478,55 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               }
 
               if (labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
-                ctx.font = `${12 / globalScale}px Sans-Serif`;
+                ctx.font = `${(n.isRoot ? 14 : 12) / globalScale}px Sans-Serif`; 
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
                 ctx.fillStyle = isDarkMode ? '#E5E7EB' : '#1f2937';
-                ctx.fillText(n.name, n.x!, n.y! + nodeRadius + 8 / globalScale);
+                ctx.fillText(n.name, n.x!, n.y! + nodeRadius + (n.isRoot ? 10 : 8) / globalScale);
               }
               ctx.globalAlpha = 1.0;
             }}
             linkWidth={(link: any) => { 
-              if (!selectedNode) return 2;
-              const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
-              const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
-              const isConnected = sourceId === selectedNode.id || targetId === selectedNode.id;
-              return isConnected ? 4 : 1;
+              const sourceNode = link.source as GraphNode; // force-graph provides object after initial load
+              const targetNode = link.target as GraphNode; // force-graph provides object
+              if (!selectedNode) return (sourceNode.id === ROOT_NODE_ID || targetNode.id === ROOT_NODE_ID) ? 1.5 : 2; 
+              
+              const isConnectedToSelected = sourceNode.id === selectedNode.id || targetNode.id === selectedNode.id;
+              if (sourceNode.id === ROOT_NODE_ID || targetNode.id === ROOT_NODE_ID) { 
+                return isConnectedToSelected ? 3 : 1;
+              }
+              return isConnectedToSelected ? 4 : 1;
             }}
             linkColor={(link: any) => { 
               const l = link as GraphLink; 
-              if (!selectedNode) return getLinkColor(l.relationshipType || 'related');
-              const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
-              const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
-              const isConnected = sourceId === selectedNode.id || targetId === selectedNode.id;
-              return isConnected ? getLinkColor(l.relationshipType || 'related') : 'rgba(150, 150, 150, 0.2)';
+              const sourceNode = link.source as GraphNode;
+              const targetNode = link.target as GraphNode;
+
+              if (!selectedNode) return getLinkColor(l.relationshipType);
+              
+              const isConnectedToSelected = sourceNode.id === selectedNode.id || targetNode.id === selectedNode.id;
+              return isConnectedToSelected ? getLinkColor(l.relationshipType) : 'rgba(150, 150, 150, 0.2)';
             }}
             linkCanvasObject={(link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
               if (!labelsEnabled || zoomLevel < LINK_LABEL_ZOOM_THRESHOLD) return;
               
               const l = link as GraphLink; 
-              const sourceNode = link.source as GraphNode; // force-graph hydrates these to objects
+              const sourceNode = link.source as GraphNode; 
               const targetNode = link.target as GraphNode; 
               
               if (sourceNode?.x != null && sourceNode?.y != null && targetNode?.x != null && targetNode?.y != null && l.relationshipType) {
+                if (sourceNode.id === ROOT_NODE_ID || targetNode.id === ROOT_NODE_ID) {
+                    if (l.relationshipType === 'isolated-concept') return; 
+                }
+
                 const midX = (sourceNode.x + targetNode.x) / 2;
                 const midY = (sourceNode.y + targetNode.y) / 2;
                 
                 ctx.font = `${8 / globalScale}px Sans-Serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
-                ctx.fillStyle = getLinkColor(l.relationshipType); // Label color same as link
-                ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; // Background for contrast
+                ctx.fillStyle = getLinkColor(l.relationshipType); 
+                ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; 
                 ctx.lineWidth = 2 / globalScale;
                 ctx.strokeText(l.relationshipType, midX, midY);
                 ctx.fillText(l.relationshipType, midX, midY);
@@ -433,12 +535,13 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             linkCanvasObjectMode={() => (labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) ? 'after' : undefined}
             d3AlphaDecay={0.015}
             d3VelocityDecay={0.4}
+            cooldownTicks={100}
+            onEngineStop={() => { if (graphRef.current) graphRef.current.zoomToFit(400, 50)}}
           />
         )}
       </div>
 
-      {/* Selected Node Info */}
-      {selectedNode && (
+      {selectedNode && ( 
         <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
           <div className="flex items-start justify-between">
             <div className="flex-1">
@@ -455,7 +558,6 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               )}
               <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Connected to {graphData.links.filter(link => { 
-                    // Ensure link.source/target are treated as IDs if they are objects
                     const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
                     const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
                     return sourceId === selectedNode.id || targetId === selectedNode.id;
