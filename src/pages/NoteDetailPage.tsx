@@ -432,7 +432,7 @@ I can help with:
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main content */}
-        <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col min-h-[calc(100vh-150px)]">
           <NoteMainContent 
             note={note}
             editMode={editMode}
