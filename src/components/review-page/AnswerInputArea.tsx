@@ -1,6 +1,6 @@
 // src/components/review-page/AnswerInputArea.tsx
 import React from 'react';
-import { Edit3, CheckCircle, Save } from 'lucide-react';
+import { Edit3, CheckCircle, Save, Brain, Sparkles } from 'lucide-react';
 
 interface AnswerInputAreaProps {
   userAnswer: string;
@@ -8,6 +8,9 @@ interface AnswerInputAreaProps {
   isAnswerSaved: boolean;
   isSaving: boolean;
   onSaveAnswer: () => Promise<void>;
+  aiReviewFeedback?: string | null;
+  isAiReviewing?: boolean;
+  onAiReviewAnswer?: () => void;
 }
 
 const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
@@ -16,6 +19,9 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
   isAnswerSaved,
   isSaving,
   onSaveAnswer,
+  aiReviewFeedback,
+  isAiReviewing = false,
+  onAiReviewAnswer,
 }) => {
   return (
     <div className="mb-8">
@@ -46,25 +52,62 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
             {userAnswer.length} characters
           </span>
           
-          <button
-            onClick={onSaveAnswer}
-            disabled={!userAnswer.trim() || isSaving || isAnswerSaved}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </>
-            ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  {isAnswerSaved ? 'Saved' : 'Save Answer'}
-                </>
+          <div className="flex items-center space-x-3">
+            {onAiReviewAnswer && (
+              <button
+                onClick={onAiReviewAnswer}
+                disabled={!isAnswerSaved || isAiReviewing}
+                className="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-600 rounded-lg shadow-sm text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isAiReviewing ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 mr-2"></div>
+                    Reviewing...
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4 mr-2" />
+                    Ask AI for Feedback
+                  </>
+                )}
+              </button>
             )}
-          </button>
+            
+            <button
+              onClick={onSaveAnswer}
+              disabled={!userAnswer.trim() || isSaving || isAnswerSaved}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+              ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    {isAnswerSaved ? 'Saved' : 'Save Answer'}
+                  </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* AI Review Feedback */}
+      {aiReviewFeedback && (
+        <div className="mt-6 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/30 dark:to-indigo-900/30 rounded-lg border border-purple-200 dark:border-purple-700/50">
+          <div className="flex items-start">
+            <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400 mr-2 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-purple-900 dark:text-purple-200 mb-2">AI Feedback</h4>
+              <div className="text-sm text-purple-800 dark:text-purple-300 leading-relaxed">
+                {aiReviewFeedback}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
