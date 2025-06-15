@@ -41,6 +41,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     if (!noteContent.trim()) {
       setError('Note content is empty. Add some content to generate a mind map.');
       setGraphData({ nodes: [], links: [] });
+      setLoading(false); // Ensure loading is false if we abort early
       return;
     }
 
@@ -66,6 +67,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
       if (!noteConceptsData || noteConceptsData.length === 0) {
         setError('No concepts found for this note. Upload the document with AI analysis enabled to generate concepts.');
         setGraphData({ nodes: [], links: [] });
+        // setLoading(false) will be handled by the finally block
         return;
       }
 
@@ -79,13 +81,13 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           relationship_type,
           strength
         `)
-        .or(`source_id.in.(${conceptIds.join(',')}),target_id.in.(${conceptIds.join(',')})`)
+        // Ensure links are strictly between concepts of the current note
         .in('source_id', conceptIds)
         .in('target_id', conceptIds);
 
       if (relationshipsError) throw relationshipsError;
 
-      const nodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
+      const allFetchedNodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
         id: nc.concepts.id,
         name: nc.concepts.name,
         definition: nc.concepts.definition,
@@ -94,7 +96,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim())
       }));
 
-      const links: GraphLink[] = (relationshipsData || [])
+      const allFetchedLinks: GraphLink[] = (relationshipsData || [])
+        // This filter is a safeguard, Supabase query should already ensure this
         .filter(rel => 
           conceptIds.includes(rel.source_id) && 
           conceptIds.includes(rel.target_id)
@@ -106,11 +109,27 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           relationshipType: rel.relationship_type
         }));
 
-      setGraphData({ nodes, links });
+      if (allFetchedLinks.length === 0) {
+        // No links, so by definition, no connected graph to show. All nodes would be orphans.
+        setGraphData({ nodes: [], links: [] });
+      } else {
+        const connectedNodeIds = new Set<string>();
+        allFetchedLinks.forEach(link => {
+          connectedNodeIds.add(link.source as string);
+          connectedNodeIds.add(link.target as string);
+        });
+
+        const connectedNodes = allFetchedNodes.filter(node => connectedNodeIds.has(node.id));
+        
+        // Use allFetchedLinks as they are already filtered to be between known conceptIds
+        // and connectedNodes will contain all nodes participating in these links.
+        setGraphData({ nodes: connectedNodes, links: allFetchedLinks });
+      }
 
     } catch (err) {
       console.error('Error loading concepts from database:', err);
       setError('Failed to load mind map data. Please try again.');
+      setGraphData({ nodes: [], links: [] });
     } finally {
       setLoading(false);
     }
@@ -186,9 +205,12 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
   useEffect(() => {
     loadConceptsFromDatabase();
-  }, [noteId, noteContent]);
+  }, [noteId, noteContent]); // loadConceptsFromDatabase is stable enough w.r.t these deps
 
-  // Don't show mind map if there are no concepts at all
+  // Don't show mind map if there are no concepts (nodes) to display.
+  // This will be true if:
+  // 1. No concepts were found initially.
+  // 2. Concepts were found, but none of them had any links (all were orphans).
   if (!loading && !error && graphData.nodes.length === 0) {
     return null;
   }
@@ -204,7 +226,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               <span className="hidden sm:inline">Mind Map for "{noteTitle}"</span>
               <span className="sm:hidden">Mind Map</span>
             </h3>
-            {graphData.nodes.length > 0 && (
+            {graphData.nodes.length > 0 && ( // This condition remains valid
               <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 {graphData.nodes.length} concepts, {graphData.links.length} connections
               </span>
@@ -305,22 +327,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
         )}
 
-        {!loading && !error && graphData.nodes.length > 0 && graphData.links.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center max-w-md mx-auto p-6">
-              <Brain className="h-12 w-12 text-amber-400 dark:text-amber-500 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Concepts Found, No Connections</h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-4">
-                This note has {graphData.nodes.length} concept(s), but no relationships were identified between them. 
-                This could mean the concepts are independent or more content analysis is needed to establish connections.
-              </p>
-              <button
-                onClick={loadConceptsFromDatabase}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 dark:bg-primary-500 dark:hover:bg-primary-600"
-              ><Database className="h-4 w-4 mr-2" />Refresh Analysis</button>
-            </div>
-          </div>
-        )}
+        {/* The "Concepts Found, No Connections" message block is removed.
+            If nodes.length > 0 and links.length > 0, the ForceGraph2D will render.
+            If nodes.length is 0 (because no concepts, or all were orphans), the component returns null earlier.
+        */}
 
         {!loading && !error && graphData.nodes.length > 0 && graphData.links.length > 0 && (
           <ForceGraph2D
@@ -386,22 +396,24 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             }}
             linkWidth={(link: any) => { 
               if (!selectedNode) return 2;
-              const isConnected = (link.source as GraphNode).id === selectedNode.id || 
-                                  (link.target as GraphNode).id === selectedNode.id;
+              const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
+              const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
+              const isConnected = sourceId === selectedNode.id || targetId === selectedNode.id;
               return isConnected ? 4 : 1;
             }}
             linkColor={(link: any) => { 
               const l = link as GraphLink; 
               if (!selectedNode) return getLinkColor(l.relationshipType || 'related');
-              const isConnected = (link.source as GraphNode).id === selectedNode.id || 
-                                  (link.target as GraphNode).id === selectedNode.id;
+              const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
+              const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
+              const isConnected = sourceId === selectedNode.id || targetId === selectedNode.id;
               return isConnected ? getLinkColor(l.relationshipType || 'related') : 'rgba(150, 150, 150, 0.2)';
             }}
             linkCanvasObject={(link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
               if (!labelsEnabled || zoomLevel < LINK_LABEL_ZOOM_THRESHOLD) return;
               
               const l = link as GraphLink; 
-              const sourceNode = link.source as GraphNode; 
+              const sourceNode = link.source as GraphNode; // force-graph hydrates these to objects
               const targetNode = link.target as GraphNode; 
               
               if (sourceNode?.x != null && sourceNode?.y != null && targetNode?.x != null && targetNode?.y != null && l.relationshipType) {
@@ -411,8 +423,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 ctx.font = `${8 / globalScale}px Sans-Serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
-                ctx.fillStyle = getLinkColor(l.relationshipType);
-                ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; 
+                ctx.fillStyle = getLinkColor(l.relationshipType); // Label color same as link
+                ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; // Background for contrast
                 ctx.lineWidth = 2 / globalScale;
                 ctx.strokeText(l.relationshipType, midX, midY);
                 ctx.fillText(l.relationshipType, midX, midY);
@@ -443,7 +455,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               )}
               <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Connected to {graphData.links.filter(link => { 
-                    return link.source === selectedNode.id || link.target === selectedNode.id;
+                    // Ensure link.source/target are treated as IDs if they are objects
+                    const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
+                    const targetId = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target;
+                    return sourceId === selectedNode.id || targetId === selectedNode.id;
                   }
                 ).length} other concepts
               </div>
