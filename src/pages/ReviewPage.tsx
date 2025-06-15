@@ -12,6 +12,8 @@ import { useDebounce } from '../hooks/useDebounce';
 import ReviewSetupScreen from '../components/review-page/ReviewSetupScreen';
 import ReviewCompleteScreen from '../components/review-page/ReviewCompleteScreen'; 
 import ActiveReviewScreen from '../components/review-page/ActiveReviewScreen';
+import Dialog from '../components/Dialog';
+import { ReviewSession, ReviewAnswer } from '../types';
 
 // Interfaces specific to the review process
 interface Question {
@@ -82,6 +84,11 @@ const ReviewPage: React.FC = () => {
   const [activeNoteSelectionTab, setActiveNoteSelectionTab] = useState<'available' | 'selected'>('available');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
+  // Resume session state
+  const [inProgressSession, setInProgressSession] = useState<ReviewSession | null>(null);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
+
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -108,6 +115,7 @@ const ReviewPage: React.FC = () => {
 
   useEffect(() => {
     loadNotesWithQuestions();
+    checkForInProgressSession();
   }, [notes]);
 
   useEffect(() => {
@@ -124,6 +132,116 @@ const ReviewPage: React.FC = () => {
       setAiReviewFeedback(null); // Clear AI feedback when changing questions
     }
   }, [currentQuestionIndex, currentQuestions, userAnswers]);
+
+  const checkForInProgressSession = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: sessions, error } = await supabase
+        .from('review_sessions')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('session_status', 'in_progress')
+        .order('started_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (sessions && sessions.length > 0) {
+        setInProgressSession(sessions[0] as ReviewSession);
+        setShowResumeDialog(true);
+      }
+    } catch (error) {
+      console.error('Error checking for in-progress session:', error);
+    }
+  };
+
+  const resumeSession = async () => {
+    if (!inProgressSession) return;
+
+    setIsLoadingSession(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
+
+      // Fetch all answers for this session
+      const { data: sessionAnswers, error: answersError } = await supabase
+        .from('review_answers')
+        .select('*')
+        .eq('session_id', inProgressSession.id)
+        .order('question_index', { ascending: true });
+
+      if (answersError) throw answersError;
+
+      // Reconstruct questions from the saved answers
+      const reconstructedQuestions: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
+        id: `${answer.session_id}-${answer.question_index}`,
+        question: answer.question_text,
+        hint: answer.hint,
+        connects: answer.connects,
+        difficulty: answer.original_difficulty as 'easy' | 'medium' | 'hard' || 'medium',
+        mastery_context: answer.mastery_context,
+        noteId: answer.note_id,
+        noteTitle: answer.note_title
+      }));
+
+      // Reconstruct user answers
+      const reconstructedUserAnswers: UserAnswer[] = (sessionAnswers as ReviewAnswer[])
+        .filter(answer => answer.answer_text.trim() !== '')
+        .map(answer => ({
+          questionIndex: answer.question_index,
+          answer: answer.answer_text,
+          timestamp: new Date(answer.updated_at),
+          difficulty_rating: answer.difficulty_rating as 'easy' | 'medium' | 'hard' | undefined
+        }));
+
+      // Calculate session stats from existing ratings
+      const sessionStats = {
+        easy: (sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating === 'easy').length,
+        medium: (sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating === 'medium').length,
+        hard: (sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating === 'hard').length
+      };
+
+      // Find the last answered question or start from the beginning
+      const lastAnsweredIndex = Math.max(
+        0,
+        Math.max(...reconstructedUserAnswers.map(a => a.questionIndex), -1)
+      );
+      const nextQuestionIndex = lastAnsweredIndex < reconstructedQuestions.length - 1 
+        ? lastAnsweredIndex + 1 
+        : lastAnsweredIndex;
+
+      // Set up the session state
+      setCurrentSessionId(inProgressSession.id);
+      setSessionStartTime(new Date(inProgressSession.started_at));
+      setCurrentQuestions(reconstructedQuestions);
+      setCurrentQuestionIndex(nextQuestionIndex);
+      setUserAnswers(reconstructedUserAnswers);
+      setReviewedCount((sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating).length);
+      setSessionStats(sessionStats);
+      setSelectedNotes(inProgressSession.selected_notes);
+      setSelectedDifficulty(inProgressSession.selected_difficulty as 'easy' | 'medium' | 'hard' | 'all');
+      setIsReviewComplete(false);
+      setCurrentStep('review');
+
+      setShowResumeDialog(false);
+      setInProgressSession(null);
+      addToast('Session resumed successfully!', 'success');
+
+    } catch (error) {
+      console.error('Error resuming session:', error);
+      addToast('Failed to resume session. Please try again.', 'error');
+    } finally {
+      setIsLoadingSession(false);
+    }
+  };
+
+  const startNewSession = () => {
+    setShowResumeDialog(false);
+    setInProgressSession(null);
+    // Continue with normal flow
+  };
 
   // Filter notes for available tab (excluding already selected notes)
   const availableNotes = notesWithQuestions.filter(note => {
@@ -300,6 +418,10 @@ const ReviewPage: React.FC = () => {
         question_text: q.question,
         answer_text: '', 
         note_title: q.noteTitle,
+        hint: q.hint,
+        connects: q.connects,
+        mastery_context: q.mastery_context,
+        original_difficulty: q.difficulty,
       }));
 
       const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
@@ -511,34 +633,49 @@ const ReviewPage: React.FC = () => {
   // RENDER SELECT STEP
   if (currentStep === 'select') {
     return (
-      <ReviewSetupScreen
-        loadingNotes={loading}
-        notesWithQuestions={notesWithQuestions}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        debouncedSearchTerm={debouncedSearchTerm}
-        activeNoteSelectionTab={activeNoteSelectionTab}
-        setActiveNoteSelectionTab={setActiveNoteSelectionTab}
-        availableNotes={availableNotes}
-        currentSelectedNotes={currentSelectedNotes}
-        handleNoteSelection={handleNoteSelection}
-        getDifficultyColor={getDifficultyColor}
-        getDifficultyIcon={getDifficultyIcon}
-        selectedNotes={selectedNotes}
-        generateNewQuestions={generateNewQuestions}
-        setGenerateNewQuestions={setGenerateNewQuestions}
-        customDifficulty={customDifficulty}
-        setCustomDifficulty={setCustomDifficulty}
-        selectedDifficulty={selectedDifficulty}
-        setSelectedDifficulty={setSelectedDifficulty}
-        selectedQuestionType={selectedQuestionType}
-        setSelectedQuestionType={setSelectedQuestionType}
-        getQuestionTypeIcon={getQuestionTypeIcon}
-        getQuestionTypeColor={getQuestionTypeColor}
-        totalQuestions={totalQuestions}
-        onStartReview={startReview}
-        startReviewDisabled={startReviewDisabled}
-      />
+      <>
+        <ReviewSetupScreen
+          loadingNotes={loading}
+          notesWithQuestions={notesWithQuestions}
+          searchTerm={searchTerm}
+          setSearchTerm={setSearchTerm}
+          debouncedSearchTerm={debouncedSearchTerm}
+          activeNoteSelectionTab={activeNoteSelectionTab}
+          setActiveNoteSelectionTab={setActiveNoteSelectionTab}
+          availableNotes={availableNotes}
+          currentSelectedNotes={currentSelectedNotes}
+          handleNoteSelection={handleNoteSelection}
+          getDifficultyColor={getDifficultyColor}
+          getDifficultyIcon={getDifficultyIcon}
+          selectedNotes={selectedNotes}
+          generateNewQuestions={generateNewQuestions}
+          setGenerateNewQuestions={setGenerateNewQuestions}
+          customDifficulty={customDifficulty}
+          setCustomDifficulty={setCustomDifficulty}
+          selectedDifficulty={selectedDifficulty}
+          setSelectedDifficulty={setSelectedDifficulty}
+          selectedQuestionType={selectedQuestionType}
+          setSelectedQuestionType={setSelectedQuestionType}
+          getQuestionTypeIcon={getQuestionTypeIcon}
+          getQuestionTypeColor={getQuestionTypeColor}
+          totalQuestions={totalQuestions}
+          onStartReview={startReview}
+          startReviewDisabled={startReviewDisabled}
+        />
+
+        {/* Resume Session Dialog */}
+        <Dialog
+          isOpen={showResumeDialog}
+          onClose={() => setShowResumeDialog(false)}
+          title="Resume Previous Session"
+          message={`You have an unfinished review session from ${inProgressSession ? new Date(inProgressSession.started_at).toLocaleString() : 'recently'}. Would you like to resume it or start a new session?`}
+          onConfirm={resumeSession}
+          confirmText={isLoadingSession ? 'Resuming...' : 'Resume Session'}
+          cancelText="Start New Session"
+          loading={isLoadingSession}
+          variant="default"
+        />
+      </>
     );
   }
 
