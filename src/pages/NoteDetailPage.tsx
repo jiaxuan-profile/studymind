@@ -7,13 +7,13 @@ import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase, deleteNoteFromDatabase, getAllSubjects } from '../services/databaseServiceClient';
+import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
 import NoteHeader from '../components/note-detail/NoteHeader';
 import NoteMainContent from '../components/note-detail/NoteMainContent';
 import StudyAssistantPanel from '../components/note-detail/StudyAssistantPanel'; 
 import Dialog from '../components/Dialog';
-import { Concept, KnowledgeGap, RelatedNote, Note as NoteType, Subject } from '../types';
+import { Concept, KnowledgeGap, RelatedNote, Note as NoteType } from '../types';
 
 const NoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -28,15 +28,12 @@ const NoteDetailPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [availableSubjects, setAvailableSubjects] = useState<Subject[]>([]);
   const [editedNote, setEditedNote] = useState(() => {
     const current = notes.find(n => n.id === id);
     return {
       title: current?.title || '',
       content: current?.content || '',
       tags: current?.tags?.join(', ') || '',
-      subject_id: current?.subject_id || null,
-      year_level: current?.year_level || null,
     };
   });
 
@@ -96,8 +93,6 @@ const NoteDetailPage: React.FC = () => {
         title: foundNote.title,
         content: foundNote.content,
         tags: foundNote.tags.join(', '),
-        subject_id: foundNote.subject_id || null,
-        year_level: foundNote.year_level || null,
       });
 
       if (foundNote.pdfPublicUrl && foundNote.originalFilename) {
@@ -112,20 +107,7 @@ const NoteDetailPage: React.FC = () => {
       
       if (foundNote.id) checkExistingData(foundNote.id);
     }
-
-    // Load subjects when component mounts or note changes
-    loadSubjects();
   }, [id, notes, navigate]);
-
-  const loadSubjects = async () => {
-    try {
-      const subjects = await getAllSubjects();
-      setAvailableSubjects(subjects);
-    } catch (error) {
-      console.error('Error loading subjects:', error);
-      addToast('Failed to load subjects', 'error');
-    }
-  };
 
   const fetchPdfInfo = async (noteId: string) => {
     try {
@@ -214,8 +196,14 @@ const NoteDetailPage: React.FC = () => {
             user_id: note.user_id!,
             title: note.title,
             content: note.content,
-            updatedAt: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
             ...noteUpdates,
+            created_at: note.createdAt.toISOString(), 
+            tags: updatedTags,
+            analysis_status: 'completed',
+            pdf_storage_path: note.pdfStoragePath ?? '',
+            pdf_public_url: note.pdfPublicUrl ?? '',
+            original_filename: note.originalFilename ?? '', 
         });
         console.log("Database updated successfully.");
         
@@ -224,8 +212,15 @@ const NoteDetailPage: React.FC = () => {
             ...noteUpdates,
             updatedAt: new Date(),
         };
-        setNote(updatedNoteForUI);
-        updateNote(note.id, noteUpdates);
+        setNote({
+          ...updatedNoteForUI,
+          analysis_status: updatedNoteForUI.analysis_status as "not_started" | "pending" | "completed" | "failed" | "in_progress" | "analyzing_gaps"
+        });
+        updateNote(note.id, {
+          summary: noteUpdates.summary,
+          tags: noteUpdates.tags,
+          analysis_status: noteUpdates.analysis_status as "not_started" | "pending" | "completed" | "failed" | "in_progress" | "analyzing_gaps"
+        });
 
         await analyzeGapsForNote(note.id);
         await generateQuestionsForNote(note.id);
@@ -265,7 +260,7 @@ const NoteDetailPage: React.FC = () => {
 
   const handleEditedNoteChange = (
     field: keyof typeof editedNote, 
-    value: string | number | null
+    value: string
   ) => {
     setEditedNote(prev => ({ ...prev, [field]: value }));
   };
@@ -310,8 +305,6 @@ const NoteDetailPage: React.FC = () => {
       const updatedTitle = editedNote.title;
       const updatedContent = editedNote.content;
       const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
-      const updatedSubjectId = editedNote.subject_id;
-      const updatedYearLevel = editedNote.year_level;
       const now = new Date();
       let newEmbedding: number[] | undefined = note.embedding;
 
@@ -329,18 +322,14 @@ const NoteDetailPage: React.FC = () => {
         content: updatedContent,
         tags: updatedTags,
         embedding: newEmbedding,
-        updatedAt: now.toISOString(),
-        createdAt: note.createdAt.toISOString(),
+        updated_at: now.toISOString(),
+        created_at: note.createdAt.toISOString(),
         // Preserve existing PDF metadata
-        pdf_storage_path: note.pdfStoragePath,
-        pdf_public_url: note.pdfPublicUrl,
-        original_filename: note.originalFilename,
-        // Preserve other metadata
+        pdf_storage_path: note.pdfStoragePath ?? '',
+        pdf_public_url: note.pdfPublicUrl ?? '',
+        original_filename: note.originalFilename ?? '',
         summary: note.summary,
         analysis_status: note.analysis_status,
-        // New fields
-        subject_id: updatedSubjectId,
-        year_level: updatedYearLevel,
       });
 
       const noteUpdatesForStore = { 
@@ -348,9 +337,7 @@ const NoteDetailPage: React.FC = () => {
         content: updatedContent, 
         tags: updatedTags, 
         updatedAt: now, 
-        embedding: newEmbedding,
-        subject_id: updatedSubjectId,
-        year_level: updatedYearLevel,
+        embedding: newEmbedding 
       };
       updateNote(note.id, noteUpdatesForStore);
       setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
@@ -487,7 +474,6 @@ I can help with:
             activeTab={activeTab}
             onTabChange={setActiveTab} 
             viewMode={viewMode}
-            subjects={availableSubjects}
           />
         </div>
         

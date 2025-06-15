@@ -17,6 +17,7 @@ export interface Note {
   embedding?: number[];
   createdAt: Date;
   updatedAt: Date;
+  contentHash?: string;
   pdfStoragePath?: string | null;
   pdfPublicUrl?: string | null;
   originalFilename?: string | null;

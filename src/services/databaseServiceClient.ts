@@ -3,9 +3,9 @@
 import { supabase } from './supabase';
 import { createHash } from 'crypto';
 import { deletePDFFromStorage } from './pdfStorageService';
-import { Subject } from '../types';
+import { Subject, Note } from '../types';
 
-interface NotePayload {
+export interface NotePayload {
   id: string;
   user_id: string;
   title: string;
@@ -13,8 +13,8 @@ interface NotePayload {
   summary?: string | null;
   tags: string[];
   embedding?: number[]; 
-  updatedAt: string;
-  createdAt?: string;
+  updated_at: string;
+  created_at: string;
   contentHash?: string;
   analysis_status?: string;
   pdf_storage_path?: string;
@@ -85,58 +85,59 @@ export async function checkDocumentExists(content: string): Promise<boolean> {
 }
 
 export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
-  try {
-    console.log("Database Service: Saving note to Supabase:", { 
-      id: noteData.id,
-      title: noteData.title,
-      tags: noteData.tags,
-      analysisStatus: noteData.analysis_status, 
-      hasSummary: !!noteData.summary,
-      hasEmbedding: !!noteData.embedding,
-      hasPdfStorage: !!noteData.pdf_storage_path,
-      subjectId: noteData.subject_id,
-      yearLevel: noteData.year_level
-    });
+  const { data, error } = await supabase
+    .from('notes')
+    .upsert({
+      ...noteData,
+      content_hash: noteData.contentHash || generateContentHash(noteData.content),
+    })
+    .select();
 
-    // Generate content hash if not provided
-    const contentHash = noteData.contentHash || generateContentHash(noteData.content);
+  if (error) throw new Error(`Failed to save note: ${error.message}`);
+  return data;
+}
 
-    const { data, error } = await supabase
-      .from('notes')
-      .upsert({
-        id: noteData.id,
-        user_id: noteData.user_id,
-        title: noteData.title,
-        content: noteData.content,
-        summary: noteData.summary,
-        tags: noteData.tags,
-        embedding: noteData.embedding,
-        updated_at: noteData.updatedAt,
-        created_at: noteData.createdAt || noteData.updatedAt,
-        content_hash: contentHash,
-        analysis_status: noteData.analysis_status, 
-        // PDF storage fields
-        pdf_storage_path: noteData.pdf_storage_path,
-        pdf_public_url: noteData.pdf_public_url,
-        original_filename: noteData.original_filename,
-        // New fields
-        subject_id: noteData.subject_id,
-        year_level: noteData.year_level
-      })
-      .select();
+export async function updateNoteInDatabase(
+  noteId: string, 
+  updates: Partial<NotePayload>
+): Promise<void> {
+  const { error } = await supabase
+    .from('notes')
+    .update({
+      ...updates,
+      updated_at: new Date().toISOString() 
+    })
+    .eq('id', noteId);
 
-    if (error) {
-      console.error("Database Service: Supabase error:", error);
-      throw new Error(`Failed to save note: ${error.message}`);
-    }
+  if (error) throw new Error(`Update failed: ${error.message}`);
+}
 
-    console.log("Database Service: Note saved successfully:", data);
-    return data;
+export async function fetchCompleteNote(noteId: string): Promise<Note> {
+  const { data, error } = await supabase
+    .from('notes')
+    .select('*')
+    .eq('id', noteId)
+    .single();
 
-  } catch (error) {
-    console.error('Database Service: Error saving note:', error);
-    throw error;
+  if (error || !data) {
+    throw new Error(error?.message || 'Note not found');
   }
+
+  return {
+    id: data.id,
+    user_id: data.user_id,
+    title: data.title,
+    content: data.content,
+    summary: data.summary,
+    tags: data.tags,
+    embedding: data.embedding ?? undefined,
+    analysis_status: data.analysis_status,
+    pdfStoragePath: data.pdf_storage_path,
+    pdfPublicUrl: data.pdf_public_url,
+    originalFilename: data.original_filename,
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
+  };
 }
 
 export async function getNoteById(id: string) {

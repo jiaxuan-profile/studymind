@@ -6,7 +6,7 @@ import { useStore } from '../store';
 import { Note } from '../types';
 
 import { generateEmbeddingOnClient } from './embeddingServiceClient';
-import { saveNoteToDatabase, checkDocumentExists } from './databaseServiceClient';
+import { NotePayload, getNoteById, saveNoteToDatabase, updateNoteInDatabase, checkDocumentExists } from './databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from './aiService';
 import { uploadPDFToStorage, PDFUploadResult } from './pdfStorageService';
 
@@ -100,7 +100,9 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
   
     const noteId = Math.random().toString(36).substring(2, 11);
     const title = file.name.replace(/\.[^/.]+$/, "");
+    const now = new Date();
   
+    // 1. Handle PDF upload first
     let pdfStorageInfo: PDFUploadResult | null = null; 
     if (fileType === 'pdf') {
       onProgress('Uploading PDF file...', 'info');
@@ -111,11 +113,12 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
       }
     }
   
+    // 2. Generate embedding
     onProgress('Generating document embedding...', 'info');
     const embedding = await generateEmbeddingOnClient(content, title);
   
-    const now = new Date();
-    let noteData = {
+    // 3. Prepare base note data
+    const initialNoteData: NotePayload = {
       id: noteId,
       user_id: user.id,
       title,
@@ -126,52 +129,75 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
       analysis_status: useAI ? 'pending' : 'not_started',
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
-      pdfStoragePath: pdfStorageInfo?.path ?? null,
-      pdfPublicUrl: pdfStorageInfo?.publicUrl ?? null,
-      originalFilename: file.name,
+      pdf_storage_path: pdfStorageInfo?.path,
+      pdf_public_url: pdfStorageInfo?.publicUrl,
+      original_filename: file.name,
     };
   
-    await saveNoteToDatabase(noteData);    
+    // FIRST SAVE - Creates the initial note record
+    await saveNoteToDatabase(initialNoteData);
   
-    if (useAI) {
-      try {
-        onProgress('Starting AI analysis...', 'info');
-        const analysis = await analyzeNote(content, title, noteId);
-        
-        noteData = {
-          ...noteData,
-          summary: analysis?.summary || null,
-          tags: [...new Set([...noteData.tags, ...(analysis?.suggestedTags || [])])],
-          analysis_status: 'in_progress',
-        };
-        await saveNoteToDatabase(noteData);
-        
-        onProgress('Analyzing knowledge gaps...', 'info');
-        await analyzeGapsForNote(noteId);
-  
-        onProgress('Generating practice questions...', 'info');
-        await generateQuestionsForNote(noteId);
-  
-        noteData.analysis_status = 'completed';
-        await saveNoteToDatabase(noteData);
-        onProgress('AI analysis completed!', 'success');
-  
-      } catch (aiError) {
-        noteData.analysis_status = 'failed';
-        await saveNoteToDatabase(noteData);
-        throw new Error(`AI analysis failed, but the document was saved. Error: ${aiError instanceof Error ? aiError.message : aiError}`);
-      }
+    if (!useAI) {
+      const finalNote = createNoteObject(initialNoteData);
+      useStore.getState().addNote(finalNote);
+      return finalNote;
     }
-    
-    const finalNote: Note = {
-        ...noteData,
-        createdAt: new Date(noteData.created_at),
-        updatedAt: new Date(noteData.updated_at),
-        summary: noteData.summary ?? null,
-        embedding: noteData.embedding ?? undefined,
-    };
-    
-    useStore.getState().addNote(finalNote);
   
-    return finalNote;
+    try {
+      onProgress('Starting AI analysis...', 'info');
+      
+      // 4. Fetch the complete note for AI processing
+      const existingNote = await getNoteById(noteId);
+      if (!existingNote) throw new Error('Note not found for AI processing');
+  
+      // 5. Perform AI analysis
+      const analysis = await analyzeNote(content, title, noteId);
+      
+      // 6. Prepare update payload - CAREFULLY preserve existing fields
+      const updatePayload: Partial<NotePayload> = {
+        summary: analysis?.summary || null,
+        tags: [...new Set([...existingNote.tags, ...(analysis?.suggestedTags || [])])],
+        analysis_status: 'in_progress',
+        updatedAt: new Date().toISOString()
+      };
+  
+      // SECOND SAVE - Partial update (won't affect PDF paths)
+      await updateNoteInDatabase(noteId, updatePayload);
+  
+      // 7. Additional AI processing
+      onProgress('Analyzing knowledge gaps...', 'info');
+      await analyzeGapsForNote(noteId);
+  
+      onProgress('Generating practice questions...', 'info');
+      await generateQuestionsForNote(noteId);
+  
+      // FINAL UPDATE - Mark as completed
+      await updateNoteInDatabase(noteId, {
+        analysis_status: 'completed',
+        updatedAt: new Date().toISOString()
+      });
+  
+      const finalNote = await getNoteById(noteId);
+      useStore.getState().addNote(finalNote);
+      onProgress('AI analysis completed!', 'success');
+      return finalNote;
+  
+    } catch (aiError) {
+      // Error update - preserves all existing data
+      await updateNoteInDatabase(noteId, {
+        analysis_status: 'failed',
+        updatedAt: new Date().toISOString()
+      });
+      throw new Error(`AI analysis failed: ${aiError instanceof Error ? aiError.message : 'Unknown error'}`);
+    }
   };
+
+  function createNoteObject(payload: NotePayload): Note {
+    return <Note>{
+      ...payload,
+      createdAt: new Date(payload.createdAt),
+      updatedAt: new Date(payload.updatedAt),
+      summary: payload.summary ?? null,
+      embedding: payload.embedding ?? undefined,
+    };
+  }
