@@ -3,6 +3,7 @@
 import { supabase } from './supabase';
 import { createHash } from 'crypto';
 import { deletePDFFromStorage } from './pdfStorageService';
+import { Subject } from '../types';
 
 interface NotePayload {
   id: string;
@@ -19,6 +20,8 @@ interface NotePayload {
   pdf_storage_path?: string;
   pdf_public_url?: string;
   original_filename?: string;
+  subject_id?: number | null;
+  year_level?: string | null;
 }
 
 function generateContentHash(content: string): string {
@@ -90,7 +93,9 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
       analysisStatus: noteData.analysis_status, 
       hasSummary: !!noteData.summary,
       hasEmbedding: !!noteData.embedding,
-      hasPdfStorage: !!noteData.pdf_storage_path
+      hasPdfStorage: !!noteData.pdf_storage_path,
+      subjectId: noteData.subject_id,
+      yearLevel: noteData.year_level
     });
 
     // Generate content hash if not provided
@@ -113,7 +118,10 @@ export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
         // PDF storage fields
         pdf_storage_path: noteData.pdf_storage_path,
         pdf_public_url: noteData.pdf_public_url,
-        original_filename: noteData.original_filename
+        original_filename: noteData.original_filename,
+        // New fields
+        subject_id: noteData.subject_id,
+        year_level: noteData.year_level
       })
       .select();
 
@@ -422,6 +430,34 @@ export async function getAllConcepts() {
 
   } catch (error) {
     console.error('Database Service: Error fetching concepts:', error);
+    throw error;
+  }
+}
+
+export async function getAllSubjects(): Promise<Subject[]> {
+  try {
+    console.log("Database Service: Fetching all subjects");
+    
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('User not authenticated');
+
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error("Database Service: Error fetching subjects:", error);
+      throw new Error(`Failed to fetch subjects: ${error.message}`);
+    }
+
+    console.log("Database Service: Subjects fetched successfully:", data?.length || 0);
+    return data as Subject[] || [];
+
+  } catch (error) {
+    console.error('Database Service: Error in getAllSubjects:', error);
     throw error;
   }
 }
