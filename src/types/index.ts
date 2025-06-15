@@ -81,13 +81,21 @@ resources: string[];
 
 // Data model for a single answer in a review session.
 export interface ReviewAnswer {
-id: string;
-question_index: number;
-question_text: string;
-answer_text: string;
-difficulty_rating?: 'easy' | 'medium' | 'hard';
-note_id: string;
-note_title: string;
+  id: string;
+  session_id: string;
+  question_index: number;
+  question_text: string;
+  answer_text: string;
+  difficulty_rating?: 'easy' | 'medium' | 'hard';
+  note_id: string;
+  note_title: string;
+  connects?: string[];
+  hint?: string;
+  mastery_context?: string;
+  original_difficulty?: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
 }
 
 // Data model for a review session.
@@ -106,6 +114,7 @@ session_status: 'in_progress' | 'completed' | 'abandoned';
 started_at: string;
 completed_at?: string;
 duration_seconds?: number;
+user_id: string;
 }
 
 // --- UI & VISUALIZATION TYPES ---
@@ -123,6 +132,7 @@ export interface GraphNode {
   y?: number;
   vx?: number;
   vy?: number;
+  isRoot?: boolean;
 }
 
 // Data model for a link in the react-force-graph-2d component.
@@ -149,3 +159,6 @@ export interface PomodoroSettings {
   cyclesBeforeLongBreak: number;
   soundEnabled: boolean;
 }
+
+// Subscription tier type
+export type SubscriptionTier = 'standard' | 'pro';
