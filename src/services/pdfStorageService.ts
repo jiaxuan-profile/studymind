@@ -57,18 +57,25 @@ export async function deletePDFFromStorage(filePath: string): Promise<void> {
   try {
     console.log('PDF Storage: Attempting to delete PDF file:', filePath);
 
-    // Ensure we have the correct file path format
+    // Get current user for RLS compliance
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.warn('PDF Storage: No authenticated user found for PDF deletion');
+      throw new Error('User not authenticated for PDF deletion');
+    }
+
+    // Ensure we have the correct file path format for RLS
     let pathToDelete = filePath;
     
-    // If the path doesn't include the user ID prefix, we need to construct it
-    if (!pathToDelete.includes('/')) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        pathToDelete = `${user.id}/${filePath}`;
-      }
+    // If the path doesn't start with the user ID, construct the proper path
+    if (!pathToDelete.startsWith(`${user.id}/`)) {
+      // Remove any leading slash and construct proper path
+      const cleanPath = pathToDelete.replace(/^\/+/, '');
+      pathToDelete = `${user.id}/${cleanPath}`;
     }
 
     console.log('PDF Storage: Deleting file at path:', pathToDelete);
+    console.log('PDF Storage: User ID for RLS:', user.id);
 
     const { error } = await supabase.storage
       .from(STORAGE_BUCKET)
@@ -78,9 +85,16 @@ export async function deletePDFFromStorage(filePath: string): Promise<void> {
       console.error('PDF Storage: Delete error:', error);
       
       // If the file doesn't exist, that's actually okay - it means it's already gone
-      if (error.message?.includes('not found') || error.message?.includes('does not exist')) {
+      if (error.message?.includes('not found') || 
+          error.message?.includes('does not exist') ||
+          error.message?.includes('Object not found')) {
         console.log('PDF Storage: File not found in storage (may have been already deleted)');
         return;
+      }
+      
+      // Log additional debugging info for RLS issues
+      if (error.message?.includes('permission') || error.message?.includes('policy')) {
+        console.error('PDF Storage: RLS policy issue - path:', pathToDelete, 'user:', user.id);
       }
       
       throw new Error(`Failed to delete PDF: ${error.message}`);
