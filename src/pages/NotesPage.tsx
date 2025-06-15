@@ -11,6 +11,7 @@ import NotesFilterBar from '../components/notes/NotesFilterBar';
 import UploaderPanel from '../components/notes/UploaderPanel';
 import NoteList from '../components/notes/NoteList';
 import NotesPagination from '../components/notes/NotesPagination';
+import Dialog from '../components/Dialog';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -28,6 +29,11 @@ const NotesPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showPdfUploader, setShowPdfUploader] = useState(false);
+  
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [noteToDeleteId, setNoteToDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   const [currentPage, setCurrentPage] = useState(1);
   
@@ -67,10 +73,30 @@ const NotesPage: React.FC = () => {
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation();    
-    if (window.confirm('Are you sure you want to delete this note?')) {
-      await deleteNote(id); 
+    e.stopPropagation();
+    setNoteToDeleteId(id);
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!noteToDeleteId) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteNote(noteToDeleteId);
+    } catch (error) {
+      console.error("Error during note deletion:", error);
+      // Error handling is already done in the store
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteDialog(false);
+      setNoteToDeleteId(null);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setShowDeleteDialog(false);
+    setNoteToDeleteId(null);
   };
 
   const handleCreateNewNote = async () => {
@@ -94,6 +120,9 @@ const NotesPage: React.FC = () => {
       alert(`Failed to create note: ${(err as Error).message}`);
     }
   };
+
+  // Find the note to delete for the dialog message
+  const noteToDelete = notes.find(note => note.id === noteToDeleteId);
 
   // --- Render Logic ---
 
@@ -169,6 +198,19 @@ const NotesPage: React.FC = () => {
       <NotesPagination
         pagination={{...pagination, currentPage: currentPage}}
         onPageChange={handleSetPage}
+      />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        isOpen={showDeleteDialog}
+        onClose={handleDeleteCancel}
+        title="Delete Note"
+        message={`Are you sure you want to delete "${noteToDelete?.title || 'this note'}"? This action cannot be undone and will permanently remove the note and all associated data.`}
+        onConfirm={handleDeleteConfirm}
+        confirmText={isDeleting ? 'Deleting...' : 'Delete Note'}
+        cancelText="Cancel"
+        loading={isDeleting}
+        variant="danger"
       />
     </div>
   );

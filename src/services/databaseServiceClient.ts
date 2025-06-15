@@ -223,7 +223,7 @@ export async function deleteNoteFromDatabase(id: string): Promise<void> {
     // First, fetch the note to check if it has an associated PDF file
     const { data: noteData, error: fetchError } = await supabase
       .from('notes')
-      .select('pdf_storage_path, original_filename')
+      .select('pdf_storage_path, pdf_public_url, original_filename, title')
       .eq('id', id)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -234,19 +234,23 @@ export async function deleteNoteFromDatabase(id: string): Promise<void> {
     }
 
     if (!noteData) {
-      console.log(`Database Service: Note with ID ${id} already deleted. Exiting deletion process.`);
+      console.log(`Database Service: Note with ID ${id} not found or already deleted.`);
       return;
     }
 
-    // If the note exists and has a PDF file, try to delete it from storage
+    // If the note has a PDF file, delete it from storage
     if (noteData.pdf_storage_path) {
       try {
         console.log("Database Service: Deleting associated PDF file:", noteData.pdf_storage_path);
         await deletePDFFromStorage(noteData.pdf_storage_path);
-        console.log("Database Service: PDF file deleted successfully");
+        console.log("Database Service: PDF file deleted successfully from storage");
       } catch (storageError) {
-        console.error("Database Service: Failed to delete PDF file (continuing with note deletion):", storageError);
+        console.error("Database Service: Failed to delete PDF file from storage:", storageError);
+        // Continue with note deletion even if PDF deletion fails
+        console.warn("Database Service: Continuing with note deletion despite PDF deletion failure");
       }
+    } else {
+      console.log("Database Service: No PDF file associated with this note");
     }
 
     // Delete the note record from the database
