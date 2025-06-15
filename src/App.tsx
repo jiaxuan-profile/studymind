@@ -34,7 +34,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function AppRoutes() {
-  const { loadNotes: storeLoadNotes, resetStore: storeResetStore, theme, setUser, loadUserProfile } = useStore();
+  const { loadNotes: storeLoadNotes, resetStore: storeResetStore, theme, setUser } = useStore();
   const { user, signOut } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
@@ -72,13 +72,12 @@ function AppRoutes() {
     if (user) {
       console.log("AppRoutes: User detected, triggering initial data load.");
       setUser(user);
-      loadUserProfile(); // Load user profile including subscription tier
       loadNotes(); 
     } else {
       console.log("AppRoutes: No user detected, resetting store.");
       resetStore();
     }
-  }, [user, loadNotes, resetStore, setUser, loadUserProfile]);
+  }, [user, loadNotes, resetStore, setUser]);
 
   return (
     <>

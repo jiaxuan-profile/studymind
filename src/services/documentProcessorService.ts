@@ -9,7 +9,6 @@ import { generateEmbeddingOnClient } from './embeddingServiceClient';
 import { saveNoteToDatabase, checkDocumentExists } from './databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote } from './aiService';
 import { uploadPDFToStorage, PDFStorageInfo } from './pdfStorageService';
-import { incrementDailyNoteCount } from './subscriptionService';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.mjs';
 
@@ -132,15 +131,7 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
       originalFilename: file.name,
     };
   
-    await saveNoteToDatabase(noteData);
-
-    // Increment daily note count after successful save
-    try {
-      await incrementDailyNoteCount();
-    } catch (error) {
-      console.warn('Failed to increment daily note count:', error);
-      // Don't fail the upload for this
-    }
+    await saveNoteToDatabase(noteData);    
   
     if (useAI) {
       try {

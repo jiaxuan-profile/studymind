@@ -5,14 +5,12 @@ import { useStore } from '../store';
 import { Plus, FileText } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce'; 
 import { Note } from '../types';
-import { checkDailyNoteLimit } from '../services/subscriptionService';
 
 import PageHeader from '../components/PageHeader';
 import NotesFilterBar from '../components/notes/NotesFilterBar';
 import UploaderPanel from '../components/notes/UploaderPanel';
 import NoteList from '../components/notes/NoteList';
 import NotesPagination from '../components/notes/NotesPagination';
-import SubscriptionBanner from '../components/SubscriptionBanner';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -23,39 +21,18 @@ const NotesPage: React.FC = () => {
     pagination,
     loadNotes,
     isLoading,
-    error,
-    userProfile,
-    loadUserProfile
+    error
   } = useStore();
   
   // --- UI State ---
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showPdfUploader, setShowPdfUploader] = useState(false);
-  const [showSubscriptionBanner, setShowSubscriptionBanner] = useState(true);
-  const [canUploadNotes, setCanUploadNotes] = useState(true);
-  const [remainingNotes, setRemainingNotes] = useState(0);
   
   const [currentPage, setCurrentPage] = useState(1);
   
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const isInitialMount = useRef(true);
-
-  // Load user profile and check limits
-  useEffect(() => {
-    loadUserProfile();
-    checkLimits();
-  }, []);
-
-  const checkLimits = async () => {
-    try {
-      const noteLimit = await checkDailyNoteLimit();
-      setCanUploadNotes(noteLimit.canUpload);
-      setRemainingNotes(noteLimit.remaining);
-    } catch (error) {
-      console.error('Error checking limits:', error);
-    }
-  };
 
   // Single source of truth for fetching data.
   useEffect(() => {
@@ -93,17 +70,10 @@ const NotesPage: React.FC = () => {
     e.stopPropagation();    
     if (window.confirm('Are you sure you want to delete this note?')) {
       await deleteNote(id); 
-      // Refresh limits after deletion
-      checkLimits();
     }
   };
 
   const handleCreateNewNote = async () => {
-    if (!canUploadNotes) {
-      alert('Daily note limit reached. Standard users can upload 2 notes per day. Upgrade to Pro for unlimited uploads.');
-      return;
-    }
-
     try {
       const id = Math.random().toString(36).substring(2, 11);
       const now = new Date();
@@ -117,26 +87,12 @@ const NotesPage: React.FC = () => {
         analysis_status: 'not_started'
       };
       await addNote(newNoteData);
-      
-      // Increment daily note count
-      try {
-        const { incrementDailyNoteCount } = await import('../services/subscriptionService');
-        await incrementDailyNoteCount();
-        checkLimits(); // Refresh limits
-      } catch (error) {
-        console.warn('Failed to increment daily note count:', error);
-      }
-      
+            
       navigate(`/notes/${id}`, { state: { isNewNote: true } });
     } catch (err) {
       console.error("Error creating new note:", err);
       alert(`Failed to create note: ${(err as Error).message}`);
     }
-  };
-
-  const handleUploadSuccess = () => {
-    checkLimits(); // Refresh limits after successful upload
-    setShowPdfUploader(false);
   };
 
   // --- Render Logic ---
@@ -168,33 +124,22 @@ const NotesPage: React.FC = () => {
       <PageHeader title="Your Notes" subtitle="Manage and view your notes">
         <button
           onClick={handleCreateNewNote}
-          disabled={!canUploadNotes}
           className="flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!canUploadNotes ? 'Daily note limit reached' : 'Create a new note'}
+          title={'Create a new note'}
         >
           <Plus className="h-5 w-5 mr-2" />
           Create Note
         </button>
         <button
           onClick={() => setShowPdfUploader(true)}
-          disabled={!canUploadNotes}
           className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
-          title={!canUploadNotes ? 'Daily upload limit reached' : 'Upload a document'}
+          title={'Upload a document'}
         >
           <FileText className="h-5 w-5 mr-2" />
           Upload Document
         </button>
       </PageHeader>
 
-      {/* Subscription Banner */}
-      {showSubscriptionBanner && userProfile && (
-        <SubscriptionBanner
-          tier={userProfile.subscription_tier}
-          remainingNotes={remainingNotes}
-          onDismiss={() => setShowSubscriptionBanner(false)}
-        />
-      )}
-      
       <NotesFilterBar
         searchTerm={searchTerm}
         onSearchChange={handleSearchChange}

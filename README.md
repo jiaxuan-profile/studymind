@@ -1,29 +1,6 @@
 # StudyMind - AI-Powered Study Assistant
 
-StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, integrated focus time management, and a comprehensive notification system with subscription-based access tiers.
-
-## Subscription Tiers
-
-StudyMind offers two subscription tiers to meet different user needs:
-
-### 🌟 Standard Plan
-- **Daily Note Limit**: 2 notes per day
-- **File Formats**: DOCX, MD, TXT only
-- **AI Analysis**: Not available
-- **PDF Uploads**: Not available
-- **Review Questions**: Manual creation only
-- **Concept Extraction**: Not available
-- **Price**: Free
-
-### 👑 Pro Plan
-- **Daily Note Limit**: Unlimited
-- **File Formats**: PDF, DOCX, MD, TXT
-- **AI Analysis**: Full AI-powered content analysis
-- **PDF Uploads**: Up to 50MB per file
-- **Review Questions**: AI-generated practice questions
-- **Concept Extraction**: Automatic concept mapping
-- **Knowledge Gap Analysis**: AI-powered learning recommendations
-- **Price**: Premium subscription
+StudyMind is an intelligent study assistant that helps students understand and connect information using AI. It features automatic concept extraction, smart summarization, vector similarity search for related content, integrated focus time management, and a comprehensive notification system.
 
 ## Learning Approach
 
@@ -53,7 +30,6 @@ StudyMind supports both formative and summative assessment strategies:
 - Automatic tag suggestions
 - AI-powered concept extraction (Pro only)
 - Multi-format document import (PDF for Pro, DOCX/MD/TXT for all)
-- Daily upload limits based on subscription tier
 
 ### 🧠 AI-Powered Analysis (Pro Only)
 - Automatic content summarization
@@ -127,12 +103,6 @@ StudyMind supports both formative and summative assessment strategies:
 - **Persistent Settings**: Theme preference saved across sessions
 - **Comprehensive Coverage**: Dark mode support for all components and pages
 
-### 💎 Subscription Management
-- **Tier-Based Access Control**: Features automatically enabled/disabled based on subscription
-- **Usage Tracking**: Daily note count monitoring for Standard users
-- **Upgrade Prompts**: Contextual suggestions to upgrade when limits are reached
-- **Visual Indicators**: Clear subscription status display throughout the app
-
 ## Database Setup
 
 All database migrations are located in the `supabase/migrations/` folder. Execute them in order to set up the complete database schema:
@@ -171,20 +141,7 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - Global concept sharing and mastery tracking
    - User-specific mastery levels
 
-9. **Subscription System** (New Migration Required)
-   - User profiles table with subscription tiers
-   - Daily usage tracking
-   - Subscription limits enforcement
-
 ## Recent Updates
-
-### ✅ Two-Tier Subscription System (Latest)
-- **Standard Plan**: 2 notes per day, basic text formats only, no AI features
-- **Pro Plan**: Unlimited notes, PDF uploads, full AI analysis and question generation
-- **Usage Tracking**: Daily note count monitoring with automatic reset
-- **Access Control**: Feature-based restrictions based on subscription tier
-- **Upgrade Prompts**: Contextual suggestions when limits are reached
-- **Subscription Banners**: Visual status indicators throughout the app
 
 ### ✅ Enhanced Dialog System
 - **Reusable Dialog Component**: Beautiful, themed confirmation dialogs
@@ -295,11 +252,6 @@ npm run dev
 - **Vector Embeddings**: Semantic content understanding
 - **Concept Extraction**: Automatic knowledge mapping (Pro only)
 
-### Subscription System
-- **Tier-Based Access**: Feature restrictions based on subscription level
-- **Usage Tracking**: Daily limits and usage monitoring
-- **Upgrade Flow**: Seamless subscription management
-
 ## Deployment
 
 The project is configured for deployment on Netlify with serverless functions for AI features.
@@ -318,4 +270,3 @@ The project is configured for deployment on Netlify with serverless functions fo
 - **Deployment**: Netlify with serverless functions
 - **File Processing**: PDF.js, Mammoth.js for document parsing
 - **Notifications**: Custom toast and notification system
-- **Subscriptions**: Custom tier-based access control system
