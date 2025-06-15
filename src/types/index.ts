@@ -21,6 +21,8 @@ export interface Note {
   pdfPublicUrl?: string | null;
   originalFilename?: string | null;
   analysis_status?: 'not_started' | 'pending' | 'completed' | 'failed' | 'in_progress' | 'analyzing_gaps';
+  subject_id?: number | null;
+  year_level?: string | null;
 }
 
 // Represents a note that is semantically similar to the current one
@@ -44,6 +46,15 @@ export interface ConceptRelationship {
   target_id: string;
   relationship_type: 'prerequisite' | 'related' | 'builds-upon';
   strength: number;
+}
+
+// Data model for a Subject
+export interface Subject {
+  id: number;
+  name: string;
+  description?: string;
+  user_id: string;
+  created_at: string;
 }
 
 // --- AI & REVIEW TYPES ---

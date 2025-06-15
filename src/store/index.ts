@@ -85,7 +85,9 @@ export const useStore = create<State>((set, get) => ({
         pdfStoragePath: noteFromDb.pdf_storage_path,
         pdfPublicUrl: noteFromDb.pdf_public_url,
         originalFilename: noteFromDb.original_filename,
-        analysis_status: noteFromDb.analysis_status
+        analysis_status: noteFromDb.analysis_status,
+        subject_id: noteFromDb.subject_id,
+        year_level: noteFromDb.year_level
       }));
 
       set({ 
@@ -114,7 +116,9 @@ export const useStore = create<State>((set, get) => ({
       createdAt: new Date(),
       updatedAt: new Date(),
       tags: note.tags || [],
-      analysis_status: 'not_started'
+      analysis_status: 'not_started',
+      subject_id: note.subject_id || null,
+      year_level: note.year_level || null
     } as Note;
     set((state) => ({
       notes: [newNote, ...state.notes],

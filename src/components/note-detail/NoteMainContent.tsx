@@ -4,17 +4,24 @@ import { FileText, Map as MapIcon } from 'lucide-react';
 import NoteEditForm from './NoteEditForm';
 import NoteContentView from './NoteContentView';
 import NoteMindMap from './NoteMindMap'; 
-import { Note } from '../../types';
+import { Note, Subject } from '../../types';
 
 interface NoteMainContentProps {
   note: Note;
   editMode: boolean;
-  editedNote: { title: string; content: string; tags: string };
-  onNoteChange: (field: keyof NoteMainContentProps['editedNote'], value: string) => void;
+  editedNote: { 
+    title: string; 
+    content: string; 
+    tags: string;
+    subject_id: number | null;
+    year_level: string | null;
+  };
+  onNoteChange: (field: keyof NoteMainContentProps['editedNote'], value: string | number | null) => void;
   isPdfAvailable: boolean;
   activeTab: 'content' | 'mindmap';
   onTabChange: (tab: 'content' | 'mindmap') => void;
   viewMode: 'text' | 'pdf';
+  subjects: Subject[];
 }
 
 const NoteMainContent: React.FC<NoteMainContentProps> = ({
@@ -26,6 +33,7 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
   activeTab,
   onTabChange,
   viewMode,
+  subjects,
 }) => {
   if (editMode) {
     // In edit mode, we always show the form, tabs are not relevant for editing UI
@@ -35,6 +43,7 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
         onNoteChange={onNoteChange}
         originalNote={note}
         isPdfAvailable={isPdfAvailable}
+        subjects={subjects}
       />
     );
   }
