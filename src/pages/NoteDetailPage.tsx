@@ -301,6 +301,7 @@ const NoteDetailPage: React.FC = () => {
         newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
       }
 
+      // CRITICAL FIX: Preserve PDF metadata during save
       await saveNoteToDatabase({ 
         id: note.id,
         user_id: user.id,
@@ -310,9 +311,22 @@ const NoteDetailPage: React.FC = () => {
         embedding: newEmbedding,
         updatedAt: now.toISOString(),
         createdAt: note.createdAt.toISOString(),
+        // Preserve existing PDF metadata
+        pdf_storage_path: note.pdfStoragePath,
+        pdf_public_url: note.pdfPublicUrl,
+        original_filename: note.originalFilename,
+        // Preserve other metadata
+        summary: note.summary,
+        analysis_status: note.analysis_status,
       });
 
-      const noteUpdatesForStore = { title: updatedTitle, content: updatedContent, tags: updatedTags, updatedAt: now, embedding: newEmbedding };
+      const noteUpdatesForStore = { 
+        title: updatedTitle, 
+        content: updatedContent, 
+        tags: updatedTags, 
+        updatedAt: now, 
+        embedding: newEmbedding 
+      };
       updateNote(note.id, noteUpdatesForStore);
       setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
       setEditMode(false);
