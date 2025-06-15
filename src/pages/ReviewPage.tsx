@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../contexts/ToastContext';
 import { 
   Target, Zap, Brain, HelpCircle, 
   MessageSquare, List, FileQuestion
@@ -43,6 +44,7 @@ type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 
 const ReviewPage: React.FC = () => {
   const { notes } = useStore();
+  const { addToast } = useToast();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
@@ -70,6 +72,10 @@ const ReviewPage: React.FC = () => {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
   const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
+
+  // AI Review state
+  const [aiReviewFeedback, setAiReviewFeedback] = useState<string | null>(null);
+  const [isAiReviewing, setIsAiReviewing] = useState(false);
 
   // Search and tab state
   const [searchTerm, setSearchTerm] = useState('');
@@ -115,6 +121,7 @@ const ReviewPage: React.FC = () => {
         setIsAnswerSaved(false);
       }
       setShowHint(false);
+      setAiReviewFeedback(null); // Clear AI feedback when changing questions
     }
   }, [currentQuestionIndex, currentQuestions, userAnswers]);
 
@@ -311,6 +318,7 @@ const ReviewPage: React.FC = () => {
       setUserAnswers([]); 
       setIsReviewComplete(false);
       setCurrentStep('review');
+      setAiReviewFeedback(null);
 
     } catch (error) {
       setSessionStartTime(null);
@@ -362,17 +370,78 @@ const ReviewPage: React.FC = () => {
   };
 
   const handleDifficultyResponse = async (difficulty: 'easy' | 'medium' | 'hard') => {
-    if (!currentSessionId || !isAnswerSaved) { alert("Please save your answer before rating."); return; }
+    if (!currentSessionId || !isAnswerSaved) { 
+      addToast("Please save your answer before rating.", 'warning'); 
+      return; 
+    }
     try {
       const { error } = await supabase.from('review_answers').update({ difficulty_rating: difficulty }).eq('session_id', currentSessionId).eq('question_index', currentQuestionIndex);
       if (error) throw error;
+      
       const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
       setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, difficulty_rating: difficulty } : a));
+      
       if (difficulty !== previouslyRated) {
         setSessionStats(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1, ...(previouslyRated && { [previouslyRated]: prev[previouslyRated] - 1 }) }));
         if (!previouslyRated) setReviewedCount(prev => prev + 1);
       }
-    } catch (error) { console.error('Error saving difficulty rating:', error); }
+    } catch (error) { 
+      console.error('Error saving difficulty rating:', error); 
+      addToast('Failed to save difficulty rating.', 'error');
+    }
+  };
+
+  const handleAiReviewAnswer = async () => {
+    if (!currentQuestion || !userAnswer.trim() || !currentSessionId) {
+      addToast('Please save your answer first before requesting AI feedback.', 'warning');
+      return;
+    }
+
+    setIsAiReviewing(true);
+    setAiReviewFeedback(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("User not authenticated for AI review.");
+
+      const payload = {
+        answers: [{
+          questionId: currentQuestion.id,
+          answerText: userAnswer.trim()
+        }],
+        noteId: currentQuestion.noteId
+      };
+
+      const response = await fetch('/api/review-answers', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to get AI feedback');
+      }
+
+      const data = await response.json();
+      
+      if (data.feedbacks && data.feedbacks.length > 0) {
+        const feedback = data.feedbacks[0];
+        setAiReviewFeedback(feedback.feedback);
+        addToast('AI feedback received!', 'success');
+      } else {
+        throw new Error('No feedback received from AI');
+      }
+
+    } catch (error) {
+      console.error('Error getting AI review:', error);
+      addToast('Failed to get AI feedback. Please try again.', 'error');
+    } finally {
+      setIsAiReviewing(false);
+    }
   };
 
   const resetReview = () => {
@@ -395,6 +464,8 @@ const ReviewPage: React.FC = () => {
     setCustomDifficulty(false);
     setSearchTerm('');
     setActiveNoteSelectionTab('available');
+    setAiReviewFeedback(null);
+    setIsAiReviewing(false);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -512,6 +583,9 @@ const ReviewPage: React.FC = () => {
         isAnswerSaved={isAnswerSaved}
         isSaving={isSaving}
         onSaveAnswer={saveAnswer}
+        aiReviewFeedback={aiReviewFeedback}
+        isAiReviewing={isAiReviewing}
+        onAiReviewAnswer={handleAiReviewAnswer}
         // ReviewControls props
         onNavigatePrevious={() => handleNavigation('previous')}
         onNavigateNext={() => handleNavigation('next')}
@@ -520,6 +594,7 @@ const ReviewPage: React.FC = () => {
         isLastQuestion={isLastQuestion}
         // DifficultyRating prop
         onRateDifficulty={handleDifficultyResponse}
+        userAnswers={userAnswers}
         // SessionProgressSidebar props
         reviewedCount={reviewedCount}
         answersSavedCount={userAnswers.length}

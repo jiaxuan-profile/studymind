@@ -18,6 +18,13 @@ interface Question {
 }
 type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 
+interface UserAnswer {
+  questionIndex: number;
+  answer: string;
+  timestamp: Date;
+  difficulty_rating?: 'easy' | 'medium' | 'hard';
+}
+
 interface ActiveReviewScreenProps {
   currentQuestionIndex: number;
   totalQuestionsInSession: number;
@@ -39,6 +46,9 @@ interface ActiveReviewScreenProps {
   isAnswerSaved: boolean;
   isSaving: boolean;
   onSaveAnswer: () => Promise<void>;
+  aiReviewFeedback?: string | null;
+  isAiReviewing?: boolean;
+  onAiReviewAnswer?: () => void;
 
   // Props for ReviewControls
   onNavigatePrevious: () => void;
@@ -49,7 +59,7 @@ interface ActiveReviewScreenProps {
 
   // Prop for DifficultyRating (and its conditional rendering)
   onRateDifficulty: (difficulty: 'easy' | 'medium' | 'hard') => void;
-  // isAnswerSaved is already listed under AnswerInputArea props
+  userAnswers: UserAnswer[];
 
   // Props for SessionProgressSidebar
   reviewedCount: number;
@@ -74,12 +84,16 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
   isAnswerSaved,
   isSaving,
   onSaveAnswer,
+  aiReviewFeedback,
+  isAiReviewing,
+  onAiReviewAnswer,
   onNavigatePrevious,
   onNavigateNext,
   onFinishSession,
   isFirstQuestion,
   isLastQuestion,
   onRateDifficulty,
+  userAnswers,
   reviewedCount,
   answersSavedCount,
   sessionStats,
@@ -87,6 +101,10 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
   if (!currentQuestion) {
     return <div className="text-center p-12">Loading question or no questions available...</div>;
   }
+
+  // Get the selected rating for the current question
+  const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+  const selectedRating = currentAnswerRecord?.difficulty_rating || null;
 
   return (
     <div className="fade-in">
@@ -119,6 +137,9 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
                 isAnswerSaved={isAnswerSaved}
                 isSaving={isSaving}
                 onSaveAnswer={onSaveAnswer}
+                aiReviewFeedback={aiReviewFeedback}
+                isAiReviewing={isAiReviewing}
+                onAiReviewAnswer={onAiReviewAnswer}
               />
               
               <ReviewControls
@@ -132,6 +153,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
               {isAnswerSaved && (
                 <DifficultyRating
                   onRateDifficulty={onRateDifficulty}
+                  selectedRating={selectedRating}
                 />
               )}
             </div>
