@@ -4,11 +4,11 @@ import { FileText } from 'lucide-react';
 import { Note, Subject } from '../../types';
 
 const YEAR_LEVEL_OPTIONS = [
-  { value: '', label: 'Select Year Level' },
-  { value: 'elementary', label: 'Elementary/Primary' },
-  { value: 'secondary', label: 'Secondary/High School' },
-  { value: 'tertiary', label: 'Tertiary (College/University)' },
-  { value: 'professional', label: 'Working Professional' }
+  { value: '0', label: 'Select Year Level' },
+  { value: '1', label: 'Primary/Elementary' },
+  { value: '2', label: 'Secondary/High School' },
+  { value: '3', label: 'Tertiary (College/University)' },
+  { value: '4', label: 'Working Professional' }
 ];
 
 interface NoteEditFormProps {
@@ -30,7 +30,7 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
   onNoteChange,
   originalNote,
   isPdfAvailable,
-  subjects,
+  subjects = [],
 }) => {
   return (
     <div className="p-6">

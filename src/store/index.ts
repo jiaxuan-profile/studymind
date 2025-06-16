@@ -1,12 +1,10 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User, ConceptRelationship, PomodoroSettings } from '../types'; 
-import { 
-  getAllNotes, 
-  updateNoteSummary, 
-  deleteNoteFromDatabase,
-  getAllConcepts,
-} from '../services/databaseServiceClient';
+import { Note, Concept, User, ConceptRelationship, PomodoroSettings } from '../types';
+import { toNote } from '../utils/transformers';
+import { withAuthenticatedUser } from '../utils/authenticatedUser';
+import { getAllConcepts } from '../services/databaseService';
+import { getAllNotes, updateNoteSummary, deleteNoteFromDatabase } from '../services/noteService';
 import { generateNoteSummary } from '../services/aiService';
 
 interface PaginationState {
@@ -26,22 +24,23 @@ interface State {
   error: string | null;
   pagination: PaginationState;
   pomodoroSettings: PomodoroSettings;
-  
-  addNote: (note: Partial<Note>) => void; 
+
+  addNote: (note: Partial<Note>) => void;
   updateNote: (id: string, updates: Partial<Note>) => void;
   deleteNote: (id: string) => Promise<void>;
   loadNotes: (page?: number, pageSize?: number, options?: { searchTerm?: string }) => Promise<void>;
   summarizeNote: (id: string) => Promise<void>;
-  
+
   addConcept: (concept: Concept) => void;
   updateConcept: (id: string, updates: Partial<Concept>) => void;
   deleteConcept: (id: string) => void;
-  
+
   setUser: (user: User | null) => void;
+  getAuthenticatedUserId: () => string | null;
   toggleTheme: () => void;
   resetStore: () => void;
   loadConcepts: () => Promise<void>;
-  
+
   updatePomodoroSettings: (updates: Partial<PomodoroSettings>) => void;
 }
 
@@ -66,31 +65,16 @@ export const useStore = create<State>((set, get) => ({
     cyclesBeforeLongBreak: 4,
     soundEnabled: true,
   },
-  
+
   loadNotes: async (page = 1, pageSize = 12, options = {}) => {
     set({ isLoading: true, error: null });
-    try {
-      const { data, count } = await getAllNotes(page, pageSize, { searchTerm: options.searchTerm });
-      const totalPages = Math.ceil((count ?? 0) / pageSize);
-      
-      const formattedNotes: Note[] = data.map(noteFromDb => ({
-        id: noteFromDb.id,
-        user_id: noteFromDb.user_id,
-        title: noteFromDb.title,
-        content: noteFromDb.content,
-        tags: noteFromDb.tags || [],
-        summary: noteFromDb.summary,
-        createdAt: new Date(noteFromDb.created_at),
-        updatedAt: new Date(noteFromDb.updated_at),
-        pdfStoragePath: noteFromDb.pdf_storage_path,
-        pdfPublicUrl: noteFromDb.pdf_public_url,
-        originalFilename: noteFromDb.original_filename,
-        analysis_status: noteFromDb.analysis_status,
-        subject_id: noteFromDb.subject_id,
-        year_level: noteFromDb.year_level
-      }));
 
-      set({ 
+    await withAuthenticatedUser(set, async (userId) => {
+      const { data, count } = await getAllNotes(page, pageSize, { searchTerm: options.searchTerm }, userId);
+      const totalPages = Math.ceil((count ?? 0) / pageSize);
+      const formattedNotes = data.map(toNote);
+
+      set({
         notes: formattedNotes,
         isLoading: false,
         pagination: {
@@ -100,47 +84,47 @@ export const useStore = create<State>((set, get) => ({
           totalNotes: count ?? 0
         }
       });
-    } catch (error) {
-      console.error('Store: Failed to load notes:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to load notes',
-        isLoading: false 
-      });
-    }
+    });
   },
-  
+
   addNote: async (note) => {
-    const newNote = {
-      ...note,
-      user_id: get().user?.id || '',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      tags: note.tags || [],
-      analysis_status: 'not_started',
-      subject_id: note.subject_id || null,
-      year_level: note.year_level || null
-    } as Note;
-    set((state) => ({
-      notes: [newNote, ...state.notes],
-      totalNotes: state.pagination.totalNotes + 1,
-    }));
+    await withAuthenticatedUser(set, async (userId) => {
+      const newNote = {
+        ...note,
+        user_id: userId || '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        tags: note.tags || [],
+        analysis_status: 'not_started',
+        subject_id: note.subjectId || null,
+        year_level: note.yearLevel || null
+      } as Note;
+
+      set((state) => ({
+        notes: [newNote, ...state.notes],
+        totalNotes: state.pagination.totalNotes + 1,
+      }));
+    });
   },
-  
+
   updateNote: (id, updates) => set((state) => ({
     notes: state.notes.map((note) => (note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note)),
   })),
-  
+
   deleteNote: async (id) => {
-    try {
-      await deleteNoteFromDatabase(id);
-      console.log("Store: Note deleted from DB. Reloading notes list.");
-      const { pagination } = get();
-      await get().loadNotes(pagination.currentPage, pagination.pageSize);
-    } catch (error) {
-      console.error("Store: Error during deleteNote action:", error);
-      set({ error: error instanceof Error ? error.message : 'Failed to delete note' });
-      throw error; 
-    }
+    await withAuthenticatedUser(set, async (userId) => {
+      try {
+        await deleteNoteFromDatabase(id, userId);
+        console.log("Store: Note deleted from DB. Reloading notes list.");
+
+        const { pagination } = get();
+        await get().loadNotes(pagination.currentPage, pagination.pageSize);
+      } catch (error) {
+        console.error("Store: Error during deleteNote action:", error);
+        set({ error: error instanceof Error ? error.message : 'Failed to delete note' });
+        throw error;
+      }
+    }, 'User ID is required to delete note');
   },
 
   summarizeNote: async (id) => {
@@ -149,7 +133,7 @@ export const useStore = create<State>((set, get) => ({
 
     try {
       set(state => ({
-        notes: state.notes.map(n => 
+        notes: state.notes.map(n =>
           n.id === id ? { ...n, summary: 'Generating summary...' } : n
         )
       }));
@@ -158,33 +142,35 @@ export const useStore = create<State>((set, get) => ({
       await updateNoteSummary(id, summary);
 
       set(state => ({
-        notes: state.notes.map(n => 
+        notes: state.notes.map(n =>
           n.id === id ? { ...n, summary } : n
         )
       }));
     } catch (error) {
       console.error('Error summarizing note:', error);
       set(state => ({
-        notes: state.notes.map(n => 
+        notes: state.notes.map(n =>
           n.id === id ? { ...n, summary: undefined } : n
         )
       }));
       throw error;
     }
   },
-  
+
   addConcept: (concept) => set((state) => ({ concepts: [...state.concepts, concept] })),
-  
+
   updateConcept: (id, updates) => set((state) => ({
     concepts: state.concepts.map((concept) => (concept.id === id ? { ...concept, ...updates } : concept)),
   })),
-  
+
   deleteConcept: (id) => set((state) => ({
     concepts: state.concepts.filter((concept) => concept.id !== id),
   })),
-  
+
   setUser: (user) => set({ user }),
-  
+
+  getAuthenticatedUserId: () => get().user?.id ?? null,
+
   toggleTheme: () => set((state) => {
     const newTheme = state.theme === 'light' ? 'dark' : 'light';
     if (typeof window !== 'undefined') {
@@ -192,11 +178,11 @@ export const useStore = create<State>((set, get) => ({
     }
     return { theme: newTheme };
   }),
-  
+
   resetStore: () => set({
     notes: [],
     concepts: [],
-    relationships: [], 
+    relationships: [],
     isLoading: false,
     error: null,
     pagination: {
@@ -217,8 +203,8 @@ export const useStore = create<State>((set, get) => ({
     try {
       const { concepts, relationships } = await getAllConcepts();
       set({
-        concepts: concepts as Concept[],          
-        relationships: relationships as ConceptRelationship[],     
+        concepts: concepts as Concept[],
+        relationships: relationships as ConceptRelationship[],
         isLoading: false
       });
     } catch (error) {
@@ -229,7 +215,7 @@ export const useStore = create<State>((set, get) => ({
       });
     }
   },
-  
+
   // Pomodoro settings actions
   updatePomodoroSettings: (updates) => set((state) => ({
     pomodoroSettings: { ...state.pomodoroSettings, ...updates }

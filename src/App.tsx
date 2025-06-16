@@ -19,6 +19,22 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ToastContainer from './components/ToastContainer';
 import { useStore } from './store';
 
+const AuthStateSynchronizer = () => {
+  const { user } = useAuth();
+  const { zustandUser, setUser } = useStore(state => ({
+    zustandUser: state.user,
+    setUser: state.setUser
+  }));
+
+  useEffect(() => {
+    if (user?.id !== zustandUser?.id) {
+      setUser(user);
+    }
+  }, [user, zustandUser, setUser]);
+
+  return null;
+};
+
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
@@ -29,17 +45,22 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  
+
   return user ? <>{children}</> : <Navigate to="/login" replace />;
 }
 
 function AppRoutes() {
-  const { loadNotes: storeLoadNotes, resetStore: storeResetStore, theme, setUser } = useStore();
-  const { user, signOut } = useAuth();
+  const {
+    user: zustandUser,
+    loadNotes: storeLoadNotes,
+    resetStore: storeResetStore,
+    theme
+  } = useStore();
+
+  const { signOut } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  // Apply theme to document
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -47,9 +68,10 @@ function AppRoutes() {
       document.documentElement.classList.remove('dark');
     }
   }, [theme]);
-    
+
   const loadNotes = useCallback(() => {
-    storeLoadNotes();
+    console.log('AppRoutes: Triggering notes load.');
+    storeLoadNotes(1, 12, {});
   }, [storeLoadNotes]);
 
   const resetStore = useCallback(() => {
@@ -59,32 +81,29 @@ function AppRoutes() {
   const handleLogout = useCallback(async () => {
     try {
       await signOut();
-      resetStore();
+      useStore.getState().resetStore();
       addToast('Logged out successfully', 'success');
       navigate('/login');
     } catch (error) {
       addToast('Failed to logout', 'error');
       console.error('Logout error:', error);
     }
-  }, [signOut, resetStore, addToast, navigate]);
+  }, [signOut, addToast, navigate]);
 
   useEffect(() => {
-    if (user) {
-      console.log("AppRoutes: User detected, triggering initial data load.");
-      setUser(user);
-      loadNotes(); 
+    if (zustandUser) {
+      loadNotes();
     } else {
-      console.log("AppRoutes: No user detected, resetting store.");
-      resetStore();
+      storeResetStore();
     }
-  }, [user, loadNotes, resetStore, setUser]);
+  }, [zustandUser, loadNotes, resetStore]);
 
   return (
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-        
+
         <Route path="/" element={
           <PrivateRoute>
             <Layout onLogout={handleLogout} />
@@ -101,7 +120,7 @@ function AppRoutes() {
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
-      
+
       <ToastContainer />
     </>
   );
@@ -110,6 +129,7 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
+      <AuthStateSynchronizer />
       <ToastProvider>
         <NotificationProvider>
           <AppRoutes />

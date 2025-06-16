@@ -3,23 +3,50 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useStore } from '../store';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { supabase } from '../services/supabase';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
-import { saveNoteToDatabase, deleteNoteFromDatabase } from '../services/databaseServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
+import { supabase } from '../services/supabase';
 import NoteHeader from '../components/note-detail/NoteHeader';
 import NoteMainContent from '../components/note-detail/NoteMainContent';
-import StudyAssistantPanel from '../components/note-detail/StudyAssistantPanel'; 
+import StudyAssistantPanel from '../components/note-detail/StudyAssistantPanel';
 import Dialog from '../components/Dialog';
 import { Concept, KnowledgeGap, RelatedNote, Note as NoteType } from '../types';
 
+import { Subject } from '../types/index';
+
+interface NoteSubject extends Subject {
+  notes: any[];
+}
+
 const NoteDetailPage: React.FC = () => {
+  const { user, loading  } = useAuth();
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    console.log('User is not authenticated');
+    return <div>Please log in to view this page.</div>;
+  }
+
+  console.log('User:', user);
+
+  const [subjects, setSubjects] = useState<NoteSubject[]>([
+    {
+      id: 1 as number,
+      name: 'Math',
+      user_id: '1',
+      created_at: new Date().toISOString(),
+      notes: []
+    }
+  ]);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const { notes, updateNote, deleteNote: deleteNoteFromStore } = useStore(); 
+  const { notes, updateNote, deleteNote } = useStore();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
 
@@ -34,14 +61,25 @@ const NoteDetailPage: React.FC = () => {
       title: current?.title || '',
       content: current?.content || '',
       tags: current?.tags?.join(', ') || '',
+      subject_id: current?.subjectId || null,
+      year_level: current?.yearLevel || null,
     };
   });
+
+  // Ensure initial state matches the SetStateAction type
+  useEffect(() => {
+    setEditedNote(prev => ({
+      ...prev,
+      subject_id: prev.subject_id || null,
+      year_level: prev.year_level || null
+    }));
+  }, []);
 
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiQuestion, setAiQuestion] = useState('');
-  
+
   const [viewMode, setViewMode] = useState<'text' | 'pdf'>('text');
   const [pdfInfo, setPdfInfo] = useState<{ publicUrl: string; fileName: string; } | null>(null);
 
@@ -60,13 +98,18 @@ const NoteDetailPage: React.FC = () => {
   const [relatedNotes, setRelatedNotes] = useState<RelatedNote[]>([]);
   const [isFindingRelated, setIsFindingRelated] = useState(false);
 
+  const [isNewNote, setIsNewNote] = useState(location.state?.isNewNote ?? false);
+  const [isLocalOnly, setIsLocalOnly] = useState(location.state?.isLocalOnly ?? false);
+
   // --- useEffects and handlers ---
   useEffect(() => {
     if (location.state?.isNewNote) {
+      setIsNewNote(true);
+      setIsLocalOnly(location.state?.isLocalOnly ?? false);
       navigate(location.pathname, { replace: true });
     }
   }, [location.state, navigate, location.pathname]);
-  
+
   useEffect(() => {
     const currentNoteId = id;
     const foundNote = notes.find((n) => n.id === currentNoteId);
@@ -80,12 +123,12 @@ const NoteDetailPage: React.FC = () => {
     if (foundNote) {
       // Only reset state if we're switching to a different note
       const isNewNote = !note || note.id !== foundNote.id;
-      
+
       if (isNewNote) {
         setRelatedNotes([]);
         setIsFindingRelated(false);
         setViewMode('text');
-        setActiveTab('content'); // Only reset tab when switching notes
+        setActiveTab('content');
       }
 
       setNote(foundNote);
@@ -93,6 +136,8 @@ const NoteDetailPage: React.FC = () => {
         title: foundNote.title,
         content: foundNote.content,
         tags: foundNote.tags.join(', '),
+        subject_id: foundNote.subjectId || null,
+        year_level: foundNote.yearLevel || null
       });
 
       if (foundNote.pdfPublicUrl && foundNote.originalFilename) {
@@ -102,28 +147,26 @@ const NoteDetailPage: React.FC = () => {
         });
       } else {
         setPdfInfo(null);
-        if (foundNote.id) fetchPdfInfo(foundNote.id);
       }
-      
-      if (foundNote.id) checkExistingData(foundNote.id);
-    }
-  }, [id, notes, navigate]);
 
-  const fetchPdfInfo = async (noteId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('pdf_public_url, original_filename')
-        .eq('id', noteId)
-        .single();
-      if (error) throw error;
-      if (data?.pdf_public_url && data?.original_filename) {
-        setPdfInfo({ publicUrl: data.pdf_public_url, fileName: data.original_filename });
+      // Only check existing data if it's not a new local-only note
+      if (foundNote.id && !isLocalOnly) {
+        checkExistingData(foundNote.id);
       }
-    } catch (error) {
-      console.error('Error fetching PDF info:', error);
     }
-  };
+  }, [id, notes, navigate, isLocalOnly]);
+
+  // Add this new useEffect for cleanup
+  useEffect(() => {
+    return () => {
+      // Cleanup: remove local-only empty notes when leaving the page
+      if (isLocalOnly && note &&
+        editedNote.title.trim() === 'Untitled Note' &&
+        editedNote.content.trim() === '') {
+        deleteNote(note.id);
+      }
+    };
+  }, [isLocalOnly, editedNote.title, editedNote.content, note, deleteNote]);
 
   const checkExistingData = async (noteId: string) => {
     setConceptsLoading(true);
@@ -138,26 +181,26 @@ const NoteDetailPage: React.FC = () => {
             definition
           )
         `)
-        .eq('note_id', noteId); 
+        .eq('note_id', noteId);
 
       if (conceptsError) throw conceptsError;
-      
+
       const concepts = (conceptsData ?? [])
-        .map(item => item.concepts)
-        .filter(concept => concept !== null) as Concept[];
-      
+        .flatMap((item: { concepts: any }) => item.concepts)
+        .filter((concept: any) => concept !== null)
+        .map((concept: any) => ({
+          id: concept.id || '',
+          name: concept.name || '',
+          definition: concept.definition || '',
+          subject_id: null,
+          year_level: null
+        }));
+
       setRelatedConcepts(concepts);
       setConceptsExist(concepts.length > 0);
-      
-      const { data: gapsData, error: gapsError } = await supabase
-        .from('knowledge_gaps')
-        .select('*')
-        .eq('note_id', noteId) 
-        .order('priority_score', { ascending: false });
 
-      if (gapsError) throw gapsError;
-
-      setKnowledgeGaps((gapsData ?? []) as KnowledgeGap[]);
+      const gapsData = await getKnowledgeGapsForNote(noteId);
+      setKnowledgeGaps(gapsData as KnowledgeGap[]);
       setGapsExist((gapsData ?? []).length > 0);
 
     } catch (error) {
@@ -174,7 +217,7 @@ const NoteDetailPage: React.FC = () => {
     setAiProcessing(true);
     try {
       console.log("Generating AI analysis for note:", note.id);
-      
+
       addToast('Starting AI analysis...', 'info');
       addNotification(`AI analysis started for "${note.title}"`, 'info', 'AI Analysis');
 
@@ -184,52 +227,52 @@ const NoteDetailPage: React.FC = () => {
         const updatedTags = [...new Set([...note.tags, ...analysis.suggestedTags])];
 
         const noteUpdates = {
-            summary: updatedSummary,
-            tags: updatedTags,
-            analysis_status: 'completed',
+          summary: updatedSummary,
+          tags: updatedTags,
+          analysis_status: 'completed',
         };
 
         console.log("Persisting AI analysis (summary and tags) to the database...");
 
         await saveNoteToDatabase({
-            id: note.id,
-            user_id: note.user_id!,
-            title: note.title,
-            content: note.content,
-            updated_at: new Date().toISOString(),
-            ...noteUpdates,
-            created_at: note.createdAt.toISOString(), 
-            tags: updatedTags,
-            analysis_status: 'completed',
-            pdf_storage_path: note.pdfStoragePath ?? '',
-            pdf_public_url: note.pdfPublicUrl ?? '',
-            original_filename: note.originalFilename ?? '', 
+          id: note.id,
+          user_id: note.userId!,
+          title: note.title,
+          content: note.content,
+          updated_at: new Date().toISOString(),
+          ...noteUpdates,
+          created_at: note.createdAt.toISOString(),
+          tags: updatedTags,
+          analysis_status: 'completed',
+          pdf_storage_path: note.pdfStoragePath ?? '',
+          pdf_public_url: note.pdfPublicUrl ?? '',
+          original_filename: note.originalFilename ?? '',
         });
         console.log("Database updated successfully.");
-        
-        const updatedNoteForUI = { 
-            ...note, 
-            ...noteUpdates,
-            updatedAt: new Date(),
+
+        const updatedNoteForUI = {
+          ...note,
+          ...noteUpdates,
+          updatedAt: new Date(),
         };
         setNote({
           ...updatedNoteForUI,
-          analysis_status: updatedNoteForUI.analysis_status as "not_started" | "pending" | "completed" | "failed" | "in_progress" | "analyzing_gaps"
+          analysisStatus: updatedNoteForUI.analysis_status as "not_started" | "pending" | "completed" | "failed" | "in_progress" | "analyzing_gaps"
         });
         updateNote(note.id, {
           summary: noteUpdates.summary,
           tags: noteUpdates.tags,
-          analysis_status: noteUpdates.analysis_status as "not_started" | "pending" | "completed" | "failed" | "in_progress" | "analyzing_gaps"
+          analysisStatus: noteUpdates.analysis_status as "not_started" | "pending" | "completed" | "failed" | "in_progress" | "analyzing_gaps"
         });
 
         await analyzeGapsForNote(note.id);
         await generateQuestionsForNote(note.id);
-        
+
         await checkExistingData(note.id);
-        
+
         addToast('AI analysis completed successfully!', 'success');
         addNotification(`AI analysis completed for "${note.title}" - concepts extracted and questions generated`, 'success', 'AI Analysis');
-        
+
         console.log("AI analysis completed successfully");
       }
     } catch (error) {
@@ -259,10 +302,18 @@ const NoteDetailPage: React.FC = () => {
   };
 
   const handleEditedNoteChange = (
-    field: keyof typeof editedNote, 
-    value: string
+    field: keyof typeof editedNote,
+    value: string | number | null
   ) => {
-    setEditedNote(prev => ({ ...prev, [field]: value }));
+    setEditedNote(prev => {
+      const newValue = field === 'year_level' && typeof value === 'number'
+        ? String(value)
+        : value;
+      return {
+        ...prev,
+        [field]: newValue
+      };
+    });
   };
 
   const handleDeleteClick = () => {
@@ -271,17 +322,16 @@ const NoteDetailPage: React.FC = () => {
 
   const handleDeleteConfirm = async () => {
     if (!note) return;
-    
+
     setIsDeleting(true);
     try {
       addToast('Deleting note...', 'info');
-      
-      await deleteNoteFromDatabase(note.id);
-      deleteNoteFromStore(note.id);
-      
+
+      deleteNote(note.id);
+
       addToast('Note deleted successfully', 'success');
       addNotification(`Note "${note.title}" was deleted`, 'info', 'Note Management');
-      
+
       navigate('/notes');
 
     } catch (error) {
@@ -294,14 +344,19 @@ const NoteDetailPage: React.FC = () => {
       setShowDeleteDialog(false);
     }
   };
-  
+
   const handleSave = async () => {
-    if (!note) return;
+    if (!note || !user) return;
+
+    // Don't save if title is still "Untitled Note" and content is empty
+    if (editedNote.title.trim() === 'Untitled Note' && editedNote.content.trim() === '') {
+      // Just navigate back without saving
+      navigate('/notes');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
       const updatedTitle = editedNote.title;
       const updatedContent = editedNote.content;
       const updatedTags = editedNote.tags.split(',').map((tag) => tag.trim()).filter(Boolean);
@@ -314,38 +369,59 @@ const NoteDetailPage: React.FC = () => {
         newEmbedding = await generateEmbeddingOnClient(updatedContent, updatedTitle);
       }
 
-      // CRITICAL FIX: Preserve PDF metadata during save
-      await saveNoteToDatabase({ 
-        id: note.id,
-        user_id: user.id,
+      // If it's a local-only note, this will be its first save to database
+      if (isLocalOnly) {
+        // Create a new note in the database
+        await saveNoteToDatabase({
+          id: note.id, // Keep the same ID for consistency
+          user_id: user.id,
+          title: updatedTitle,
+          content: updatedContent,
+          tags: updatedTags,
+          embedding: newEmbedding,
+          updated_at: now.toISOString(),
+          created_at: note.createdAt.toISOString(),
+          pdf_storage_path: '',
+          pdf_public_url: '',
+          original_filename: '',
+          summary: '',
+          analysis_status: 'not_started',
+        });
+
+        setIsLocalOnly(false); // It's now saved to database
+      } else {
+        // Normal update flow - preserve PDF metadata
+        await saveNoteToDatabase({
+          id: note.id,
+          user_id: user.id,
+          title: updatedTitle,
+          content: updatedContent,
+          tags: updatedTags,
+          embedding: newEmbedding,
+          updated_at: now.toISOString(),
+          created_at: note.createdAt.toISOString(),
+          pdf_storage_path: note.pdfStoragePath ?? '',
+          pdf_public_url: note.pdfPublicUrl ?? '',
+          original_filename: note.originalFilename ?? '',
+          summary: note.summary,
+          analysis_status: note.analysisStatus,
+        });
+      }
+
+      const noteUpdatesForStore = {
         title: updatedTitle,
         content: updatedContent,
         tags: updatedTags,
-        embedding: newEmbedding,
-        updated_at: now.toISOString(),
-        created_at: note.createdAt.toISOString(),
-        // Preserve existing PDF metadata
-        pdf_storage_path: note.pdfStoragePath ?? '',
-        pdf_public_url: note.pdfPublicUrl ?? '',
-        original_filename: note.originalFilename ?? '',
-        summary: note.summary,
-        analysis_status: note.analysis_status,
-      });
-
-      const noteUpdatesForStore = { 
-        title: updatedTitle, 
-        content: updatedContent, 
-        tags: updatedTags, 
-        updatedAt: now, 
-        embedding: newEmbedding 
+        updatedAt: now,
+        embedding: newEmbedding
       };
       updateNote(note.id, noteUpdatesForStore);
       setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
       setEditMode(false);
-      
+
       addToast('Note saved successfully!', 'success');
       addNotification(`Note "${updatedTitle}" was updated`, 'success', 'Note Management');
-      
+
     } catch (error) {
       console.error("Failed to save note:", error);
       const errorMessage = `Error saving note: ${(error as Error).message}`;
@@ -355,12 +431,12 @@ const NoteDetailPage: React.FC = () => {
       setIsSaving(false);
     }
   };
-  
+
   const handleAskAi = () => {
     if (!note) return;
     setAiLoading(true);
-    setAiResponse(null); 
-    
+    setAiResponse(null);
+
     console.log(`Simulating AI call with question: "${aiQuestion}" for note: "${note.title}"`);
 
     // Simulating AI response with a delay
@@ -402,7 +478,7 @@ I can help with:
 - Creating study questions
 - Identifying gaps in understanding`;
       }
-      
+
       setAiResponse(response);
       setAiLoading(false);
     }, 1500);
@@ -416,37 +492,37 @@ I can help with:
     if (!note) return;
     setIsFindingRelated(true);
     try {
-        addToast('Finding related notes...', 'info');
-        const results = await findRelatedNotes(note.id);
-        setRelatedNotes(results);
-        
-        if (results.length > 0) {
-          addToast(`Found ${results.length} related notes`, 'success');
-        } else {
-          addToast('No related notes found', 'info');
-        }
+      addToast('Finding related notes...', 'info');
+      const results = await findRelatedNotes(note.id);
+      setRelatedNotes(results);
+
+      if (results.length > 0) {
+        addToast(`Found ${results.length} related notes`, 'success');
+      } else {
+        addToast('No related notes found', 'info');
+      }
     } catch (error) {
-        console.error("Failed to find related notes:", error);
-        addToast("Could not find related notes at this time.", 'error');
+      console.error("Failed to find related notes:", error);
+      addToast("Could not find related notes at this time.", 'error');
     } finally {
-        setIsFindingRelated(false);
+      setIsFindingRelated(false);
     }
   };
- 
+
   if (!note) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  const isPdfNote = note.tags.includes('PDF') || pdfInfo;
+  const isPdfNote = note.tags.includes('PDF') || pdfInfo !== null;
   const isPdfAvailable = !!note.pdfPublicUrl;
 
   return (
     <div className="fade-in">
-       <NoteHeader 
+      <NoteHeader
         onBack={() => navigate('/notes')}
         isPdfNote={isPdfNote}
         pdfInfoAvailable={isPdfAvailable}
@@ -454,29 +530,36 @@ I can help with:
         activeTab={activeTab}
         viewMode={viewMode}
         onToggleViewMode={toggleViewMode}
-        onEdit={() => setEditMode(true)} 
+        onEdit={() => setEditMode(true)}
         onDelete={handleDeleteClick}
         isDeleting={isDeleting}
         onSave={handleSave}
         isSaving={isSaving}
-        onCancelEdit={() => setEditMode(false)} 
+        onCancelEdit={() => setEditMode(false)}
       />
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main content */}
         <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col min-h-[calc(100vh-150px)]">
-          <NoteMainContent 
+          <NoteMainContent
+            subjects={subjects}
             note={note}
             editMode={editMode}
-            editedNote={editedNote}
+            editedNote={{
+              title: editedNote.title,
+              content: editedNote.content,
+              tags: editedNote.tags,
+              subject_id: Number(editedNote.subject_id) || null,
+              year_level: editedNote.year_level ? String(editedNote.year_level) : null
+            }}
             onNoteChange={handleEditedNoteChange}
             isPdfAvailable={isPdfAvailable}
             activeTab={activeTab}
-            onTabChange={setActiveTab} 
+            onTabChange={setActiveTab}
             viewMode={viewMode}
           />
         </div>
-        
+
         {/* AI Assistant Panel */}
         <div className="md:col-start-3 md:col-span-1">
           <StudyAssistantPanel

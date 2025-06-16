@@ -112,8 +112,8 @@ const NotesPage: React.FC = () => {
         updatedAt: now,
         analysis_status: 'not_started'
       };
-      await addNote(newNoteData);
-            
+
+      await addNote(newNoteData);            
       navigate(`/notes/${id}`, { state: { isNewNote: true } });
     } catch (err) {
       console.error("Error creating new note:", err);

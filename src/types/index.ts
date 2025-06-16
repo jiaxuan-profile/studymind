@@ -6,10 +6,29 @@ import type { User as SupabaseUser } from '@supabase/supabase-js';
 // Re-exporting the Supabase user type for consistency
 export type User = SupabaseUser;
 
+export interface NotePayload {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  summary?: string | null;
+  tags: string[];
+  embedding?: number[];
+  updated_at: string;
+  created_at: string;
+  contentHash?: string;
+  analysis_status?: string;
+  pdf_storage_path?: string;
+  pdf_public_url?: string;
+  original_filename?: string;
+  subject_id?: number | null;
+  year_level?: number | null;
+}
+
 // Main data model for a Note
 export interface Note {
   id: string;
-  user_id: string; 
+  userId: string;
   title: string;
   content: string;
   tags: string[];
@@ -21,9 +40,35 @@ export interface Note {
   pdfStoragePath?: string | null;
   pdfPublicUrl?: string | null;
   originalFilename?: string | null;
-  analysis_status?: 'not_started' | 'pending' | 'completed' | 'failed' | 'in_progress' | 'analyzing_gaps';
-  subject_id?: number | null;
-  year_level?: string | null;
+  analysisStatus?: 'not_started' | 'pending' | 'completed' | 'failed' | 'in_progress' | 'analyzing_gaps';
+  subjectId?: string | null;
+  yearLevel?: number | null;
+}
+
+export interface NoteConceptPayload {
+  note_id: string;
+  concept_id: string;
+  relevance_score: number;
+  mastery_level: number;
+}
+
+// Main data model for a Note-Concept
+export interface NoteConceptWithDetails {
+  noteId: string;
+  conceptId: string;
+  relevanceScore: number;
+  masteryLevel: number;
+  concept: {
+    id: string;
+    name: string;
+    definition: string;
+  };
+}
+
+export interface AllConceptsData {
+  concepts: any[];
+  relationships: any[];
+  noteConcepts: any[];
 }
 
 // Represents a note that is semantically similar to the current one
@@ -53,7 +98,7 @@ export interface ConceptRelationship {
 export interface Subject {
   id: number;
   name: string;
-  description?: string;
+  description?: string | null;
   user_id: string;
   created_at: string;
 }
@@ -78,17 +123,17 @@ export interface Question {
 
 // Data model for a generated Knowledge Gap.
 export interface KnowledgeGap {
-id: string;
-note_id: string;
-user_id: string;
-concept: string; // The name of the concept with a gap
-gap_type: 'prerequisite' | 'reinforcement' | 'connection' | 'general';
-missing_prerequisite?: string | null;
-reinforcement_strategy: string;
-user_mastery: number;
-priority_score: number;
-status: 'identified' | 'in_progress' | 'resolved';
-resources: string[];
+  id: string;
+  note_id: string;
+  user_id: string;
+  concept: string; // The name of the concept with a gap
+  gap_type: 'prerequisite' | 'reinforcement' | 'connection' | 'general';
+  missing_prerequisite?: string | null;
+  reinforcement_strategy: string;
+  user_mastery: number;
+  priority_score: number;
+  status: 'identified' | 'in_progress' | 'resolved';
+  resources: string[];
 }
 
 // Data model for a single answer in a review session.
@@ -112,21 +157,21 @@ export interface ReviewAnswer {
 
 // Data model for a review session.
 export interface ReviewSession {
-id: string;
-session_name?: string;
-selected_notes: string[];
-selected_difficulty: string;
-total_questions: number;
-questions_answered: number;
-questions_rated: number;
-easy_ratings: number;
-medium_ratings: number;
-hard_ratings: number;
-session_status: 'in_progress' | 'completed' | 'abandoned';
-started_at: string;
-completed_at?: string;
-duration_seconds?: number;
-user_id: string;
+  id: string;
+  session_name?: string;
+  selected_notes: string[];
+  selected_difficulty: string;
+  total_questions: number;
+  questions_answered: number;
+  questions_rated: number;
+  easy_ratings: number;
+  medium_ratings: number;
+  hard_ratings: number;
+  session_status: 'in_progress' | 'completed' | 'abandoned';
+  started_at: string;
+  completed_at?: string;
+  duration_seconds?: number;
+  user_id: string;
 }
 
 // --- UI & VISUALIZATION TYPES ---
