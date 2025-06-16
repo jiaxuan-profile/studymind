@@ -57,6 +57,7 @@ const NoteDetailPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
   const [editedNote, setEditedNote] = useState(() => {
     const current = notes.find(n => n.id === id);
     return {
@@ -67,6 +68,27 @@ const NoteDetailPage: React.FC = () => {
       year_level: current?.yearLevel || null,
     };
   });
+
+  // Dirty flag state
+  const [isDirty, setIsDirty] = useState(false);
+
+  // Check if the current state is dirty (has unsaved changes)
+  const checkIsDirty = () => {
+    const hasChanges = (
+      editedNote.title !== initialNoteState.title ||
+      editedNote.content !== initialNoteState.content ||
+      editedNote.tags !== initialNoteState.tags ||
+      editedNote.subject_id !== initialNoteState.subject_id ||
+      editedNote.year_level !== initialNoteState.year_level
+    );
+    setIsDirty(hasChanges);
+    return hasChanges;
+  };
+
+  // Update dirty flag whenever editedNote changes
+  useEffect(() => {
+    checkIsDirty();
+  }, [editedNote, initialNoteState]);
 
   // Ensure initial state matches the SetStateAction type
   useEffect(() => {
@@ -485,6 +507,17 @@ const NoteDetailPage: React.FC = () => {
       };
       updateNote(note.id, noteUpdatesForStore);
       setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
+      
+      // Update initial state to reflect saved changes
+      const newInitialState = {
+        title: updatedTitle,
+        content: updatedContent,
+        tags: updatedTags.join(', '),
+        subject_id: editedNote.subject_id,
+        year_level: editedNote.year_level
+      };
+      setInitialNoteState(newInitialState);
+      setIsDirty(false);
       setEditMode(false);
 
       addToast('Note saved successfully!', 'success');
@@ -498,6 +531,27 @@ const NoteDetailPage: React.FC = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleCancelEdit = () => {
+    if (isNewNote) {
+      navigate('/notes');
+      return;
+    }
+
+    if (isDirty) {
+      setShowDiscardDialog(true);
+    } else {
+      setEditMode(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    // Reset to initial state
+    setEditedNote(initialNoteState);
+    setIsDirty(false);
+    setEditMode(false);
+    setShowDiscardDialog(false);
   };
 
   const handleAskAi = () => {
@@ -603,26 +657,7 @@ I can help with:
         isDeleting={isDeleting}
         onSave={handleSave}
         isSaving={isSaving}
-        onCancelEdit={() => {
-          if (isNewNote) {
-            navigate('/notes');
-          } else {
-            // Check for changes before canceling
-            const hasChanges = (
-              editedNote.title !== initialNoteState.title ||
-              editedNote.content !== initialNoteState.content ||
-              editedNote.tags !== initialNoteState.tags ||
-              editedNote.subject_id !== initialNoteState.subject_id ||
-              editedNote.year_level !== initialNoteState.year_level
-            );
-            
-            if (hasChanges) {
-              setShowDeleteDialog(true);
-            } else {
-              setEditMode(false);
-            }
-          }
-        }}
+        onCancelEdit={handleCancelEdit}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -683,16 +718,25 @@ I can help with:
       <Dialog
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
+        title="Delete Note"
+        message={`Are you sure you want to delete "${note.title}"? This action cannot be undone and will permanently remove the note and all associated data.`}
+        onConfirm={handleDeleteConfirm}
+        confirmText={isDeleting ? "Deleting..." : "Delete Note"}
+        cancelText="Cancel"
+        loading={isDeleting}
+        variant="danger"
+      />
+
+      {/* Discard Changes Confirmation Dialog */}
+      <Dialog
+        isOpen={showDiscardDialog}
+        onClose={() => setShowDiscardDialog(false)}
         title="Unsaved Changes"
-        message={`You have unsaved changes. Are you sure you want to discard them?`}
-        onConfirm={() => {
-          setEditMode(false);
-          setShowDeleteDialog(false);
-        }}
+        message="You have unsaved changes. Are you sure you want to discard them?"
+        onConfirm={handleDiscardChanges}
         confirmText="Discard Changes"
         cancelText="Continue Editing"
-        loading={isDeleting}
-        variant="default"
+        variant="danger"
       />
     </div>
   );
