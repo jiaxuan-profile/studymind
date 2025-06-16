@@ -1,6 +1,6 @@
 // src/components/note-detail/NoteEditForm.tsx
 import React, { useState } from 'react';
-import { FileText, Plus, Check, X } from 'lucide-react';
+import { FileText, Plus, Check, X, ChevronDown } from 'lucide-react';
 import { Note, Subject } from '../../types';
 
 const YEAR_LEVEL_OPTIONS = [
@@ -64,6 +64,11 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
     }
   };
 
+  // Enhanced input styling with better border contrast
+  const inputClasses = "block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200";
+  
+  const textareaClasses = "block w-full rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 p-4 transition-all duration-200";
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -73,7 +78,7 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
         <input
           type="text"
           id="title"
-          className="block w-full h-12 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4"
+          className={inputClasses}
           value={editedNote.title}
           onChange={(e) => onNoteChange('title', e.target.value)}
         />
@@ -94,7 +99,7 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
                     value={newSubjectName}
                     onChange={(e) => setNewSubjectName(e.target.value)}
                     placeholder="Enter new subject name"
-                    className="block w-full h-12 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200"
+                    className={inputClasses}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -122,7 +127,7 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
                 <button
                   type="button"
                   onClick={handleCancelCreate}
-                  className="inline-flex items-center justify-center w-12 h-12 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200 hover:scale-105"
+                  className="inline-flex items-center justify-center w-12 h-12 border-2 border-gray-400 dark:border-gray-600 rounded-lg shadow-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all duration-200 hover:scale-105"
                   title="Cancel"
                 >
                   <X className="h-5 w-5" />
@@ -141,22 +146,27 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
               </div>
             </div>
           ) : (
-            <select
-              id="subject"
-              className="block w-full h-12 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200"
-              value={editedNote.subject_id || ''}
-              onChange={(e) => handleSubjectChange(e.target.value)}
-            >
-              <option value="">Select Subject</option>
-              {subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
+            <div className="relative">
+              <select
+                id="subject"
+                className="block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 pl-4 pr-12 transition-all duration-200 appearance-none cursor-pointer"
+                value={editedNote.subject_id || ''}
+                onChange={(e) => handleSubjectChange(e.target.value)}
+              >
+                <option value="">Select Subject</option>
+                {subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+                <option value="CREATE_NEW" className="font-medium text-primary bg-primary/5">
+                  + Create New Subject
                 </option>
-              ))}
-              <option value="CREATE_NEW" className="font-medium text-primary bg-primary/5">
-                + Create New Subject
-              </option>
-            </select>
+              </select>
+              <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+              </div>
+            </div>
           )}
         </div>
 
@@ -164,18 +174,23 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
           <label htmlFor="year_level" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             Year Level
           </label>
-          <select
-            id="year_level"
-            className="block w-full h-12 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200"
-            value={editedNote.year_level || ''}
-            onChange={(e) => onNoteChange('year_level', e.target.value || null)}
-          >
-            {YEAR_LEVEL_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="year_level"
+              className="block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 pl-4 pr-12 transition-all duration-200 appearance-none cursor-pointer"
+              value={editedNote.year_level || ''}
+              onChange={(e) => onNoteChange('year_level', e.target.value || null)}
+            >
+              {YEAR_LEVEL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+              <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            </div>
+          </div>
         </div>
       </div>
       
@@ -186,7 +201,7 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
         <textarea
           id="content"
           rows={20}
-          className="block w-full rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base font-mono bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 p-4 transition-all duration-200"
+          className={textareaClasses}
           value={editedNote.content}
           onChange={(e) => onNoteChange('content', e.target.value)}
         />
@@ -199,7 +214,7 @@ const NoteEditForm: React.FC<NoteEditFormProps> = ({
         <input
           type="text"
           id="tags"
-          className="block w-full h-12 rounded-lg border-gray-300 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200"
+          className={inputClasses}
           value={editedNote.tags}
           onChange={(e) => onNoteChange('tags', e.target.value)}
         />
