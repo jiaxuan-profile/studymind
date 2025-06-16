@@ -110,7 +110,7 @@ const NotesPage: React.FC = () => {
         tags: [], 
         createdAt: now, 
         updatedAt: now,
-        analysis_status: 'not_started'
+        analysisStatus: 'not_started'
       };
 
       await addNote(newNoteData);            

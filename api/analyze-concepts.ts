@@ -37,7 +37,10 @@ const REDUCE_PROMPT = `You are a master synthesizer. You will be given a list of
 1.  De-duplicate the concepts, merging similar ideas. The final concept list should be clean and comprehensive.
 2.  Generate a concise, overarching summary of the entire document based on these concepts.
 3.  Identify the 5 most relevant, high-level academic tags for the document. Return exactly 5.
-4.  Determine the relationships (prerequisite, related, builds-upon) between the final concepts.
+4.  Determine the relationships between the final concepts. ONLY use these relationship types:
+    - "prerequisite": When one concept must be understood before another
+    - "related": When concepts are connected but neither is prerequisite
+    - "builds-upon": When one concept extends or specializes another
 
 ---
 CRITICAL RULES:

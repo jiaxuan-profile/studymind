@@ -60,7 +60,6 @@ export async function getNoteById(noteId: string, userId: string): Promise<Note>
             throw new Error(error?.message || 'Note not found');
         }
 
-        console.log("Note Service: Note fetched successfully:", data);
         return toNote(data);
 
     } catch (error) {
