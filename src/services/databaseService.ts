@@ -1,7 +1,7 @@
 // src/services/databaseService.ts
 
 import { supabase } from './supabase';
-import { AllConceptsData, Subject } from '../types';
+import { AllConceptsData, Subject, KnowledgeGap } from '../types';
 
 export async function getAllConcepts(): Promise<AllConceptsData> {
   try {
@@ -62,6 +62,30 @@ export async function getAllSubjects(userId: string): Promise<Subject[]> {
 
   } catch (error) {
     console.error('Database Service: Error in getAllSubjects:', error);
+    throw error;
+  }
+}
+
+export async function getKnowledgeGapsForNote(noteId: string): Promise<KnowledgeGap[]> {
+  try {
+    console.log(`Database Service: Fetching knowledge gaps for note ID: ${noteId}`);
+
+    const { data, error } = await supabase
+      .from('knowledge_gaps')
+      .select('*')
+      .eq('note_id', noteId)
+      .order('priority_score', { ascending: false });
+
+    if (error) {
+      console.error("Database Service: Error fetching knowledge gaps:", error);
+      throw new Error(`Failed to fetch knowledge gaps: ${error.message}`);
+    }
+
+    console.log(`Database Service: Found ${data?.length || 0} knowledge gaps for note ${noteId}`);
+    return data as KnowledgeGap[] || [];
+
+  } catch (error) {
+    console.error('Database Service: Error in getKnowledgeGapsForNote:', error);
     throw error;
   }
 }

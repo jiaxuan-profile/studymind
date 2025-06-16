@@ -16,6 +16,8 @@ import Dialog from '../components/Dialog';
 import { Concept, KnowledgeGap, RelatedNote, Note as NoteType } from '../types';
 
 import { Subject } from '../types/index';
+import { getKnowledgeGapsForNote } from '../services/databaseService';
+import { saveNoteToDatabase } from '../services/noteService';
 
 interface NoteSubject extends Subject {
   notes: any[];

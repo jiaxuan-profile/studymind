@@ -126,7 +126,7 @@ async function storeConceptsAndRelationships(
     const { error: conceptsError } = await supabase.from('concepts').upsert(conceptDataToUpsert, { onConflict: 'id' });
     if (conceptsError) console.error('AI Service: Error storing all gathered concepts:', conceptsError);
 
-    const noteConceptLinks = conceptDataToUpsert.map(c => ({ note_id: noteId, concept_id: c.id, relevance_score: 0.8 }));
+    const noteConceptLinks = conceptDataToUpsert.map(c => ({ note_id: noteId, concept_id: c.id, relevance_score: 0.8, user_id: userId }));
     if (noteConceptLinks.length > 0) {
       const { error: associationError } = await supabase.from('note_concepts').upsert(noteConceptLinks, { onConflict: 'note_id, concept_id' });
       if (associationError) console.error('AI Service: Error creating note-concept associations:', associationError);
