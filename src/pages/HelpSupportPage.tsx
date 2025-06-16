@@ -13,6 +13,7 @@ import {
   Send,
   CheckCircle
 } from 'lucide-react';
+import { useStore } from '../store';
 
 interface FAQItem {
   id: string;
@@ -160,291 +161,298 @@ const HelpSupportPage: React.FC = () => {
     setExpandedFAQ(expandedFAQ === id ? null : id);
   };
 
+  // Enhanced input styling with better border contrast
+  const inputClasses = "block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200";
+  
+  const textareaClasses = "block w-full rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 p-4 transition-all duration-200";
+
   return (
-    <div className="fade-in">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-          <HelpCircle className="h-8 w-8 text-primary mr-3" />
-          Help & Support
-        </h1>
-        <p className="mt-2 text-gray-600">
-          Find answers to common questions or get in touch with our support team
-        </p>
-      </div>
+    <div className="fade-in bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+            <HelpCircle className="h-8 w-8 text-primary mr-3" />
+            Help & Support
+          </h1>
+          <p className="mt-2 text-gray-600 dark:text-gray-400">
+            Find answers to common questions or get in touch with our support team
+          </p>
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-8">
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 text-center hover:shadow-xl transition-shadow">
-              <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Book className="h-6 w-6 text-primary" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 text-center hover:shadow-xl transition-shadow">
+                <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Book className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">User Guide</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Complete guide to using StudyMind</p>
+                <button className="text-primary hover:text-primary-dark text-sm font-medium flex items-center mx-auto">
+                  View Guide <ExternalLink className="h-4 w-4 ml-1" />
+                </button>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">User Guide</h3>
-              <p className="text-sm text-gray-600 mb-4">Complete guide to using StudyMind</p>
-              <button className="text-primary hover:text-primary-dark text-sm font-medium flex items-center mx-auto">
-                View Guide <ExternalLink className="h-4 w-4 ml-1" />
-              </button>
+
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 text-center hover:shadow-xl transition-shadow">
+                <div className="h-12 w-12 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Video className="h-6 w-6 text-secondary" />
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Video Tutorials</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Step-by-step video guides</p>
+                <button className="text-secondary hover:text-secondary-dark text-sm font-medium flex items-center mx-auto">
+                  Watch Videos <ExternalLink className="h-4 w-4 ml-1" />
+                </button>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 text-center hover:shadow-xl transition-shadow">
+                <div className="h-12 w-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <MessageCircle className="h-6 w-6 text-accent" />
+                </div>
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-2">Community</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">Connect with other users</p>
+                <button className="text-accent hover:text-accent-dark text-sm font-medium flex items-center mx-auto">
+                  Join Community <ExternalLink className="h-4 w-4 ml-1" />
+                </button>
+              </div>
             </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 text-center hover:shadow-xl transition-shadow">
-              <div className="h-12 w-12 bg-secondary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Video className="h-6 w-6 text-secondary" />
+            {/* FAQ Section */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">Frequently Asked Questions</h2>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Video Tutorials</h3>
-              <p className="text-sm text-gray-600 mb-4">Step-by-step video guides</p>
-              <button className="text-secondary hover:text-secondary-dark text-sm font-medium flex items-center mx-auto">
-                Watch Videos <ExternalLink className="h-4 w-4 ml-1" />
-              </button>
-            </div>
 
-            <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200 text-center hover:shadow-xl transition-shadow">
-              <div className="h-12 w-12 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <MessageCircle className="h-6 w-6 text-accent" />
+              <div className="p-6">
+                {/* Search and Filter */}
+                <div className="mb-6 space-y-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-gray-400 dark:text-gray-500" />
+                    </div>
+                    <input
+                      type="text"
+                      className="block w-full pl-10 pr-3 py-3 border-2 border-gray-400 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-gray-100 focus:outline-none focus:placeholder-gray-400 focus:ring-2 focus:ring-primary focus:border-primary transition-all duration-200"
+                      placeholder="Search FAQs..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {categories.map((category) => {
+                      const Icon = category.icon;
+                      return (
+                        <button
+                          key={category.id}
+                          onClick={() => setSelectedCategory(category.id)}
+                          className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                            selectedCategory === category.id
+                              ? 'bg-primary text-white'
+                              : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          <Icon className="h-4 w-4 mr-1" />
+                          {category.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* FAQ List */}
+                <div className="space-y-4">
+                  {filteredFAQs.length > 0 ? (
+                    filteredFAQs.map((faq) => (
+                      <div key={faq.id} className="border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <button
+                          onClick={() => toggleFAQ(faq.id)}
+                          className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                        >
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{faq.question}</span>
+                          {expandedFAQ === faq.id ? (
+                            <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                          ) : (
+                            <ChevronRight className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                          )}
+                        </button>
+                        {expandedFAQ === faq.id && (
+                          <div className="px-4 pb-3 text-gray-600 dark:text-gray-300 border-t border-gray-100 dark:border-gray-700">
+                            <p className="pt-3">{faq.answer}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <Search className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No FAQs found</h3>
+                      <p className="text-gray-600 dark:text-gray-400">
+                        {searchTerm ? `No results for "${searchTerm}"` : 'No FAQs in this category'}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Community</h3>
-              <p className="text-sm text-gray-600 mb-4">Connect with other users</p>
-              <button className="text-accent hover:text-accent-dark text-sm font-medium flex items-center mx-auto">
-                Join Community <ExternalLink className="h-4 w-4 ml-1" />
-              </button>
             </div>
           </div>
 
-          {/* FAQ Section */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-900">Frequently Asked Questions</h2>
-            </div>
-
-            <div className="p-6">
-              {/* Search and Filter */}
-              <div className="mb-6 space-y-4">
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm"
-                    placeholder="Search FAQs..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  {categories.map((category) => {
-                    const Icon = category.icon;
-                    return (
-                      <button
-                        key={category.id}
-                        onClick={() => setSelectedCategory(category.id)}
-                        className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          selectedCategory === category.id
-                            ? 'bg-primary text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                        }`}
-                      >
-                        <Icon className="h-4 w-4 mr-1" />
-                        {category.name}
-                      </button>
-                    );
-                  })}
-                </div>
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Contact Form */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-gradient-to-r from-accent/10 to-warning/10 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 flex items-center">
+                  <Mail className="h-5 w-5 mr-2" />
+                  Contact Support
+                </h3>
               </div>
 
-              {/* FAQ List */}
-              <div className="space-y-4">
-                {filteredFAQs.length > 0 ? (
-                  filteredFAQs.map((faq) => (
-                    <div key={faq.id} className="border border-gray-200 rounded-lg">
-                      <button
-                        onClick={() => toggleFAQ(faq.id)}
-                        className="w-full px-4 py-3 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
-                      >
-                        <span className="font-medium text-gray-900">{faq.question}</span>
-                        {expandedFAQ === faq.id ? (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
-                        )}
-                      </button>
-                      {expandedFAQ === faq.id && (
-                        <div className="px-4 pb-3 text-gray-600 border-t border-gray-100">
-                          <p className="pt-3">{faq.answer}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                ) : (
+              <div className="p-6">
+                {submitSuccess ? (
                   <div className="text-center py-8">
-                    <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No FAQs found</h3>
-                    <p className="text-gray-600">
-                      {searchTerm ? `No results for "${searchTerm}"` : 'No FAQs in this category'}
-                    </p>
+                    <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Message Sent!</h4>
+                    <p className="text-gray-600 dark:text-gray-400">We'll get back to you within 24 hours.</p>
                   </div>
+                ) : (
+                  <form onSubmit={handleContactSubmit} className="space-y-4">
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Name
+                      </label>
+                      <input
+                        type="text"
+                        id="name"
+                        required
+                        className={inputClasses}
+                        value={contactForm.name}
+                        onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        required
+                        className={inputClasses}
+                        value={contactForm.email}
+                        onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="category" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Category
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="category"
+                          className="block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 pl-4 pr-12 transition-all duration-200 appearance-none cursor-pointer"
+                          value={contactForm.category}
+                          onChange={(e) => setContactForm({ ...contactForm, category: e.target.value })}
+                        >
+                          <option value="general">General Question</option>
+                          <option value="technical">Technical Issue</option>
+                          <option value="feature">Feature Request</option>
+                          <option value="billing">Billing</option>
+                          <option value="bug">Bug Report</option>
+                        </select>
+                        <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
+                          <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="subject" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Subject
+                      </label>
+                      <input
+                        type="text"
+                        id="subject"
+                        required
+                        className={inputClasses}
+                        value={contactForm.subject}
+                        onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="message" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Message
+                      </label>
+                      <textarea
+                        id="message"
+                        rows={4}
+                        required
+                        className={textareaClasses}
+                        value={contactForm.message}
+                        onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full inline-flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-5 w-5 mr-2" />
+                          Send Message
+                        </>
+                      )}
+                    </button>
+                  </form>
                 )}
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Contact Form */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-accent/10 to-warning/10 px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                <Mail className="h-5 w-5 mr-2" />
-                Contact Support
-              </h3>
-            </div>
-
-            <div className="p-6">
-              {submitSuccess ? (
-                <div className="text-center py-8">
-                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                  <h4 className="text-lg font-medium text-gray-900 mb-2">Message Sent!</h4>
-                  <p className="text-gray-600">We'll get back to you within 24 hours.</p>
-                </div>
-              ) : (
-                <form onSubmit={handleContactSubmit} className="space-y-4">
-                  <div>
-                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      id="name"
-                      required
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                      value={contactForm.name}
-                      onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      id="email"
-                      required
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                      value={contactForm.email}
-                      onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                      Category
-                    </label>
-                    <div className="relative">
-                      <select
-                        id="category"
-                        className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm appearance-none bg-white pr-10"
-                        value={contactForm.category}
-                        onChange={(e) => setContactForm({ ...contactForm, category: e.target.value })}
-                      >
-                        <option value="general">General Question</option>
-                        <option value="technical">Technical Issue</option>
-                        <option value="feature">Feature Request</option>
-                        <option value="billing">Billing</option>
-                        <option value="bug">Bug Report</option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                        <ChevronDown className="h-4 w-4 text-gray-400" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-1">
-                      Subject
-                    </label>
-                    <input
-                      type="text"
-                      id="subject"
-                      required
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                      value={contactForm.subject}
-                      onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-1">
-                      Message
-                    </label>
-                    <textarea
-                      id="message"
-                      rows={4}
-                      required
-                      className="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 sm:text-sm"
-                      value={contactForm.message}
-                      onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                    />
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            {/* Quick Links */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="p-6">
+                <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Quick Links</h3>
+                <div className="space-y-3">
+                  <a
+                    href="#"
+                    className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
                   >
-                    {isSubmitting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="h-4 w-4 mr-2" />
-                        Send Message
-                      </>
-                    )}
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
-
-          {/* Quick Links */}
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <div className="p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Quick Links</h3>
-              <div className="space-y-3">
-                <a
-                  href="#"
-                  className="flex items-center text-gray-600 hover:text-primary transition-colors"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Getting Started Guide
-                </a>
-                <a
-                  href="#"
-                  className="flex items-center text-gray-600 hover:text-primary transition-colors"
-                >
-                  <Video className="h-4 w-4 mr-2" />
-                  Video Tutorials
-                </a>
-                <a
-                  href="#"
-                  className="flex items-center text-gray-600 hover:text-primary transition-colors"
-                >
-                  <Book className="h-4 w-4 mr-2" />
-                  API Documentation
-                </a>
-                <a
-                  href="#"
-                  className="flex items-center text-gray-600 hover:text-primary transition-colors"
-                >
-                  <MessageCircle className="h-4 w-4 mr-2" />
-                  Community Forum
-                </a>
+                    <FileText className="h-4 w-4 mr-2" />
+                    Getting Started Guide
+                  </a>
+                  <a
+                    href="#"
+                    className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
+                  >
+                    <Video className="h-4 w-4 mr-2" />
+                    Video Tutorials
+                  </a>
+                  <a
+                    href="#"
+                    className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
+                  >
+                    <Book className="h-4 w-4 mr-2" />
+                    API Documentation
+                  </a>
+                  <a
+                    href="#"
+                    className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
+                  >
+                    <MessageCircle className="h-4 w-4 mr-2" />
+                    Community Forum
+                  </a>
+                </div>
               </div>
             </div>
           </div>
