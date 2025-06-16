@@ -8,8 +8,8 @@ import { supabase } from './supabase';
 
 export async function checkDocumentExists(content: string, userId: string): Promise<boolean> {
     try {
-        console.log("Note Service: Checking document exists:");
         const contentHash = generateContentHash(content);
+        console.log("Note Service: Checking document exists:", contentHash);
 
         const { data, error } = await supabase
             .from('notes')
@@ -31,7 +31,7 @@ export async function checkDocumentExists(content: string, userId: string): Prom
 }
 
 export async function saveNoteToDatabase(noteData: NotePayload): Promise<any> {
-    console.log("Note Service: Saving note:", noteData);
+    console.log("Note Service: Saving note:", noteData.id);
     const { data, error } = await supabase
         .from('notes')
         .upsert({

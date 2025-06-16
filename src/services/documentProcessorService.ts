@@ -2,7 +2,6 @@
 import * as pdfjsLib from 'pdfjs-dist';
 import * as mammoth from 'mammoth';
 import { supabase } from './supabase';
-import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store';
 import { Note, NotePayload } from '../types';
 
@@ -95,9 +94,8 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
     const content = await extractContentFromFile(file, fileType);
     if (!content) throw new Error('Could not extract any content from the file.');
     
-    const docAuth = useAuth();
-    if (!docAuth.user) throw new Error('User not authenticated');
-    if (await checkDocumentExists(content)) {
+    if (!user) throw new Error('User not authenticated');
+    if (await checkDocumentExists(content, user.id)) {
       throw new Error('This document has already been uploaded.');
     }
   
@@ -150,9 +148,7 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
       onProgress('Starting AI analysis...', 'info');
       
       // 4. Fetch the complete note for AI processing
-      const noteAuth = useAuth();
-      if (!noteAuth.user) throw new Error('User not authenticated');
-      const existingNote = await getNoteById(noteId);
+      const existingNote = await getNoteById(noteId, user.id);
       if (!existingNote) throw new Error('Note not found for AI processing');
   
       // 5. Perform AI analysis
@@ -167,7 +163,7 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
       };
   
       // SECOND SAVE - Partial update (won't affect PDF paths)
-      await updateNoteInDatabase(noteId, updatePayload);
+      await updateNoteInDatabase(noteId, updatePayload, user.id);
   
       // 7. Additional AI processing
       onProgress('Analyzing knowledge gaps...', 'info');
@@ -182,9 +178,7 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
         updated_at: new Date().toISOString()
       });
   
-      const finalAuth = useAuth();
-      if (!finalAuth.user) throw new Error('User not authenticated');
-      const finalNote = await getNoteById(noteId);
+      const finalNote = await getNoteById(noteId, user.id);
       useStore.getState().addNote(finalNote);
       onProgress('AI analysis completed!', 'success');
       return finalNote;
@@ -200,7 +194,8 @@ const extractContentFromFile = async (file: File, fileType: string): Promise<str
   };
 
   function createNoteObject(payload: NotePayload): Note {
-    return <Note>{
+    return {
+      userId: payload.user_id,
       ...payload,
       createdAt: new Date(payload.created_at),
       updatedAt: new Date(payload.updated_at),

@@ -32,8 +32,6 @@ const NoteDetailPage: React.FC = () => {
     return <div>Please log in to view this page.</div>;
   }
 
-  console.log('User:', user);
-
   const [subjects, setSubjects] = useState<NoteSubject[]>([
     {
       id: 1 as number,
