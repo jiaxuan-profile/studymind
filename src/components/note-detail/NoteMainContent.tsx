@@ -22,6 +22,8 @@ interface NoteMainContentProps {
   onTabChange: (tab: 'content' | 'mindmap') => void;
   viewMode: 'text' | 'pdf';
   subjects: Subject[];
+  onCreateSubject?: (name: string) => Promise<void>;
+  isCreatingSubject?: boolean;
 }
 
 const NoteMainContent: React.FC<NoteMainContentProps> = ({
@@ -34,6 +36,8 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
   onTabChange,
   viewMode,
   subjects,
+  onCreateSubject,
+  isCreatingSubject,
 }) => {
   if (editMode) {
     // In edit mode, we always show the form, tabs are not relevant for editing UI
@@ -44,6 +48,8 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
         originalNote={note}
         isPdfAvailable={isPdfAvailable}
         subjects={subjects}
+        onCreateSubject={onCreateSubject}
+        isCreatingSubject={isCreatingSubject}
       />
     );
   }

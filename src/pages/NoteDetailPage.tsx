@@ -77,7 +77,6 @@ const NoteDetailPage: React.FC = () => {
     }));
   }, []);
 
-  const [newSubjectName, setNewSubjectName] = useState('');
   const [isCreatingSubject, setIsCreatingSubject] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
@@ -326,15 +325,15 @@ const NoteDetailPage: React.FC = () => {
     });
   };
 
-  const handleCreateSubject = async () => {
-    if (!newSubjectName.trim() || !user?.id) return;
+  const handleCreateSubject = async (name: string) => {
+    if (!name.trim() || !user?.id) return;
     
     setIsCreatingSubject(true);
     try {
       const { data, error } = await supabase
         .from('subjects')
         .insert([{
-          name: newSubjectName.trim(),
+          name: name.trim(),
           user_id: user.id
         }])
         .select();
@@ -350,12 +349,13 @@ const NoteDetailPage: React.FC = () => {
           ...prev,
           subject_id: data[0].id
         }));
-        setNewSubjectName('');
         addToast('Subject created successfully', 'success');
+        addNotification(`Subject "${name.trim()}" was created`, 'success', 'Note Management');
       }
     } catch (error) {
       console.error('Error creating subject:', error);
       addToast('Failed to create subject', 'error');
+      addNotification('Failed to create subject', 'error', 'Note Management');
     } finally {
       setIsCreatingSubject(false);
     }
@@ -626,36 +626,6 @@ I can help with:
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Subject creation dialog */}
-        <Dialog
-          isOpen={!!newSubjectName && editMode}
-          onClose={() => setNewSubjectName('')}
-          title="Create New Subject"
-          message={
-            <div className="space-y-2">
-              <input
-                type="text"
-                value={newSubjectName}
-                onChange={(e) => setNewSubjectName(e.target.value)}
-                placeholder="Enter subject name"
-                className="w-full px-3 py-2 border rounded-md"
-              />
-              <button
-                onClick={handleCreateSubject}
-                disabled={isCreatingSubject || !newSubjectName.trim()}
-                className="w-full bg-primary text-white py-2 rounded-md disabled:opacity-50"
-              >
-                {isCreatingSubject ? 'Creating...' : 'Create Subject'}
-              </button>
-            </div>
-          }
-          onConfirm={handleCreateSubject}
-          confirmText={isCreatingSubject ? 'Creating...' : 'Create'}
-          cancelText="Cancel"
-          loading={isCreatingSubject}
-          variant="default"
-          hideButtons={true}
-        />
         {/* Main content */}
         <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col min-h-[calc(100vh-150px)]">
           <NoteMainContent
@@ -674,6 +644,8 @@ I can help with:
             activeTab={activeTab}
             onTabChange={setActiveTab}
             viewMode={viewMode}
+            onCreateSubject={handleCreateSubject}
+            isCreatingSubject={isCreatingSubject}
           />
         </div>
 
