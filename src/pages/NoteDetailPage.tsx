@@ -535,7 +535,13 @@ I can help with:
         isDeleting={isDeleting}
         onSave={handleSave}
         isSaving={isSaving}
-        onCancelEdit={() => setEditMode(false)}
+        onCancelEdit={() => {
+          if (isNewNote) {
+            navigate('/notes');
+          } else {
+            setEditMode(false);
+          }
+        }}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
