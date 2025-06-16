@@ -34,15 +34,7 @@ const NoteDetailPage: React.FC = () => {
     return <div>Please log in to view this page.</div>;
   }
 
-  const [subjects, setSubjects] = useState<NoteSubject[]>([
-    {
-      id: 1 as number,
-      name: 'Math',
-      user_id: '1',
-      created_at: new Date().toISOString(),
-      notes: []
-    }
-  ]);
+  const [subjects, setSubjects] = useState<NoteSubject[]>([]);
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,6 +43,16 @@ const NoteDetailPage: React.FC = () => {
   const { addNotification } = useNotifications();
 
   const [note, setNote] = useState<NoteType | undefined>(notes.find((n) => n.id === id));
+  const [initialNoteState, setInitialNoteState] = useState(() => {
+    const current = notes.find(n => n.id === id);
+    return {
+      title: current?.title || '',
+      content: current?.content || '',
+      tags: current?.tags?.join(', ') || '',
+      subject_id: current?.subjectId || null,
+      year_level: current?.yearLevel || null,
+    };
+  });
   const [editMode, setEditMode] = useState(location.state?.isNewNote ?? false);
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -75,6 +77,8 @@ const NoteDetailPage: React.FC = () => {
     }));
   }, []);
 
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -132,13 +136,15 @@ const NoteDetailPage: React.FC = () => {
       }
 
       setNote(foundNote);
-      setEditedNote({
+      const newEditedNote = {
         title: foundNote.title,
         content: foundNote.content,
         tags: foundNote.tags.join(', '),
         subject_id: foundNote.subjectId || null,
         year_level: foundNote.yearLevel || null
-      });
+      };
+      setEditedNote(newEditedNote);
+      setInitialNoteState(newEditedNote);
 
       if (foundNote.pdfPublicUrl && foundNote.originalFilename) {
         setPdfInfo({
@@ -155,6 +161,33 @@ const NoteDetailPage: React.FC = () => {
       }
     }
   }, [id, notes, navigate, isLocalOnly]);
+
+  // Fetch subjects for current user
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchSubjects = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        setSubjects(data?.map(subject => ({
+          ...subject,
+          notes: []
+        })) || []);
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+        addToast('Failed to load subjects', 'error');
+      }
+    };
+
+    fetchSubjects();
+  }, [user?.id]);
 
   // Add this new useEffect for cleanup
   useEffect(() => {
@@ -291,6 +324,41 @@ const NoteDetailPage: React.FC = () => {
       else newSet.add(gapId);
       return newSet;
     });
+  };
+
+  const handleCreateSubject = async () => {
+    if (!newSubjectName.trim() || !user?.id) return;
+    
+    setIsCreatingSubject(true);
+    try {
+      const { data, error } = await supabase
+        .from('subjects')
+        .insert([{
+          name: newSubjectName.trim(),
+          user_id: user.id
+        }])
+        .select();
+
+      if (error) throw error;
+
+      if (data?.[0]) {
+        setSubjects(prev => [...prev, {
+          ...data[0],
+          notes: []
+        }]);
+        setEditedNote(prev => ({
+          ...prev,
+          subject_id: data[0].id
+        }));
+        setNewSubjectName('');
+        addToast('Subject created successfully', 'success');
+      }
+    } catch (error) {
+      console.error('Error creating subject:', error);
+      addToast('Failed to create subject', 'error');
+    } finally {
+      setIsCreatingSubject(false);
+    }
   };
 
   const handleAiQuestionChange = (question: string) => {
@@ -539,12 +607,55 @@ I can help with:
           if (isNewNote) {
             navigate('/notes');
           } else {
-            setEditMode(false);
+            // Check for changes before canceling
+            const hasChanges = (
+              editedNote.title !== initialNoteState.title ||
+              editedNote.content !== initialNoteState.content ||
+              editedNote.tags !== initialNoteState.tags ||
+              editedNote.subject_id !== initialNoteState.subject_id ||
+              editedNote.year_level !== initialNoteState.year_level
+            );
+            
+            if (hasChanges) {
+              setShowDeleteDialog(true);
+            } else {
+              setEditMode(false);
+            }
           }
         }}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Subject creation dialog */}
+        <Dialog
+          isOpen={!!newSubjectName && editMode}
+          onClose={() => setNewSubjectName('')}
+          title="Create New Subject"
+          message={
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={newSubjectName}
+                onChange={(e) => setNewSubjectName(e.target.value)}
+                placeholder="Enter subject name"
+                className="w-full px-3 py-2 border rounded-md"
+              />
+              <button
+                onClick={handleCreateSubject}
+                disabled={isCreatingSubject || !newSubjectName.trim()}
+                className="w-full bg-primary text-white py-2 rounded-md disabled:opacity-50"
+              >
+                {isCreatingSubject ? 'Creating...' : 'Create Subject'}
+              </button>
+            </div>
+          }
+          onConfirm={handleCreateSubject}
+          confirmText={isCreatingSubject ? 'Creating...' : 'Create'}
+          cancelText="Cancel"
+          loading={isCreatingSubject}
+          variant="default"
+          hideButtons={true}
+        />
         {/* Main content */}
         <div className="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col min-h-[calc(100vh-150px)]">
           <NoteMainContent
@@ -600,13 +711,16 @@ I can help with:
       <Dialog
         isOpen={showDeleteDialog}
         onClose={() => setShowDeleteDialog(false)}
-        title="Delete Note"
-        message={`Are you sure you want to delete "${note.title}"? This action cannot be undone and will permanently remove the note and all associated data.`}
-        onConfirm={handleDeleteConfirm}
-        confirmText="Delete Note"
-        cancelText="Cancel"
+        title="Unsaved Changes"
+        message={`You have unsaved changes. Are you sure you want to discard them?`}
+        onConfirm={() => {
+          setEditMode(false);
+          setShowDeleteDialog(false);
+        }}
+        confirmText="Discard Changes"
+        cancelText="Continue Editing"
         loading={isDeleting}
-        variant="danger"
+        variant="default"
       />
     </div>
   );

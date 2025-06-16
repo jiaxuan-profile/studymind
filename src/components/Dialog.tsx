@@ -5,12 +5,13 @@ interface DialogProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
-  message: string;
+  message: React.ReactNode;
   onConfirm: () => void;
   confirmText?: string;
   cancelText?: string;
   loading?: boolean;
   variant?: 'default' | 'danger';
+  hideButtons?: boolean;
 }
 
 const Dialog: React.FC<DialogProps> = ({
@@ -22,7 +23,8 @@ const Dialog: React.FC<DialogProps> = ({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   loading = false,
-  variant = 'default'
+  variant = 'default',
+  hideButtons = false
 }) => {
   if (!isOpen) return null;
 
@@ -75,14 +77,15 @@ const Dialog: React.FC<DialogProps> = ({
               </div>
               
               <div className="mt-2">
-                <p className="text-sm text-gray-500 dark:text-gray-400">
+                <div className="text-sm text-gray-500 dark:text-gray-400">
                   {message}
-                </p>
+                </div>
               </div>
             </div>
           </div>
           
-          <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+          {!hideButtons && (
+            <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
             <button
               type="button"
               onClick={onConfirm}
@@ -111,7 +114,8 @@ const Dialog: React.FC<DialogProps> = ({
             >
               {cancelText}
             </button>
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
