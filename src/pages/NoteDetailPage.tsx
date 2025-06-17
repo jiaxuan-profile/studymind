@@ -35,7 +35,7 @@ interface NoteSubject extends Subject {
 }
 
 const NoteDetailPage: React.FC = () => {
-  const { user, loading  } = useAuth();
+  const { user, loading } = useAuth();
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -373,7 +373,7 @@ const NoteDetailPage: React.FC = () => {
 
   const handleCreateSubject = async (name: string) => {
     if (!name.trim() || !user?.id) return;
-    
+
     setIsCreatingSubject(true);
     try {
       const { data, error } = await supabase
@@ -530,8 +530,11 @@ const NoteDetailPage: React.FC = () => {
         embedding: newEmbedding
       };
       updateNote(note.id, noteUpdatesForStore);
-      setNote(prevNote => ({ ...prevNote!, ...noteUpdatesForStore }));
-      
+      setNote({
+        ...note!,
+        ...noteUpdatesForStore
+      });
+
       // Update initial state to reflect saved changes
       const newInitialState = {
         title: updatedTitle,
@@ -559,17 +562,10 @@ const NoteDetailPage: React.FC = () => {
 
   const handleCancelEdit = () => {
     // Special handling for new empty notes
-    if (isNewNote &&
-        editedNote.title.trim() === 'Untitled Note' &&
-        editedNote.content.trim() === '') {
-      navigate('/notes');
-      return;
-    }
-
-    if (isDirty) {
+    if (checkIsDirty()) {
       setShowDiscardDialog(true);
     } else {
-      setEditMode(false);
+      navigate('/notes');
     }
   };
 
@@ -579,6 +575,7 @@ const NoteDetailPage: React.FC = () => {
     setIsDirty(false);
     setEditMode(false);
     setShowDiscardDialog(false);
+    navigate('/notes');
   };
 
   const handleAskAi = () => {
@@ -593,33 +590,33 @@ const NoteDetailPage: React.FC = () => {
       let response;
       if (aiQuestion.toLowerCase().includes('summary') || aiQuestion.toLowerCase().includes('summarize')) {
         response = `# Summary of "${note?.title}"
- 
+  
         This note covers the following key points:
- 
+  
         1. The main components and structure
         2. Important relationships between concepts
         3. Core principles and definitions
- 
+  
         ## Key Concepts:
         ${note?.content.split('\n').filter(line => line.startsWith('##')).map(line => `- ${line.replace('##', '').trim()}`).join('\n')}
- 
+  
         ## Suggested Connections:
         This note connects well with other topics in your notes. I recommend exploring related concepts to deepen your understanding.`;
       } else if (aiQuestion.toLowerCase().includes('explain') || aiQuestion.toLowerCase().includes('clarify')) {
         response = `# Explanation
- 
+  
         Based on your note, here's a simplified explanation:
- 
+  
         ${note?.content.split('\n').slice(0, 5).join('\n')}
- 
+  
         Would you like me to break down any specific part in more detail?`;
       } else {
         response = `I've analyzed your note on "${note?.title}" and can help answer your question: "${aiQuestion}"
- 
+  
         Based on the content, I can see that this note covers ${note?.tags.join(', ')}. 
- 
+  
         To properly answer your specific question, I would need to understand more about what exactly you're looking to learn. Could you provide more details or ask a more specific question about the content?
- 
+  
         I can help with:
         - Summarizing key points
         - Explaining complex concepts
@@ -675,8 +672,8 @@ const NoteDetailPage: React.FC = () => {
         onBack={() => {
           // Special handling for new empty notes
           if (isNewNote &&
-              editedNote.title.trim() === 'Untitled Note' &&
-              editedNote.content.trim() === '') {
+            editedNote.title.trim() === 'Untitled Note' &&
+            editedNote.content.trim() === '') {
             navigate('/notes');
             return;
           }
