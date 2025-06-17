@@ -1,7 +1,18 @@
 // src/pages/NoteDetailPage.tsx
 
 import React, { useState, useEffect } from 'react';
+interface BeforeUnloadEvent extends Event {
+  returnValue: any;
+}
+interface BeforeUnloadEvent extends Event {
+  returnValue: any;
+}
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+declare global {
+  interface WindowEventMap {
+    beforeunload: BeforeUnloadEvent;
+  }
+}
 import { useStore } from '../store';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
@@ -71,6 +82,19 @@ const NoteDetailPage: React.FC = () => {
 
   // Dirty flag state
   const [isDirty, setIsDirty] = useState(false);
+
+  // Handle window beforeunload for browser tab/window closing
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (editMode && isDirty) {
+        e.preventDefault();
+        return e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [editMode, isDirty]);
 
   // Check if the current state is dirty (has unsaved changes)
   const checkIsDirty = () => {
@@ -534,7 +558,10 @@ const NoteDetailPage: React.FC = () => {
   };
 
   const handleCancelEdit = () => {
-    if (isNewNote) {
+    // Special handling for new empty notes
+    if (isNewNote &&
+        editedNote.title.trim() === 'Untitled Note' &&
+        editedNote.content.trim() === '') {
       navigate('/notes');
       return;
     }
@@ -566,39 +593,39 @@ const NoteDetailPage: React.FC = () => {
       let response;
       if (aiQuestion.toLowerCase().includes('summary') || aiQuestion.toLowerCase().includes('summarize')) {
         response = `# Summary of "${note?.title}"
-
-This note covers the following key points:
-
-1. The main components and structure
-2. Important relationships between concepts
-3. Core principles and definitions
-
-## Key Concepts:
-${note?.content.split('\n').filter(line => line.startsWith('##')).map(line => `- ${line.replace('##', '').trim()}`).join('\n')}
-
-## Suggested Connections:
-This note connects well with other topics in your notes. I recommend exploring related concepts to deepen your understanding.`;
+ 
+        This note covers the following key points:
+ 
+        1. The main components and structure
+        2. Important relationships between concepts
+        3. Core principles and definitions
+ 
+        ## Key Concepts:
+        ${note?.content.split('\n').filter(line => line.startsWith('##')).map(line => `- ${line.replace('##', '').trim()}`).join('\n')}
+ 
+        ## Suggested Connections:
+        This note connects well with other topics in your notes. I recommend exploring related concepts to deepen your understanding.`;
       } else if (aiQuestion.toLowerCase().includes('explain') || aiQuestion.toLowerCase().includes('clarify')) {
         response = `# Explanation
-
-Based on your note, here's a simplified explanation:
-
-${note?.content.split('\n').slice(0, 5).join('\n')}
-
-Would you like me to break down any specific part in more detail?`;
+ 
+        Based on your note, here's a simplified explanation:
+ 
+        ${note?.content.split('\n').slice(0, 5).join('\n')}
+ 
+        Would you like me to break down any specific part in more detail?`;
       } else {
         response = `I've analyzed your note on "${note?.title}" and can help answer your question: "${aiQuestion}"
-
-Based on the content, I can see that this note covers ${note?.tags.join(', ')}. 
-
-To properly answer your specific question, I would need to understand more about what exactly you're looking to learn. Could you provide more details or ask a more specific question about the content?
-
-I can help with:
-- Summarizing key points
-- Explaining complex concepts
-- Connecting this to other topics
-- Creating study questions
-- Identifying gaps in understanding`;
+ 
+        Based on the content, I can see that this note covers ${note?.tags.join(', ')}. 
+ 
+        To properly answer your specific question, I would need to understand more about what exactly you're looking to learn. Could you provide more details or ask a more specific question about the content?
+ 
+        I can help with:
+        - Summarizing key points
+        - Explaining complex concepts
+        - Connecting this to other topics
+        - Creating study questions
+        - Identifying gaps in understanding`;
       }
 
       setAiResponse(response);
@@ -645,7 +672,21 @@ I can help with:
   return (
     <div className="fade-in">
       <NoteHeader
-        onBack={() => navigate('/notes')}
+        onBack={() => {
+          // Special handling for new empty notes
+          if (isNewNote &&
+              editedNote.title.trim() === 'Untitled Note' &&
+              editedNote.content.trim() === '') {
+            navigate('/notes');
+            return;
+          }
+
+          if (editMode && isDirty) {
+            setShowDiscardDialog(true);
+          } else {
+            navigate('/notes');
+          }
+        }}
         isPdfNote={isPdfNote}
         pdfInfoAvailable={isPdfAvailable}
         editMode={editMode}
