@@ -2,9 +2,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
+import { useAuth } from '../contexts/AuthContext';
+import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { Plus, FileText } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce'; 
-import { Note } from '../types';
+import { Note, Subject } from '../types';
+import { supabase } from '../services/supabase';
 
 import PageHeader from '../components/PageHeader';
 import NotesFilterBar from '../components/notes/NotesFilterBar';
@@ -15,6 +19,9 @@ import Dialog from '../components/Dialog';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { addToast } = useToast();
+  const { addNotification } = useNotifications();
   const { 
     notes, 
     addNote,
@@ -35,10 +42,38 @@ const NotesPage: React.FC = () => {
   const [noteToDeleteId, setNoteToDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
+  // Subject management state
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false);
+  
   const [currentPage, setCurrentPage] = useState(1);
   
   const debouncedSearchTerm = useDebounce(searchTerm, 500);
   const isInitialMount = useRef(true);
+
+  // Fetch subjects for current user
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const fetchSubjects = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('name', { ascending: true });
+
+        if (error) throw error;
+
+        setSubjects(data || []);
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+        addToast('Failed to load subjects', 'error');
+      }
+    };
+
+    fetchSubjects();
+  }, [user?.id]);
 
   // Single source of truth for fetching data.
   useEffect(() => {
@@ -121,6 +156,35 @@ const NotesPage: React.FC = () => {
     }
   };
 
+  const handleCreateSubject = async (name: string) => {
+    if (!name.trim() || !user?.id) return;
+
+    setIsCreatingSubject(true);
+    try {
+      const { data, error } = await supabase
+        .from('subjects')
+        .insert([{
+          name: name.trim(),
+          user_id: user.id
+        }])
+        .select();
+
+      if (error) throw error;
+
+      if (data?.[0]) {
+        setSubjects(prev => [...prev, data[0]]);
+        addToast('Subject created successfully', 'success');
+        addNotification(`Subject "${name.trim()}" was created`, 'success', 'Note Management');
+      }
+    } catch (error) {
+      console.error('Error creating subject:', error);
+      addToast('Failed to create subject', 'error');
+      addNotification('Failed to create subject', 'error', 'Note Management');
+    } finally {
+      setIsCreatingSubject(false);
+    }
+  };
+
   // Find the note to delete for the dialog message
   const noteToDelete = notes.find(note => note.id === noteToDeleteId);
 
@@ -182,6 +246,9 @@ const NotesPage: React.FC = () => {
       {showPdfUploader && (
         <UploaderPanel 
           onClose={() => setShowPdfUploader(false)}
+          subjects={subjects}
+          onCreateSubject={handleCreateSubject}
+          isCreatingSubject={isCreatingSubject}
         />
       )}
       

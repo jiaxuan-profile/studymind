@@ -80,7 +80,9 @@ const convertToMarkdown = (text: string): string => {
 export const processAndSaveDocument = async (
   file: File,
   useAI: boolean,
-  onProgress: ProgressCallback
+  onProgress: ProgressCallback,
+  selectedSubjectId?: number | null,
+  selectedYearLevel?: number | null
 ): Promise<Note> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('You must be logged in to upload documents.');
@@ -133,6 +135,8 @@ export const processAndSaveDocument = async (
     pdf_storage_path: pdfStorageInfo?.path,
     pdf_public_url: pdfStorageInfo?.publicUrl,
     original_filename: file.name,
+    subject_id: selectedSubjectId,
+    year_level: selectedYearLevel,
   };
 
   // FIRST SAVE - Creates the initial note record
@@ -201,5 +205,7 @@ function createNoteObject(payload: NotePayload): Note {
     updatedAt: new Date(payload.updated_at),
     summary: payload.summary ?? null,
     embedding: payload.embedding ?? undefined,
+    subjectId: payload.subject_id ? payload.subject_id.toString() : null,
+    yearLevel: payload.year_level,
   };
 }
