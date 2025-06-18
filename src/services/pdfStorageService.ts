@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-const STORAGE_BUCKET = 'pdfs';
+const STORAGE_BUCKET = 'uploads';
 
 export interface PDFUploadResult {
   path: string;

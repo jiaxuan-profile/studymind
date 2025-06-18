@@ -13,34 +13,34 @@ CREATE INDEX IF NOT EXISTS idx_notes_original_filename ON notes(original_filenam
 
 -- Create storage bucket for PDFs if it doesn't exist
 INSERT INTO storage.buckets (id, name, public)
-VALUES ('pdfs', 'pdfs', true)
+VALUES ('uploads', 'uploads', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Set up storage policies for the PDFs bucket
 DROP POLICY IF EXISTS "Users can upload their own PDFs" ON storage.objects;
 CREATE POLICY "Users can upload their own PDFs" ON storage.objects
 FOR INSERT WITH CHECK (
-  bucket_id = 'pdfs' AND 
+  bucket_id = 'uploads' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
 DROP POLICY IF EXISTS "Users can view their own PDFs" ON storage.objects;
 CREATE POLICY "Users can view their own PDFs" ON storage.objects
 FOR SELECT USING (
-  bucket_id = 'pdfs' AND 
+  bucket_id = 'uploads' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
 DROP POLICY IF EXISTS "Users can update their own PDFs" ON storage.objects;
 CREATE POLICY "Users can update their own PDFs" ON storage.objects
 FOR UPDATE USING (
-  bucket_id = 'pdfs' AND 
+  bucket_id = 'uploads' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
 
 DROP POLICY IF EXISTS "Users can delete their own PDFs" ON storage.objects;
 CREATE POLICY "Users can delete their own PDFs" ON storage.objects
 FOR DELETE USING (
-  bucket_id = 'pdfs' AND 
+  bucket_id = 'uploads' AND 
   auth.uid()::text = (storage.foldername(name))[1]
 );
