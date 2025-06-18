@@ -1,12 +1,21 @@
 // src/components/notes/UploaderPanel.tsx
 import React from 'react';
 import DocumentUploader from '../DocumentUploader';
+import { Subject } from '../../types';
 
 interface UploaderPanelProps {
   onClose: () => void;
+  subjects?: Subject[];
+  onCreateSubject?: (name: string) => Promise<void>;
+  isCreatingSubject?: boolean;
 }
 
-const UploaderPanel: React.FC<UploaderPanelProps> = ({ onClose }) => {
+const UploaderPanel: React.FC<UploaderPanelProps> = ({ 
+  onClose, 
+  subjects, 
+  onCreateSubject, 
+  isCreatingSubject 
+}) => {
   return (
     <div className="mb-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 slide-in">
       <div className="flex justify-between items-center mb-4">
@@ -21,7 +30,12 @@ const UploaderPanel: React.FC<UploaderPanelProps> = ({ onClose }) => {
           </svg>
         </button>
       </div>
-      <DocumentUploader onClose={onClose} />
+      <DocumentUploader 
+        onClose={onClose} 
+        subjects={subjects}
+        onCreateSubject={onCreateSubject}
+        isCreatingSubject={isCreatingSubject}
+      />
     </div>
   );
 };

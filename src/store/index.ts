@@ -91,13 +91,13 @@ export const useStore = create<State>((set, get) => ({
     await withAuthenticatedUser(set, async (userId) => {
       const newNote = {
         ...note,
-        user_id: userId || '',
+        userId: userId || '',
         createdAt: new Date(),
         updatedAt: new Date(),
         tags: note.tags || [],
-        analysis_status: 'not_started',
-        subject_id: note.subjectId || null,
-        year_level: note.yearLevel || null
+        analysisStatus: 'not_started',
+        subjectId: note.subjectId || null,
+        yearLevel: note.yearLevel || null
       } as Note;
 
       set((state) => ({
