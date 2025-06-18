@@ -65,8 +65,8 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
     // Create a new speech synthesis utterance
     const utterance = new SpeechSynthesisUtterance(note.summary);
     
-    // Configure the utterance
-    utterance.rate = 0.9; // Slightly slower for better comprehension
+    // Configure the utterance with increased speed
+    utterance.rate = 1.3; // Increased from 0.9 to 1.3 for faster playback
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
@@ -130,7 +130,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
                     onClick={handleReadSummary}
                     disabled={!note.summary}
                     className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 hover:bg-blue-200 dark:hover:bg-blue-800/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title={isSpeaking ? 'Stop reading summary' : 'Read summary aloud'}
+                    title={isSpeaking ? 'Stop reading summary' : 'Read summary aloud (1.3x speed)'}
                   >
                     {isSpeaking ? (
                       <>
