@@ -1,7 +1,7 @@
 // src/components/note-detail/NoteContentView.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { FileText, Sparkles, CheckCircle, AlertTriangle } from 'lucide-react';
+import { FileText, Sparkles, CheckCircle, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 import PDFViewer from '../PDFViewer';
 import { Note } from '../../types';
 
@@ -16,6 +16,78 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
   viewMode,
   isPdfAvailable,
 }) => {
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  // Check if speech synthesis is supported
+  const speechSupported = typeof window !== 'undefined' && 'speechSynthesis' in window;
+
+  // Cleanup speech when component unmounts or note changes
+  useEffect(() => {
+    return () => {
+      if (speechSupported && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        setIsSpeaking(false);
+      }
+    };
+  }, [note.id, speechSupported]);
+
+  // Monitor speech synthesis state
+  useEffect(() => {
+    if (!speechSupported) return;
+
+    const checkSpeechState = () => {
+      if (!window.speechSynthesis.speaking && isSpeaking) {
+        setIsSpeaking(false);
+      }
+    };
+
+    const interval = setInterval(checkSpeechState, 100);
+    return () => clearInterval(interval);
+  }, [isSpeaking, speechSupported]);
+
+  const handleReadSummary = () => {
+    if (!speechSupported) {
+      alert('Text-to-speech is not supported in your browser.');
+      return;
+    }
+
+    if (!note.summary) {
+      return;
+    }
+
+    // If already speaking, stop the speech
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    // Create a new speech synthesis utterance
+    const utterance = new SpeechSynthesisUtterance(note.summary);
+    
+    // Configure the utterance
+    utterance.rate = 0.9; // Slightly slower for better comprehension
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Set up event handlers
+    utterance.onstart = () => {
+      setIsSpeaking(true);
+    };
+
+    utterance.onend = () => {
+      setIsSpeaking(false);
+    };
+
+    utterance.onerror = (event) => {
+      console.error('Speech synthesis error:', event.error);
+      setIsSpeaking(false);
+    };
+
+    // Start speaking
+    window.speechSynthesis.speak(utterance);
+  };
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
@@ -51,7 +123,29 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
           <div className="flex items-start">
             <Sparkles className="h-5 w-5 text-blue-600 dark:text-blue-400 mr-2 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
-              <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">AI-Generated Summary</h4>
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-medium text-blue-900 dark:text-blue-200">AI-Generated Summary</h4>
+                {speechSupported && (
+                  <button
+                    onClick={handleReadSummary}
+                    disabled={!note.summary}
+                    className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 hover:bg-blue-200 dark:hover:bg-blue-800/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title={isSpeaking ? 'Stop reading summary' : 'Read summary aloud'}
+                  >
+                    {isSpeaking ? (
+                      <>
+                        <VolumeX className="h-3 w-3 mr-1" />
+                        Stop
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="h-3 w-3 mr-1" />
+                        Listen
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
               <div className="text-sm text-blue-800 dark:text-blue-300 prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown>{note.summary}</ReactMarkdown>
               </div>
