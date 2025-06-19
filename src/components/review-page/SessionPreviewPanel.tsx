@@ -1,8 +1,9 @@
 // src/components/review-page/SessionPreviewPanel.tsx
 import React from 'react';
-import { TrendingUp, Play } from 'lucide-react';
+import { TrendingUp, Play, Sparkles } from 'lucide-react';
 
 type QuestionType = 'short' | 'mcq' | 'open';
+type QuestionCount = '5' | '10' | 'all';
 
 interface SessionPreviewPanelProps {
   selectedNotesCount: number;
@@ -11,7 +12,11 @@ interface SessionPreviewPanelProps {
   getQuestionTypeColor: (type: QuestionType) => string;
   getQuestionTypeIcon: (type: QuestionType) => React.ReactNode;
   onStartReview: () => void;
-  startReviewDisabled: boolean; // Pre-calculated disabled state
+  startReviewDisabled: boolean;
+  isGeneratingQuestions?: boolean;
+  generateNewQuestions?: boolean;
+  selectedQuestionCount: QuestionCount;
+  setSelectedQuestionCount: (count: QuestionCount) => void;
 }
 
 const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
@@ -22,23 +27,60 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
   getQuestionTypeIcon,
   onStartReview,
   startReviewDisabled,
+  isGeneratingQuestions = false,
+  generateNewQuestions = false,
+  selectedQuestionCount,
+  setSelectedQuestionCount,
 }) => {
+  // Calculate the actual number of questions that will be used
+  const finalQuestionCount = selectedQuestionCount === 'all' 
+    ? totalQuestions 
+    : Math.min(parseInt(selectedQuestionCount), totalQuestions);
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="p-6">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
-          <TrendingUp className="h-5 w-5 mr-2" />
+      <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+          <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">4</span>
           Session Preview
-        </h3>
-        
+        </h2>
+      </div>
+
+      <div className="p-6">
         {selectedNotesCount > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">
-                {totalQuestions}
+                {finalQuestionCount}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Total Questions</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                {selectedQuestionCount === 'all' 
+                  ? 'Total Questions' 
+                  : `Questions (${finalQuestionCount} of ${totalQuestions} available)`}
+              </div>
             </div>
+
+            {/* Question Count Selection */}
+            {generateNewQuestions && (
+              <div className="mt-4">
+                <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Number of Questions:</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['5', '10', 'all'] as const).map((count) => (
+                    <button
+                      key={count}
+                      onClick={() => setSelectedQuestionCount(count)}
+                      className={`py-2 px-3 rounded-lg border-2 text-center transition-colors ${
+                        selectedQuestionCount === count
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {count === 'all' ? 'All' : `${count}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="text-center">
               <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getQuestionTypeColor(selectedQuestionType)}`}>
@@ -56,8 +98,22 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
               disabled={startReviewDisabled}
               className="w-full inline-flex items-center justify-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Play className="h-5 w-5 mr-2" />
-              Start Review Session
+              {isGeneratingQuestions ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                  Generating Questions...
+                </>
+              ) : generateNewQuestions ? (
+                <>
+                  <Sparkles className="h-5 w-5 mr-2" />
+                  Generate & Start Review
+                </>
+              ) : (
+                <>
+                  <Play className="h-5 w-5 mr-2" />
+                  Start Review Session
+                </>
+              )}
             </button>
 
             {totalQuestions === 0 && selectedNotesCount > 0 && (

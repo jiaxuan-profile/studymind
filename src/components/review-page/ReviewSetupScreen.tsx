@@ -16,6 +16,7 @@ interface Question {
   connects?: string[];
   difficulty: 'easy' | 'medium' | 'hard';
   mastery_context?: string;
+  is_default?: boolean;
 }
 
 interface NoteWithQuestions {
@@ -57,6 +58,9 @@ interface ReviewSetupScreenProps {
   totalQuestions: number;
   onStartReview: () => void;
   startReviewDisabled: boolean;
+  isGeneratingQuestions?: boolean;
+  selectedQuestionCount: '5' | '10' | 'all';
+  setSelectedQuestionCount: (count: '5' | '10' | 'all') => void;
 }
 
 const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = ({
@@ -89,6 +93,9 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = ({
   totalQuestions,
   onStartReview,
   startReviewDisabled,
+  isGeneratingQuestions = false,
+  selectedQuestionCount,
+  setSelectedQuestionCount,
 }) => {
   return (
     <div className="fade-in">
@@ -142,6 +149,10 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = ({
             getQuestionTypeIcon={getQuestionTypeIcon}
             onStartReview={onStartReview}
             startReviewDisabled={startReviewDisabled}
+            isGeneratingQuestions={isGeneratingQuestions}
+            generateNewQuestions={generateNewQuestions}
+            selectedQuestionCount={selectedQuestionCount}
+            setSelectedQuestionCount={setSelectedQuestionCount}
           />
         </div>
       </div>      

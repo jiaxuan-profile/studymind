@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../contexts/ToastContext';
+import { useNotifications } from '../contexts/NotificationContext';
 import { 
   Target, Zap, Brain, HelpCircle, 
   MessageSquare, List, FileQuestion
@@ -25,6 +26,7 @@ interface Question {
   mastery_context?: string;
   ai_feedback?: string;
   ai_reviewed?: boolean;
+  is_default?: boolean;
 }
 
 interface NoteWithQuestions {
@@ -47,10 +49,12 @@ type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 const ReviewPage: React.FC = () => {
   const { notes, subjects, user, loadSubjects } = useStore();
   const { addToast } = useToast();
+  const { addNotification } = useNotifications();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
   const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>('short');
+  const [selectedQuestionCount, setSelectedQuestionCount] = useState<'5' | '10' | 'all'>('all');
   const [notesWithQuestions, setNotesWithQuestions] = useState<NoteWithQuestions[]>([]);
   const [currentQuestions, setCurrentQuestions] = useState<CurrentQuestionType[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -63,6 +67,7 @@ const ReviewPage: React.FC = () => {
   // Pro user question generation options
   const [generateNewQuestions, setGenerateNewQuestions] = useState(false);
   const [customDifficulty, setCustomDifficulty] = useState(false);
+  const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
   
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState<string>('');
@@ -284,7 +289,7 @@ const ReviewPage: React.FC = () => {
       
       const { data: allQuestions, error } = await supabase 
         .from('questions')
-        .select('id, note_id, question, hint, connects, difficulty, mastery_context')
+        .select('id, note_id, question, hint, connects, difficulty, mastery_context, is_default')
         .eq('user_id', user.id);
 
       if (error) throw error;
@@ -361,47 +366,90 @@ const ReviewPage: React.FC = () => {
     setSelectedNotes(prev => prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]);
   };
 
-  const startReview = async () => {
+  const generateQuestions = async () => {
+    if (!generateNewQuestions || selectedNotes.length === 0) return;
+    
+    setIsGeneratingQuestions(true);
+    addToast('Generating questions...', 'info');
+    addNotification('Starting question generation for selected notes', 'info', 'Review');
+    
+    try {
+      const { generateQuestionsForNote } = await import('../services/aiService');
+      
+      for (const noteId of selectedNotes) {
+        try {
+          const difficulty = customDifficulty ? 'custom' : selectedDifficulty;
+          await generateQuestionsForNote(noteId, { 
+            difficulty: difficulty as any,
+            questionType: selectedQuestionType 
+          });
+          addToast(`Generated questions for note ${notesWithQuestions.find(n => n.id === noteId)?.title || noteId}`, 'success');
+        } catch (error) {
+          console.warn(`Failed to generate questions for note ${noteId}:`, error);
+          addToast(`Failed to generate questions for one note`, 'error');
+        }
+      }
+      
+      // Reload questions after generation
+      await loadNotesWithQuestions();
+      addNotification('Question generation completed', 'success', 'Review');
+      
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      addToast('Failed to generate questions', 'error');
+      addNotification('Question generation failed', 'error', 'Review');
+    } finally {
+      setIsGeneratingQuestions(false);
+    }
+  };
+
+  const handleStartReviewProcess = async () => {
     try {
       setLoading(true);
-      if (!user || !user.id) { // Check user from store
+      if (!user || !user.id) {
         addToast('User not authenticated. Please log in.', 'error');
         setLoading(false);
         return;
       }
 
+      // Generate questions if needed
       if (generateNewQuestions) {
-        const { generateQuestionsForNote } = await import('../services/aiService');
-        
-        for (const noteId of selectedNotes) {
-          try {
-            const difficulty = customDifficulty ? 'custom' : selectedDifficulty;
-            await generateQuestionsForNote(noteId, { 
-              difficulty: difficulty as any,
-              questionType: selectedQuestionType 
-            });
-          } catch (error) {
-            console.warn(`Failed to generate questions for note ${noteId}:`, error);
-          }
-        }
-        
-        // Reload questions after generation
-        await loadNotesWithQuestions();
+        await generateQuestions();
       }
 
+      // Get all questions that match our criteria
       const questionsToReview: CurrentQuestionType[] = selectedNotes.flatMap(noteId => {
         const note = notesWithQuestions.find(n => n.id === noteId);
         if (!note) return [];
+        
+        // Filter questions by difficulty and is_default if generating new questions
         return note.questions
-          .filter(q => selectedDifficulty === 'all' || q.difficulty === selectedDifficulty)
+          .filter(q => {
+            // Filter by difficulty
+            const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
+            
+            // If generating new questions, only use default questions
+            const defaultMatches = generateNewQuestions ? (q.is_default === true) : true;
+            
+            return difficultyMatches && defaultMatches;
+          })
           .map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
       });
       
+      // Shuffle the questions
       const shuffledQuestions = questionsToReview.sort(() => Math.random() - 0.5);
+      
       if (shuffledQuestions.length === 0) { 
         addToast("No questions found for the selected criteria.", "warning"); 
         setLoading(false);
         return; 
+      }
+
+      // Apply question count limit if not "all"
+      let finalQuestions = shuffledQuestions;
+      if (selectedQuestionCount !== 'all') {
+        const count = parseInt(selectedQuestionCount);
+        finalQuestions = shuffledQuestions.slice(0, Math.min(count, shuffledQuestions.length));
       }
 
       const now = new Date();
@@ -455,7 +503,7 @@ const ReviewPage: React.FC = () => {
         session_name: sessionName,
         selected_notes: selectedNotes,
         selected_difficulty: selectedDifficulty,
-        total_questions: shuffledQuestions.length,
+        total_questions: finalQuestions.length,
         session_status: 'in_progress',
       }).select().single();
 
@@ -463,7 +511,7 @@ const ReviewPage: React.FC = () => {
       if (!sessionData) throw new Error("Failed to create session.");
       const newSessionId = sessionData.id;
 
-      const placeholderAnswers = shuffledQuestions.map((q, index) => ({
+      const placeholderAnswers = finalQuestions.map((q, index) => ({
         session_id: newSessionId,
         question_index: index,
         user_id: user.id,
@@ -487,7 +535,7 @@ const ReviewPage: React.FC = () => {
       setCurrentSessionId(newSessionId);
       setSessionName(sessionName);
       setSessionStartTime(new Date());
-      setCurrentQuestions(shuffledQuestions);
+      setCurrentQuestions(finalQuestions);
       setCurrentQuestionIndex(0);
       setReviewedCount(0);
       setSessionStats({ easy: 0, medium: 0, hard: 0 });
@@ -626,6 +674,7 @@ const ReviewPage: React.FC = () => {
     setSelectedNotes([]);
     setSelectedDifficulty('all');
     setSelectedQuestionType('short');
+    setSelectedQuestionCount('all');
     setCurrentQuestions([]);
     setCurrentQuestionIndex(0);
     setShowHint(false);
@@ -642,6 +691,7 @@ const ReviewPage: React.FC = () => {
     setActiveNoteSelectionTab('available');
     setAiReviewFeedback(null);
     setIsAiReviewing(false);
+    setIsGeneratingQuestions(false);
   };
 
   const getDifficultyColor = (difficulty: string) => {
@@ -682,7 +732,7 @@ const ReviewPage: React.FC = () => {
 
   const currentQuestion = currentQuestions[currentQuestionIndex];
   const totalQuestions = calculateTotalQuestions();
-  const startReviewDisabled = selectedNotes.length === 0 || selectedQuestionType !== 'short' || totalQuestions === 0;
+  const startReviewDisabled = selectedNotes.length === 0 || selectedQuestionType !== 'short' || totalQuestions === 0 || isGeneratingQuestions;
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {
@@ -713,8 +763,11 @@ const ReviewPage: React.FC = () => {
           getQuestionTypeIcon={getQuestionTypeIcon}
           getQuestionTypeColor={getQuestionTypeColor}
           totalQuestions={totalQuestions}
-          onStartReview={startReview}
+          onStartReview={handleStartReviewProcess}
           startReviewDisabled={startReviewDisabled}
+          isGeneratingQuestions={isGeneratingQuestions}
+          selectedQuestionCount={selectedQuestionCount}
+          setSelectedQuestionCount={setSelectedQuestionCount}
         />
 
         {/* Resume Session Dialog */}
