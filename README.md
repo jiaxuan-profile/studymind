@@ -89,7 +89,7 @@ StudyMind supports both formative and summative assessment strategies:
 - Performance insights and trends
 - Focus time analytics and productivity metrics
 
-### 🎯 Concept Mastery System (Pro Only)
+### 🎯 Concept Mastery System
 - **3-Tier Mastery Classification**:
   - 🟢 Mastered (≥70%): Used as foundation for new questions
   - 🟡 Developing (30-70%): Targeted with focused practice
@@ -97,6 +97,25 @@ StudyMind supports both formative and summative assessment strategies:
 - **Adaptive Question Weights**:
   - Higher frequency of developing concept questions
   - Gradual reintroduction of struggling concepts
+- **Visual Mastery Tracking**:
+  - Concept nodes sized and colored by mastery level
+  - Border thickness indicates confidence level
+  - Hover tooltips show exact mastery percentages
+  - Mastery tiers clearly indicated with color coding
+- **Performance-Based Progression**:
+  - Mastery increases based on question difficulty and correctness
+  - Easy questions: +0.1 mastery for correct answers
+  - Medium questions: +0.2 mastery for correct answers
+  - Hard questions: +0.3 mastery for correct answers
+  - Penalties for incorrect answers scaled by difficulty
+- **Confidence Scoring**:
+  - Tracks how well you can assess your own knowledge
+  - Increases when self-assessment matches actual performance
+  - Decreases when there's a mismatch between perception and reality
+- **Mastery Persistence**:
+  - Concepts remain in your knowledge graph even if notes are deleted
+  - Long-term tracking of your growing expertise
+  - **Coming Soon**: Mastery history and progression tracking
 
 ### 🌙 Theme Support
 - **Light/Dark Mode**: Toggle between light and dark themes
@@ -142,6 +161,16 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - User-specific mastery levels
 
 ## Recent Updates
+
+### ✅ Concept Mastery Gamification
+- **Visual Mastery Indicators**: Nodes in concept graph sized and colored by mastery level
+- **Confidence Tracking**: Border thickness indicates confidence in knowledge
+- **Mastery Tiers**: Color-coded system (Green/Yellow/Red) for mastery levels
+- **Performance-Based Progression**: Answer questions correctly to increase mastery
+- **Difficulty Weighting**: Harder questions provide greater mastery increases
+- **Self-Assessment Integration**: User difficulty ratings affect mastery adjustments
+- **Mastery Statistics**: Dashboard showing total concepts, mastered concepts, and average mastery
+- **Coming Soon**: Mastery history tracking and achievement badges
 
 ### ✅ Enhanced Dialog System
 - **Reusable Dialog Component**: Beautiful, themed confirmation dialogs

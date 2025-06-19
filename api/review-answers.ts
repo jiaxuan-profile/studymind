@@ -129,8 +129,72 @@ const handler: Handler = async (event) => {
             continue; // Skip if question has no linked concepts
         }
 
-        // Determine the mastery change
-        const masteryChange = fb.isCorrect ? 0.1 : -0.15;
+        // Determine the mastery change based on correctness and difficulty
+        // Base values: Easy +0.1/-0.15, Medium +0.2/-0.2, Hard +0.3/-0.25
+        let masteryChange = 0;
+        
+        if (fb.isCorrect) {
+            // Correct answers increase mastery based on difficulty
+            switch (question.difficulty) {
+                case 'easy': masteryChange = 0.1; break;
+                case 'medium': masteryChange = 0.2; break;
+                case 'hard': masteryChange = 0.3; break;
+                default: masteryChange = 0.15; // Default if difficulty is unknown
+            }
+        } else {
+            // Incorrect answers decrease mastery based on difficulty
+            switch (question.difficulty) {
+                case 'easy': masteryChange = -0.15; break;
+                case 'medium': masteryChange = -0.2; break;
+                case 'hard': masteryChange = -0.25; break;
+                default: masteryChange = -0.2; // Default if difficulty is unknown
+            }
+        }
+
+        // Fetch the review answer to check if user rated the difficulty
+        const { data: reviewAnswer } = await supabase
+            .from('review_answers')
+            .select('difficulty_rating')
+            .eq('question_text', question.question)
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+        
+        // Adjust mastery change based on user's difficulty rating
+        if (reviewAnswer?.difficulty_rating) {
+            // If user found it easier than expected and got it right, reduce the mastery gain
+            if (fb.isCorrect && 
+                ((question.difficulty === 'hard' && reviewAnswer.difficulty_rating === 'easy') ||
+                 (question.difficulty === 'medium' && reviewAnswer.difficulty_rating === 'easy'))) {
+                masteryChange *= 0.7; // Reduce the gain by 30%
+            }
+            
+            // If user found it harder than expected and still got it right, increase the mastery gain
+            if (fb.isCorrect && 
+                ((question.difficulty === 'easy' && reviewAnswer.difficulty_rating === 'hard') ||
+                 (question.difficulty === 'medium' && reviewAnswer.difficulty_rating === 'hard'))) {
+                masteryChange *= 1.3; // Increase the gain by 30%
+            }
+            
+            // If user found it harder and got it wrong, reduce the mastery loss
+            if (!fb.isCorrect && reviewAnswer.difficulty_rating === 'hard') {
+                masteryChange *= 0.8; // Reduce the loss by 20%
+            }
+        }
+
+        // Calculate confidence score adjustment
+        // Confidence increases when user's perception matches reality
+        // Confidence decreases when there's a mismatch
+        let confidenceChange = 0;
+        
+        if (reviewAnswer?.difficulty_rating) {
+            const perceptionMatchesReality = 
+                (fb.isCorrect && reviewAnswer.difficulty_rating !== 'hard') || 
+                (!fb.isCorrect && reviewAnswer.difficulty_rating === 'hard');
+            
+            confidenceChange = perceptionMatchesReality ? 0.05 : -0.1;
+        }
 
         // For every concept linked to this question, update the user's mastery
         for (const conceptName of question.connects) {
@@ -140,19 +204,26 @@ const handler: Handler = async (event) => {
                 // Fetch current mastery to update it
                 const { data: currentMastery } = await supabase
                     .from('user_concept_mastery')
-                    .select('mastery_level')
+                    .select('mastery_level, confidence_score')
                     .eq('user_id', user.id)
                     .eq('concept_id', concept.id)
                     .single();
                 
                 const currentLevel = currentMastery?.mastery_level ?? 0.5;
+                const currentConfidence = currentMastery?.confidence_score ?? 0.5;
+                
+                // Ensure mastery stays between 0 and 1
                 const newLevel = Math.max(0, Math.min(1, currentLevel + masteryChange));
+                
+                // Ensure confidence stays between 0 and 1
+                const newConfidence = Math.max(0, Math.min(1, currentConfidence + confidenceChange));
 
                 // Call the RPC function to update or insert the mastery level
                 await supabase.rpc('update_user_mastery', {
                     user_uuid: user.id,
                     concept_id_param: concept.id,
-                    new_mastery_level: newLevel
+                    new_mastery_level: newLevel,
+                    new_confidence_score: newConfidence
                 });
             }
         }

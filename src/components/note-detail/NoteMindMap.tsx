@@ -9,7 +9,10 @@ import {
   Brain,
   Loader2,
   Database,
-  Info
+  Info,
+  Trophy,
+  Target,
+  TrendingUp
 } from 'lucide-react';
 import { GraphData, GraphNode, GraphLink } from '../../types'; // Assuming GraphNode has isRoot?: boolean
 import { supabase } from '../../services/supabase';
@@ -18,6 +21,14 @@ interface NoteMindMapProps {
   noteId: string;
   noteTitle: string;
   noteContent: string;
+}
+
+interface UserMastery {
+  concept_id: string;
+  mastery_level: number;
+  confidence_score: number;
+  last_reviewed_at?: string;
+  review_count: number;
 }
 
 const ROOT_NODE_ID = '---CENTRAL-THEME-ROOT---';
@@ -79,6 +90,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
   const [zoomLevel, setZoomLevel] = useState(1);
   const [_hoveredNode, setHoveredNode] = useState<GraphNode | null>(null); 
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [userMasteryData, setUserMasteryData] = useState<Map<string, UserMastery>>(new Map());
   const graphRef = useRef<any>(null);
 
   const NODE_LABEL_ZOOM_THRESHOLD = 1.2;
@@ -100,6 +112,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     setError(null);
     
     try {
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
       const { data: noteConceptsData, error: noteConceptsError } = await supabase
         .from('note_concepts')
         .select(`
@@ -124,6 +140,24 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
       const conceptIds = noteConceptsData.map(nc => nc.concepts.id);
 
+      // Fetch user mastery data for these concepts
+      const { data: masteryData, error: masteryError } = await supabase
+        .from('user_concept_mastery')
+        .select('concept_id, mastery_level, confidence_score, last_reviewed_at, review_count')
+        .eq('user_id', user.id)
+        .in('concept_id', conceptIds);
+      
+      if (masteryError) {
+        console.warn("Could not fetch mastery data:", masteryError);
+      }
+
+      // Create mastery map
+      const masteryMap = new Map<string, UserMastery>();
+      (masteryData || []).forEach(mastery => {
+        masteryMap.set(mastery.concept_id, mastery);
+      });
+      setUserMasteryData(masteryMap);
+
       const { data: relationshipsData, error: relationshipsError } = await supabase
         .from('concept_relationships')
         .select(`
@@ -137,15 +171,23 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
 
       if (relationshipsError) throw relationshipsError;
 
-      const initialNodes: GraphNode[] = noteConceptsData.map((nc, index) => ({
-        id: nc.concepts.id,
-        name: nc.concepts.name,
-        definition: nc.concepts.definition,
-        val: 1 + (nc.relevance_score || 0.5) * 2,
-        color: getConceptColor(index, nc.relevance_score || 0.5),
-        hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim()),
-        isRoot: false,
-      }));
+      const initialNodes: GraphNode[] = noteConceptsData.map((nc, index) => {
+        const mastery = masteryMap.get(nc.concepts.id);
+        const masteryLevel = mastery?.mastery_level || 0.5;
+        const confidenceScore = mastery?.confidence_score || 0.5;
+        
+        return {
+          id: nc.concepts.id,
+          name: nc.concepts.name,
+          definition: nc.concepts.definition,
+          val: 1 + (nc.relevance_score || 0.5) * 2 + masteryLevel * 1.5, // Size based on relevance and mastery
+          color: getConceptColor(index, nc.relevance_score || 0.5, masteryLevel),
+          hasDefinition: !!(nc.concepts.definition && nc.concepts.definition.trim()),
+          isRoot: false,
+          masteryLevel,
+          confidenceScore
+        };
+      });
 
       const initialLinks: GraphLink[] = (relationshipsData || []).map(rel => ({
         source: rel.source_id,
@@ -162,6 +204,8 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
         color: '#FFBF00', 
         hasDefinition: true,
         isRoot: true,
+        masteryLevel: 1,
+        confidenceScore: 1
       };
 
       let processedNodes: GraphNode[];
@@ -214,18 +258,33 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [noteId, noteContent, noteTitle]); 
 
-  const getConceptColor = (index: number, relevance: number): string => {
+  const getConceptColor = (index: number, relevance: number, masteryLevel: number): string => {
     const baseColors = [
       '#6366F1', '#10B981', '#F59E0B', '#EF4444', 
       '#8B5CF6', '#06B6D4', '#84CC16', '#F97316',
     ];
     const baseColor = baseColors[index % baseColors.length];
-    const opacity = Math.max(0.6, relevance);
+    
+    // Adjust color based on mastery level
     const hex = baseColor.replace('#', '');
     const r = parseInt(hex.substr(0, 2), 16);
     const g = parseInt(hex.substr(2, 2), 16);
     const b = parseInt(hex.substr(4, 2), 16);
+    
+    // Higher mastery = more opacity
+    const opacity = Math.max(0.4, 0.4 + (masteryLevel * 0.6));
+    
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+  };
+
+  const getMasteryTier = (masteryLevel: number): { tier: string; color: string; icon: React.ReactNode } => {
+    if (masteryLevel >= 0.7) {
+      return { tier: 'Mastered', color: '#10B981', icon: <Trophy className="h-3 w-3" /> };
+    } else if (masteryLevel >= 0.3) {
+      return { tier: 'Developing', color: '#F59E0B', icon: <Target className="h-3 w-3" /> };
+    } else {
+      return { tier: 'Struggling', color: '#EF4444', icon: <TrendingUp className="h-3 w-3" /> };
+    }
   };
 
   const getLinkColor = (relationshipType: string = 'related'): string => {
@@ -269,6 +328,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
     const textColor = isDarkMode ? '#D1D5DB' : '#6b7280'; 
     const headingColor = isDarkMode ? '#F3F4F6' : '#1f2937';
     const borderColor = isDarkMode ? '#4B5563' : '#e5e7eb';
+    
+    const masteryLevel = node.masteryLevel || 0.5;
+    const confidenceScore = node.confidenceScore || 0.5;
+    const masteryTier = getMasteryTier(masteryLevel);
 
     return `<div style="
       background: ${bgColor}; 
@@ -280,7 +343,19 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
       font-family: system-ui, -apple-system, sans-serif;
     ">
       <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: ${headingColor};">${node.name}</div>
-      <div style="color: ${textColor}; font-size: 14px; line-height: 1.4;">${node.definition}</div>
+      <div style="color: ${textColor}; font-size: 14px; line-height: 1.4; margin-bottom: 8px;">${node.definition}</div>
+      ${!node.isRoot ? `
+      <div style="border-top: 1px solid ${borderColor}; padding-top: 8px; margin-top: 8px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="font-size: 12px; color: ${textColor};">Mastery:</span>
+          <span style="font-size: 12px; font-weight: bold; color: ${masteryTier.color};">${Math.round(masteryLevel * 100)}%</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-size: 12px; color: ${textColor};">Confidence:</span>
+          <span style="font-size: 12px; font-weight: bold; color: ${headingColor};">${Math.round(confidenceScore * 100)}%</span>
+        </div>
+      </div>
+      ` : ''}
     </div>`;
   };
 
@@ -354,10 +429,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
           </div>
           <div className="flex flex-wrap items-center space-x-2 sm:space-x-3 text-xs">
             <div className="flex items-center space-x-1 sm:space-x-2">
-              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('prerequisite')}} /> Prerequisite</div>
-              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('builds-upon')}} /> Builds Upon</div>
-              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('related')}} /> Related</div>
-              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('sub-theme')}} /> Sub-theme</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('prerequisite')}} /> Prerequisite</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('builds-upon')}} /> Builds Upon</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('related')}} /> Related</div>
+              <div className="flex items-center"><div className="w-3 h-0.5" style={{backgroundColor: getLinkColor('sub-theme')}} /> Sub-theme</div>
             </div>
             <label className="flex items-center cursor-pointer">
               <input
@@ -436,8 +511,11 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               const nodeRadius = Math.sqrt(Math.max(0, n.val || 1)) * effectiveMultiplier;
               
               const color = n.color || '#94A3B8';
+              const masteryLevel = n.masteryLevel || 0.5;
+              const confidenceScore = n.confidenceScore || 0.5;
+              const masteryTier = getMasteryTier(masteryLevel);
 
-              ctx.globalAlpha = isDimmed ? 0.3 : 1.0;
+              ctx.globalAlpha = isDimmed ? 0.3 : (0.4 + masteryLevel * 0.6); // Opacity based on mastery
               
               if (n.isRoot) {
                 ctx.beginPath();
@@ -452,6 +530,13 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 ctx.arc(n.x!, n.y!, nodeRadius, 0, 2 * Math.PI, false);
                 ctx.fillStyle = color;
                 ctx.fill();
+                
+                // Mastery tier border
+                if (!isDimmed) {
+                  ctx.strokeStyle = masteryTier.color;
+                  ctx.lineWidth = (1 + confidenceScore * 2) / globalScale; // Border thickness based on confidence
+                  ctx.stroke();
+                }
               }
 
               if (isSelected || (isConnectedToSelected && !n.isRoot)) { 
@@ -475,6 +560,17 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 const iconY = n.y! - nodeRadius + iconSize * 0.9;
                 ctx.beginPath(); ctx.arc(iconX, iconY, iconSize, 0, 2 * Math.PI, false);
                 ctx.fillStyle = '#9CA3AF'; ctx.fill();
+              }
+
+              // Mastery indicator (only for non-root nodes)
+              if (!n.isRoot && !isDimmed) {
+                const masteryIconSize = Math.max(0.8, 2 / globalScale);
+                const masteryIconX = n.x! - nodeRadius + masteryIconSize * 0.9;
+                const masteryIconY = n.y! - nodeRadius + masteryIconSize * 0.9;
+                ctx.beginPath();
+                ctx.arc(masteryIconX, masteryIconY, masteryIconSize, 0, 2 * Math.PI, false);
+                ctx.fillStyle = masteryTier.color;
+                ctx.fill();
               }
 
               if (labelsEnabled && zoomLevel >= NODE_LABEL_ZOOM_THRESHOLD) {
@@ -502,10 +598,10 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               const sourceNode = link.source as GraphNode;
               const targetNode = link.target as GraphNode;
 
-              if (!selectedNode) return getLinkColor(l.relationshipType);
+              if (!selectedNode) return getLinkColor(l.relationshipType as string);
               
               const isConnectedToSelected = sourceNode.id === selectedNode.id || targetNode.id === selectedNode.id;
-              return isConnectedToSelected ? getLinkColor(l.relationshipType) : 'rgba(150, 150, 150, 0.2)';
+              return isConnectedToSelected ? getLinkColor(l.relationshipType as string) : 'rgba(150, 150, 150, 0.2)';
             }}
             linkCanvasObject={(link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
               if (!labelsEnabled || zoomLevel < LINK_LABEL_ZOOM_THRESHOLD) return;
@@ -525,11 +621,11 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
                 ctx.font = `${8 / globalScale}px Sans-Serif`;
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
                 const isDarkMode = typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
-                ctx.fillStyle = getLinkColor(l.relationshipType); 
+                ctx.fillStyle = getLinkColor(l.relationshipType as string); 
                 ctx.strokeStyle = isDarkMode ? '#111827' : 'white'; 
                 ctx.lineWidth = 2 / globalScale;
-                ctx.strokeText(l.relationshipType, midX, midY);
-                ctx.fillText(l.relationshipType, midX, midY);
+                ctx.strokeText(l.relationshipType as string, midX, midY);
+                ctx.fillText(l.relationshipType as string, midX, midY);
               }
             }}
             linkCanvasObjectMode={() => (labelsEnabled && zoomLevel >= LINK_LABEL_ZOOM_THRESHOLD) ? 'after' : undefined}
@@ -556,6 +652,33 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
               ) : (
                 <p className="text-sm text-gray-400 dark:text-gray-500 italic">No definition available</p>
               )}
+              
+              {/* Mastery information for selected node */}
+              {!selectedNode.isRoot && selectedNode.masteryLevel !== undefined && (
+                <div className="mt-3 p-2 bg-gray-100 dark:bg-gray-700/50 rounded-md">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center">
+                      {getMasteryTier(selectedNode.masteryLevel).icon}
+                      <span className="text-xs font-medium ml-1" style={{ color: getMasteryTier(selectedNode.masteryLevel).color }}>
+                        {getMasteryTier(selectedNode.masteryLevel).tier}
+                      </span>
+                    </div>
+                    <span className="text-xs font-medium" style={{ color: getMasteryTier(selectedNode.masteryLevel).color }}>
+                      {Math.round(selectedNode.masteryLevel * 100)}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-1.5">
+                    <div 
+                      className="h-1.5 rounded-full" 
+                      style={{ 
+                        width: `${selectedNode.masteryLevel * 100}%`,
+                        backgroundColor: getMasteryTier(selectedNode.masteryLevel).color
+                      }}
+                    ></div>
+                  </div>
+                </div>
+              )}
+              
               <div className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 Connected to {graphData.links.filter(link => { 
                     const sourceId = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source;
@@ -567,7 +690,7 @@ const NoteMindMap: React.FC<NoteMindMapProps> = ({ noteId, noteTitle, noteConten
             </div>
             <button
               onClick={() => setSelectedNode(null)}
-              className="text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-400 transition-colors ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              className="text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors ml-2 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
               aria-label="Clear selection"
             ><RotateCcw className="h-4 w-4" /></button>
           </div>
