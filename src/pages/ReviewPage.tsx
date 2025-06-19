@@ -45,7 +45,7 @@ type QuestionType = 'short' | 'mcq' | 'open';
 type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 
 const ReviewPage: React.FC = () => {
-  const { notes } = useStore();
+  const { notes, subjects, user, loadSubjects } = useStore();
   const { addToast } = useToast();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
@@ -65,6 +65,7 @@ const ReviewPage: React.FC = () => {
   const [customDifficulty, setCustomDifficulty] = useState(false);
   
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessionName, setSessionName] = useState<string>('');
   
   const [userAnswer, setUserAnswer] = useState('');
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
@@ -88,6 +89,7 @@ const ReviewPage: React.FC = () => {
   const [inProgressSession, setInProgressSession] = useState<ReviewSession | null>(null);
   const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
+  const [sessionGeneratedName, setSessionGeneratedName] = useState<string>('');
 
   const navigate = useNavigate();
 
@@ -113,6 +115,16 @@ const ReviewPage: React.FC = () => {
     return [h > 0 ? `${h}h` : '', m > 0 ? `${m}m` : '', `${s}s`].filter(Boolean).join(' ');
   };
 
+  useEffect(() => {
+    if (user && user.id && subjects.length === 0) {
+      console.log("ReviewPage: User is available, attempting to load subjects.");
+      loadSubjects().catch((error: any) => {
+        console.error("ReviewPage: Failed to load subjects:", error);
+        addToast('Could not load subject data. Session names might be affected.', 'warning');
+      });
+    }
+  }, [user, subjects.length, loadSubjects, addToast]);
+  
   useEffect(() => {
     loadNotesWithQuestions();
     checkForInProgressSession();
@@ -215,6 +227,7 @@ const ReviewPage: React.FC = () => {
       // Set up the session state
       setCurrentSessionId(inProgressSession.id);
       setSessionStartTime(new Date(inProgressSession.started_at));
+      setSessionName(inProgressSession.session_name || `Resumed Session ${new Date(inProgressSession.started_at).toLocaleString()}`);
       setCurrentQuestions(reconstructedQuestions);
       setCurrentQuestionIndex(nextQuestionIndex);
       setUserAnswers(reconstructedUserAnswers);
@@ -235,12 +248,6 @@ const ReviewPage: React.FC = () => {
     } finally {
       setIsLoadingSession(false);
     }
-  };
-
-  const startNewSession = () => {
-    setShowResumeDialog(false);
-    setInProgressSession(null);
-    // Continue with normal flow
   };
 
   // Filter notes for available tab (excluding already selected notes)
@@ -357,8 +364,11 @@ const ReviewPage: React.FC = () => {
   const startReview = async () => {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !user.id) { // Check user from store
+        addToast('User not authenticated. Please log in.', 'error');
+        setLoading(false);
+        return;
+      }
 
       if (generateNewQuestions) {
         const { generateQuestionsForNote } = await import('../services/aiService');
@@ -389,13 +399,56 @@ const ReviewPage: React.FC = () => {
       
       const shuffledQuestions = questionsToReview.sort(() => Math.random() - 0.5);
       if (shuffledQuestions.length === 0) { 
-        alert("No questions found for the selected criteria."); 
+        addToast("No questions found for the selected criteria.", "warning"); 
         setLoading(false);
         return; 
       }
 
       const now = new Date();
-      const sessionName = `Review ${now.toLocaleDateString()} ${now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+      
+      // Get year level and subject from first note
+      const firstNote = notes.find(n => n.id === selectedNotes[0]);
+      let yearCode = '';
+      if (firstNote?.yearLevel) {
+        switch(firstNote.yearLevel) {
+          case 1: yearCode = 'PRI'; break;
+          case 2: yearCode = 'SEC'; break;
+          case 3: yearCode = 'TER'; break;
+          case 4: yearCode = 'PRO'; break;
+          default: yearCode = '';
+        }
+      }
+
+      let subjectNameString = 'General';
+      if (firstNote?.subjectId) {
+        if (subjects.length > 0) {
+          const foundSubject = subjects.find(s => s?.id && String(s.id) === String(firstNote.subjectId));
+          if (foundSubject) {
+            subjectNameString = foundSubject.name;
+          } else {
+            addToast(`Note's subject (ID: ${firstNote.subjectId}) not found. Using 'General'.`, 'info');
+            subjectNameString = 'General';
+          }
+        } else {
+          addToast("Subjects not loaded yet. Using 'General' for session name.", 'info');
+          subjectNameString = 'General';
+        }
+      }
+
+      // Format date as dd-mmm-yyyy hh:mm am/pm
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = now.toLocaleString('default', { month: 'short' }).toUpperCase();
+      const year = now.getFullYear();
+      
+      // Format time in 12-hour with AM/PM
+      let hours = now.getHours();
+      const ampm = hours >= 12 ? 'PM' : 'AM';
+      hours = hours % 12;
+      hours = hours ? hours : 12; // Convert 0 to 12
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      
+      const sessionName = `${yearCode ? yearCode + '-' : ''}${subjectNameString.replace(/\s+/g, '-')} ${day} ${month} ${year} ${hours}:${minutes} ${ampm}`;
+      setSessionGeneratedName(sessionName);
 
       const { data: sessionData, error: sessionError } = await supabase.from('review_sessions').insert({
         user_id: user.id,
@@ -432,6 +485,7 @@ const ReviewPage: React.FC = () => {
       }
 
       setCurrentSessionId(newSessionId);
+      setSessionName(sessionName);
       setSessionStartTime(new Date());
       setCurrentQuestions(shuffledQuestions);
       setCurrentQuestionIndex(0);
@@ -668,7 +722,7 @@ const ReviewPage: React.FC = () => {
           isOpen={showResumeDialog}
           onClose={() => setShowResumeDialog(false)}
           title="Resume Previous Session"
-          message={`You have an unfinished review session from ${inProgressSession ? new Date(inProgressSession.started_at).toLocaleString() : 'recently'}. Would you like to resume it or start a new session?`}
+          message={`You have an unfinished review session "${sessionGeneratedName || inProgressSession?.session_name || 'Untitled'}" from ${inProgressSession ? new Date(inProgressSession.started_at).toLocaleString() : 'recently'}. Would you like to resume it or start a new session?`}
           onConfirm={resumeSession}
           confirmText={isLoadingSession ? 'Resuming...' : 'Resume Session'}
           cancelText="Start New Session"
@@ -705,6 +759,7 @@ const ReviewPage: React.FC = () => {
         currentQuestionIndex={currentQuestionIndex}
         totalQuestionsInSession={currentQuestions.length}
         currentSessionId={currentSessionId}
+        sessionName={sessionName}
         sessionStartTime={sessionStartTime}
         formattedDuration={formattedTime}
         onResetReview={resetReview}

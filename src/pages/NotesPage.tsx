@@ -149,7 +149,7 @@ const NotesPage: React.FC = () => {
       };
 
       await addNote(newNoteData);            
-      navigate(`/notes/${id}`, { state: { isNewNote: true } });
+      navigate(`/notes/${id}`, { state: { isNewNote: true, from: location.pathname } });
     } catch (err) {
       console.error("Error creating new note:", err);
       alert(`Failed to create note: ${(err as Error).message}`);

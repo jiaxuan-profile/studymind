@@ -1,15 +1,8 @@
 // src/components/note-detail/NoteEditForm.tsx
 import React, { useState } from 'react';
-import { FileText, Plus, Check, X, ChevronDown } from 'lucide-react';
-import { Note, Subject } from '../../types';
+import { FileText, Check, X, ChevronDown } from 'lucide-react';
+import { Note, Subject, YEAR_LEVEL_OPTIONS } from '../../types';
 
-const YEAR_LEVEL_OPTIONS = [
-  { value: '0', label: 'Select Year Level' },
-  { value: '1', label: 'Primary/Elementary' },
-  { value: '2', label: 'Secondary/High School' },
-  { value: '3', label: 'Tertiary (College/University)' },
-  { value: '4', label: 'Working Professional' }
-];
 
 interface NoteEditFormProps {
   editedNote: { 

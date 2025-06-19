@@ -2,8 +2,9 @@
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { FileText, Sparkles, CheckCircle, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
+import { getAllSubjects } from '../../services/databaseService';
 import PDFViewer from '../PDFViewer';
-import { Note } from '../../types';
+import { Note, YEAR_LEVEL_OPTIONS } from '../../types';
 
 interface NoteContentViewProps {
   note: Note;
@@ -16,6 +17,33 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
   viewMode,
   isPdfAvailable,
 }) => {
+  const [subjectName, setSubjectName] = useState<string>(
+    note.subjectId ? `Subject ${note.subjectId}` : 'No subject'
+  );
+
+  useEffect(() => {
+    const fetchSubjectName = async () => {
+      try {
+        if (!note.subjectId) {
+          setSubjectName('No subject');
+          return;
+        }
+        
+        const subjects = await getAllSubjects(note.userId);
+        const subject = subjects.find(s => s.id === parseInt(note.subjectId!, 10));
+        setSubjectName(subject?.name || `Subject ${note.subjectId}`);
+      } catch (error) {
+        console.error('Error fetching subject name:', error);
+      }
+    };
+
+    fetchSubjectName();
+  }, [note.subjectId, note.userId]);
+
+  const getYearLevelName = (yearLevel: number) => {
+    const option = YEAR_LEVEL_OPTIONS.find(opt => opt.value === String(yearLevel));
+    return option ? option.label : `Year ${yearLevel}`;
+  };
   const [isSpeaking, setIsSpeaking] = useState(false);
 
   // Check if speech synthesis is supported
@@ -67,7 +95,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
     
     // Configure the utterance with increased speed
     utterance.rate = 1.3; // Increased from 0.9 to 1.3 for faster playback
-    utterance.pitch = 1.0;
+    utterance.pitch = 1.2;
     utterance.volume = 1.0;
 
     // Set up event handlers
@@ -105,6 +133,26 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
         )}
       </div>
       
+      {/* Subject and Year Level */}
+      <div className="flex flex-wrap gap-4 mb-4">
+        {note.subjectId && (
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Subject:</span>
+            <span className="px-3 py-1 rounded-md text-sm bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+              {subjectName}
+            </span>
+          </div>
+        )}
+        {note.yearLevel && (
+          <div className="flex items-center">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Year Level:</span>
+            <span className="px-3 py-1 rounded-md text-sm bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200">
+              {getYearLevelName(note.yearLevel)}
+            </span>
+          </div>
+        )}
+      </div>
+
       {/* Tags */}
       <div className="flex flex-wrap gap-2 mb-6">
         {note.tags.map((tag, i) => (

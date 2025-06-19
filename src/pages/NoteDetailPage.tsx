@@ -20,6 +20,7 @@ import { useNotifications } from '../contexts/NotificationContext';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
 import { supabase } from '../services/supabase';
+import { getAllSubjects } from '../services/databaseService';
 import NoteHeader from '../components/note-detail/NoteHeader';
 import NoteMainContent from '../components/note-detail/NoteMainContent';
 import StudyAssistantPanel from '../components/note-detail/StudyAssistantPanel';
@@ -205,7 +206,16 @@ const NoteDetailPage: React.FC = () => {
         checkExistingData(foundNote.id);
       }
     }
-  }, [id, notes, navigate, isLocalOnly]);
+    
+    // Set the from location if not already set
+    if (location.state?.from === undefined) {
+      navigate(location.pathname, {
+        ...location,
+        state: { ...location.state, from: '/notes' },
+        replace: true
+      });
+    }
+  }, [id, notes, navigate, isLocalOnly, location]);
 
   // Fetch subjects for current user
   useEffect(() => {
@@ -213,18 +223,11 @@ const NoteDetailPage: React.FC = () => {
 
     const fetchSubjects = async () => {
       try {
-        const { data, error } = await supabase
-          .from('subjects')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('name', { ascending: true });
-
-        if (error) throw error;
-
-        setSubjects(data?.map(subject => ({
+        const subjects = await getAllSubjects(user.id);
+        setSubjects(subjects.map(subject => ({
           ...subject,
           notes: []
-        })) || []);
+        })));
       } catch (error) {
         console.error('Error fetching subjects:', error);
         addToast('Failed to load subjects', 'error');
@@ -312,6 +315,7 @@ const NoteDetailPage: React.FC = () => {
 
         console.log("Persisting AI analysis (summary and tags) to the database...");
 
+        console.log("Subject ID before save:", editedNote.subject_id);
         await saveNoteToDatabase({
           id: note.id,
           user_id: note.userId!,
@@ -519,6 +523,8 @@ const NoteDetailPage: React.FC = () => {
           original_filename: note.originalFilename ?? '',
           summary: note.summary,
           analysis_status: note.analysisStatus,
+          subject_id: editedNote.subject_id === null || editedNote.subject_id === undefined ? null : Number(editedNote.subject_id),
+          year_level: editedNote.year_level === null || editedNote.year_level === undefined ? null : Number(editedNote.year_level),
         });
       }
 
@@ -565,7 +571,7 @@ const NoteDetailPage: React.FC = () => {
     if (checkIsDirty()) {
       setShowDiscardDialog(true);
     } else {
-      navigate('/notes');
+      navigate(location.state?.from || '/notes');
     }
   };
 
@@ -575,7 +581,7 @@ const NoteDetailPage: React.FC = () => {
     setIsDirty(false);
     setEditMode(false);
     setShowDiscardDialog(false);
-    navigate('/notes');
+    navigate(location.state?.from || '/notes');
   };
 
   const handleAskAi = () => {
@@ -674,14 +680,16 @@ const NoteDetailPage: React.FC = () => {
           if (isNewNote &&
             editedNote.title.trim() === 'Untitled Note' &&
             editedNote.content.trim() === '') {
-            navigate('/notes');
+            navigate(location.state?.from || '/notes', {
+              state: { from: location.pathname }
+            });
             return;
           }
 
           if (editMode && isDirty) {
             setShowDiscardDialog(true);
           } else {
-            navigate('/notes');
+            navigate(location.state?.from || '/notes');
           }
         }}
         isPdfNote={isPdfNote}

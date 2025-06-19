@@ -219,3 +219,11 @@ export interface PomodoroSettings {
 
 // Subscription tier type
 export type SubscriptionTier = 'standard' | 'pro';
+
+export const YEAR_LEVEL_OPTIONS = [
+  { value: '0', label: 'Select Year Level' },
+  { value: '1', label: 'Primary/Elementary' },
+  { value: '2', label: 'Secondary/High School' },
+  { value: '3', label: 'Tertiary (College/University)' },
+  { value: '4', label: 'Working Professional' }
+] as const;

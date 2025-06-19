@@ -6,6 +6,7 @@ interface ReviewHeaderProps {
   currentQuestionIndex: number;
   totalQuestionsInSession: number;
   currentSessionId: string | null;
+  sessionName: string;
   sessionStartTime: Date | null;
   formattedDuration: string;
   onResetReview: () => void;
@@ -18,13 +19,14 @@ const ReviewHeader: React.FC<ReviewHeaderProps> = ({
   sessionStartTime,
   formattedDuration,
   onResetReview,
+  sessionName,
 }) => {
   return (
     <div className="mb-6 flex justify-between items-center">
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
           <GraduationCap className="h-8 w-8 text-primary mr-3" />
-          Review Session
+          {sessionName}
         </h1>
         <p className="mt-2 text-gray-600 dark:text-gray-300">
           Question {currentQuestionIndex + 1} of {totalQuestionsInSession}

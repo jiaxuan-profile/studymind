@@ -29,6 +29,7 @@ interface ActiveReviewScreenProps {
   currentQuestionIndex: number;
   totalQuestionsInSession: number;
   currentSessionId: string | null;
+  sessionName: string;
   sessionStartTime: Date | null;
   formattedDuration: string;
   onResetReview: () => void;
@@ -72,6 +73,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
   totalQuestionsInSession,
   currentSessionId,
   sessionStartTime,
+  sessionName,
   formattedDuration,
   onResetReview,
   currentQuestion,
@@ -112,6 +114,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
         currentQuestionIndex={currentQuestionIndex}
         totalQuestionsInSession={totalQuestionsInSession}
         currentSessionId={currentSessionId}
+        sessionName={sessionName}
         sessionStartTime={sessionStartTime}
         formattedDuration={formattedDuration}
         onResetReview={onResetReview}

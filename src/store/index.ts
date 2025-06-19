@@ -1,9 +1,9 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User, ConceptRelationship, PomodoroSettings } from '../types';
+import { Note, Concept, User, ConceptRelationship, PomodoroSettings, Subject } from '../types';
 import { toNote } from '../utils/transformers';
 import { withAuthenticatedUser } from '../utils/authenticatedUser';
-import { getAllConcepts } from '../services/databaseService';
+import { getAllConcepts, getAllSubjects } from '../services/databaseService';
 import { getAllNotes, updateNoteSummary, deleteNoteFromDatabase } from '../services/noteService';
 import { generateNoteSummary } from '../services/aiService';
 
@@ -18,6 +18,7 @@ interface State {
   notes: Note[];
   concepts: Concept[];
   relationships: ConceptRelationship[];
+  subjects: Subject[];
   user: User | null;
   theme: 'light' | 'dark';
   isLoading: boolean;
@@ -48,6 +49,7 @@ export const useStore = create<State>((set, get) => ({
   notes: [],
   concepts: [],
   relationships: [],
+  subjects: [],
   user: null,
   theme: (typeof window !== 'undefined' && localStorage.getItem('studymind-theme') as 'light' | 'dark') || 'light',
   isLoading: false,
@@ -139,7 +141,9 @@ export const useStore = create<State>((set, get) => ({
       }));
 
       const summary = await generateNoteSummary(note.content);
-      await updateNoteSummary(id, summary);
+      const userId = get().user?.id;
+      if (!userId) throw new Error('User not authenticated');
+      await updateNoteSummary(id, summary, userId);
 
       set(state => ({
         notes: state.notes.map(n =>
@@ -192,6 +196,26 @@ export const useStore = create<State>((set, get) => ({
       totalNotes: 0,
     }
   }),
+
+  loadSubjects: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      const userId = get().user?.id;
+      if (!userId) throw new Error('User not authenticated');
+      
+      const subjects = await getAllSubjects(userId);
+      set({
+        subjects,
+        isLoading: false
+      });
+    } catch (error) {
+      console.error('Store: Failed to load subjects:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load subjects',
+        isLoading: false,
+      });
+    }
+  },
 
   loadConcepts: async () => {
     if (get().concepts.length > 0) {
