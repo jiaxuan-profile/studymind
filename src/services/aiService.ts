@@ -20,7 +20,7 @@ interface AIAnalysisResult {
   }>;
 }
 
-export type QuestionDifficulty = 'easy' | 'medium' | 'hard' | 'mixed';
+export type QuestionDifficulty = 'easy' | 'medium' | 'hard' | 'mixed' | 'custom';
 export type QuestionType = 'mcq' | 'short' | 'open';
 
 const getApiBaseUrl = () => {

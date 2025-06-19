@@ -115,6 +115,7 @@ export interface Question {
   connects?: string[] | null; // Connects to concept names
   difficulty: 'easy' | 'medium' | 'hard';
   mastery_context?: string | null;
+  is_default?: boolean; // Marks questions generated during AI analysis
   // For MCQs
   question_type?: 'mcq' | 'short' | 'open';
   options?: string[] | null;
@@ -190,6 +191,8 @@ export interface GraphNode {
   vx?: number;
   vy?: number;
   isRoot?: boolean;
+  masteryLevel?: number;
+  confidenceScore?: number;
 }
 
 // Data model for a link in the react-force-graph-2d component.

@@ -179,6 +179,7 @@ const handler: Handler = async (event) => {
       question_type: questionTypeFilter || 'short',
       options: q.options || null,
       answer: q.answer || null,
+      is_default: true, // Mark these questions as default since they're generated during AI analysis
     }));
 
     if (questionsToInsert.length > 0) {
