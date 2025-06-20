@@ -832,7 +832,12 @@ const ReviewPage: React.FC = () => {
 
   const currentQuestion = currentQuestions[currentQuestionIndex];
   const totalQuestions = calculateTotalQuestions();
-  const startReviewDisabled = selectedNotes.length === 0 || selectedQuestionType !== 'short' || totalQuestions === 0 || isGeneratingQuestions;
+  
+  // Modified condition: Enable the button if generateNewQuestions is true, regardless of totalQuestions
+  const startReviewDisabled = selectedNotes.length === 0 || 
+                             selectedQuestionType !== 'short' || 
+                             (totalQuestions === 0 && !generateNewQuestions) || 
+                             isGeneratingQuestions;
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {
