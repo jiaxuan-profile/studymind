@@ -1,6 +1,5 @@
-// src/components/review-page/SessionPreviewPanel.tsx
 import React from 'react';
-import { Play, Sparkles } from 'lucide-react';
+import { Play, Sparkles, Info } from 'lucide-react';
 
 type QuestionType = 'short' | 'mcq' | 'open';
 type QuestionCount = '5' | '10' | 'all';
@@ -48,14 +47,30 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
       <div className="p-4">
         {selectedNotesCount > 0 ? (
           <div className="space-y-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-primary">{finalQuestionCount}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedQuestionCount === 'all' 
-                  ? 'Total Questions' 
-                  : `Questions (${finalQuestionCount} of ${totalQuestions} available)`}
+            {generateNewQuestions ? (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30 rounded-lg p-3 text-blue-800 dark:text-blue-300 flex items-start">
+                <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium">Generating new questions</p>
+                  <p className="mt-1 text-blue-700 dark:text-blue-400 text-xs">
+                    {selectedQuestionCount === '5' 
+                      ? "5 new questions will be generated based on your selected notes."
+                      : selectedQuestionCount === '10'
+                      ? "10 questions will be generated, mixing new and existing ones."
+                      : "All available questions will be used, plus new generated ones."}
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">{finalQuestionCount}</div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">
+                  {selectedQuestionCount === 'all' 
+                    ? 'Total Questions' 
+                    : `Questions (${finalQuestionCount} of ${totalQuestions} available)`}
+                </div>
+              </div>
+            )}
 
             {/* Question Count Selection */}
             {generateNewQuestions && (
@@ -76,19 +91,16 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
                     </button>
                   ))}
                 </div>
-                {selectedQuestionCount === '5' && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Selecting 5 will show only new questions (not previously reviewed)
-                  </p>
-                )}
-                {selectedQuestionCount !== '5' && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                    Selecting {selectedQuestionCount} will mix new and existing questions
-                  </p>
-                )}
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  {selectedQuestionCount === '5' 
+                    ? "Generate 5 new questions based on your selected notes"
+                    : selectedQuestionCount === '10'
+                    ? "Generate up to 10 questions, mixing new and existing ones"
+                    : "Use all available questions plus generate new ones"}
+                </p>
               </div>
             )}
-
+            
             <div className="text-center">
               <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getQuestionTypeColor(selectedQuestionType)}`}>
                 {getQuestionTypeIcon(selectedQuestionType)}
