@@ -6,12 +6,14 @@ import { supabase } from '../services/supabase';
 import { useDebounce } from '../hooks/useDebounce';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useDemoMode } from '../contexts/DemoModeContext';
 
 // Import the new components
 import ReviewHistoryHeader from '../components/review-history/ReviewHistoryHeader';
 import ReviewHistoryFilterBar from '../components/review-history/ReviewHistoryFilterBar';
 import ReviewSessionList from '../components/review-history/ReviewSessionList';
 import ReviewHistoryPagination from '../components/review-history/ReviewHistoryPagination';
+import DemoModeNotice from '../components/DemoModeNotice';
 import Dialog from '../components/Dialog';
 
 interface ReviewSession {
@@ -51,6 +53,7 @@ const ReviewHistoryPage: React.FC = () => {
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
+  const { isReadOnlyDemo } = useDemoMode();
 
   useEffect(() => {
     loadReviewSessions(pagination.currentPage, pagination.pageSize, debouncedSearchTerm);
@@ -59,6 +62,74 @@ const ReviewHistoryPage: React.FC = () => {
   const loadReviewSessions = async (page: number, pageSize: number, searchTerm: string = '') => {
     setLoading(true);
     try {
+      if (isReadOnlyDemo) {
+        // Create mock data for demo mode
+        const mockSessions: ReviewSession[] = [
+          {
+            id: 'mock1',
+            session_name: 'TER-Computer-Science 15-JUN-2025 10:30 AM',
+            selected_notes: ['note1', 'note2'],
+            selected_difficulty: 'medium',
+            total_questions: 10,
+            questions_answered: 10,
+            questions_rated: 8,
+            easy_ratings: 3,
+            medium_ratings: 4,
+            hard_ratings: 1,
+            session_status: 'completed',
+            started_at: '2025-06-15T10:30:00Z',
+            completed_at: '2025-06-15T11:15:00Z',
+            duration_seconds: 2700
+          },
+          {
+            id: 'mock2',
+            session_name: 'SEC-Mathematics 12-JUN-2025 3:45 PM',
+            selected_notes: ['note3'],
+            selected_difficulty: 'all',
+            total_questions: 5,
+            questions_answered: 5,
+            questions_rated: 5,
+            easy_ratings: 2,
+            medium_ratings: 2,
+            hard_ratings: 1,
+            session_status: 'completed',
+            started_at: '2025-06-12T15:45:00Z',
+            completed_at: '2025-06-12T16:10:00Z',
+            duration_seconds: 1500
+          },
+          {
+            id: 'mock3',
+            session_name: 'PRI-Science 10-JUN-2025 9:15 AM',
+            selected_notes: ['note4', 'note5'],
+            selected_difficulty: 'easy',
+            total_questions: 8,
+            questions_answered: 6,
+            questions_rated: 4,
+            easy_ratings: 3,
+            medium_ratings: 1,
+            hard_ratings: 0,
+            session_status: 'in_progress',
+            started_at: '2025-06-10T09:15:00Z'
+          }
+        ];
+        
+        // Filter by search term if provided
+        const filteredSessions = searchTerm.trim() 
+          ? mockSessions.filter(s => s.session_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+          : mockSessions;
+        
+        setReviewSessions(filteredSessions);
+        setPagination(prev => ({
+          ...prev,
+          currentPage: page,
+          totalSessions: filteredSessions.length,
+          totalPages: Math.ceil(filteredSessions.length / prev.pageSize),
+        }));
+        
+        setLoading(false);
+        return;
+      }
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
       
@@ -121,6 +192,12 @@ const ReviewHistoryPage: React.FC = () => {
   const handleDeleteClick = (sessionId: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    if (isReadOnlyDemo) {
+      addToast('Delete operation not available in demo mode', 'warning');
+      return;
+    }
+    
     setSessionToDeleteId(sessionId);
     setShowDeleteDialog(true);
   };
@@ -181,6 +258,8 @@ const ReviewHistoryPage: React.FC = () => {
         subtitle="View your past review sessions and track your progress"
         onBackToSetup={handleBackToSetup}
       />
+
+      {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
 
       <ReviewHistoryFilterBar
         searchTerm={searchTerm}

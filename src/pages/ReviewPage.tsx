@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useDemoMode } from '../contexts/DemoModeContext';
 import {
   Target, Zap, Brain, HelpCircle,
   MessageSquare, List, FileQuestion
@@ -14,6 +15,7 @@ import ReviewSetupScreen from '../components/review-page/ReviewSetupScreen';
 import ReviewCompleteScreen from '../components/review-page/ReviewCompleteScreen';
 import ActiveReviewScreen from '../components/review-page/ActiveReviewScreen';
 import Dialog from '../components/Dialog';
+import DemoModeNotice from '../components/DemoModeNotice';
 import { ReviewSession, ReviewAnswer } from '../types';
 
 // Interfaces specific to the review process
@@ -54,6 +56,7 @@ const ReviewPage: React.FC = () => {
   const { notes, subjects, user, loadSubjects: storeLoadSubjects } = useStore();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
+  const { isReadOnlyDemo } = useDemoMode();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
@@ -132,6 +135,12 @@ const ReviewPage: React.FC = () => {
   };
 
   const retrySession = async (sessionId: string) => {
+    if (isReadOnlyDemo) {
+      addToast('Retry operation not available in demo mode', 'warning');
+      navigate('/history');
+      return;
+    }
+    
     setIsLoadingSession(true);
 
     try {
@@ -285,6 +294,8 @@ const ReviewPage: React.FC = () => {
   }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
 
   const checkForInProgressSession = async () => {
+    if (isReadOnlyDemo) return;
+    
     const state = location.state as LocationState | null;
     if (state?.retrySessionId || isLoadingSession || showResumeDialog) {
       return;
@@ -315,6 +326,12 @@ const ReviewPage: React.FC = () => {
 
   const resumeSession = async () => {
     if (!inProgressSession) return;
+    
+    if (isReadOnlyDemo) {
+      addToast('Resume operation not available in demo mode', 'warning');
+      setShowResumeDialog(false);
+      return;
+    }
 
     setIsLoadingSession(true);
     try {
@@ -423,6 +440,47 @@ const ReviewPage: React.FC = () => {
   const loadNotesWithQuestions = async () => {
     setLoading(true);
     try {
+      if (isReadOnlyDemo) {
+        // Create mock data for demo mode
+        const mockQuestions: Question[] = [
+          {
+            id: 'q1',
+            question: 'What is the difference between short-term and long-term memory?',
+            hint: 'Think about duration and capacity.',
+            connects: ['Memory', 'Cognition'],
+            difficulty: 'medium',
+            mastery_context: 'Tests understanding of memory types.'
+          },
+          {
+            id: 'q2',
+            question: 'Explain the concept of active recall and why it is effective for learning.',
+            hint: 'Consider how retrieval practice affects memory formation.',
+            connects: ['Learning', 'Memory'],
+            difficulty: 'easy',
+            mastery_context: 'Tests basic understanding of study techniques.'
+          },
+          {
+            id: 'q3',
+            question: 'How does spaced repetition enhance long-term retention?',
+            hint: 'Think about the spacing effect and forgetting curve.',
+            connects: ['Learning', 'Memory'],
+            difficulty: 'hard',
+            mastery_context: 'Tests advanced understanding of learning principles.'
+          }
+        ];
+        
+        const mockNotesWithQuestions: NoteWithQuestions[] = notes.slice(0, 3).map(note => ({
+          id: note.id,
+          title: note.title,
+          tags: note.tags,
+          questions: mockQuestions
+        }));
+        
+        setNotesWithQuestions(mockNotesWithQuestions);
+        setLoading(false);
+        return;
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
@@ -472,6 +530,11 @@ const ReviewPage: React.FC = () => {
 
   const finishReviewSession = async () => {
     if (!currentSessionId) return Promise.resolve();
+    
+    if (isReadOnlyDemo) {
+      setIsReviewComplete(true);
+      return Promise.resolve();
+    }
 
     const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
     const isUnsaved = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
@@ -543,6 +606,55 @@ const ReviewPage: React.FC = () => {
   };
 
   const handleStartReviewProcess = async () => {
+    if (isReadOnlyDemo) {
+      // Create mock review session for demo mode
+      const mockQuestions: CurrentQuestionType[] = [
+        {
+          id: 'mock1',
+          question: 'What is the difference between short-term and long-term memory?',
+          hint: 'Think about duration and capacity.',
+          connects: ['Memory', 'Cognition'],
+          difficulty: 'medium',
+          mastery_context: 'Tests understanding of memory types.',
+          noteId: 'mock-note-1',
+          noteTitle: 'Memory Systems'
+        },
+        {
+          id: 'mock2',
+          question: 'Explain the concept of active recall and why it is effective for learning.',
+          hint: 'Consider how retrieval practice affects memory formation.',
+          connects: ['Learning', 'Memory'],
+          difficulty: 'easy',
+          mastery_context: 'Tests basic understanding of study techniques.',
+          noteId: 'mock-note-2',
+          noteTitle: 'Learning Strategies'
+        },
+        {
+          id: 'mock3',
+          question: 'How does spaced repetition enhance long-term retention?',
+          hint: 'Think about the spacing effect and forgetting curve.',
+          connects: ['Learning', 'Memory'],
+          difficulty: 'hard',
+          mastery_context: 'Tests advanced understanding of learning principles.',
+          noteId: 'mock-note-3',
+          noteTitle: 'Advanced Study Techniques'
+        }
+      ];
+      
+      setSessionName('Demo Review Session');
+      setSessionStartTime(new Date());
+      setCurrentQuestions(mockQuestions);
+      setCurrentQuestionIndex(0);
+      setReviewedCount(0);
+      setSessionStats({ easy: 0, medium: 0, hard: 0 });
+      setUserAnswers([]);
+      setIsReviewComplete(false);
+      setCurrentStep('review');
+      setAiReviewFeedback(null);
+      
+      return;
+    }
+    
     try {
       setLoading(true);
       if (!user || !user.id) {
@@ -701,6 +813,19 @@ const ReviewPage: React.FC = () => {
 
   const saveAnswer = async () => {
     if (!userAnswer.trim() || !currentSessionId) return Promise.resolve();
+    
+    if (isReadOnlyDemo) {
+      // Simulate saving in demo mode
+      const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
+      if (answerExists) {
+        setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim(), timestamp: new Date() } : a));
+      } else {
+        setUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
+      }
+      setIsAnswerSaved(true);
+      return Promise.resolve();
+    }
+    
     setIsSaving(true);
     try {
       const { error } = await supabase
@@ -740,10 +865,28 @@ const ReviewPage: React.FC = () => {
   };
 
   const handleDifficultyResponse = async (difficulty: 'easy' | 'medium' | 'hard') => {
-    if (!currentSessionId || !isAnswerSaved) {
+    if (!isAnswerSaved) {
       addToast("Please save your answer before rating.", 'warning');
       return;
     }
+    
+    if (isReadOnlyDemo) {
+      // Simulate rating in demo mode
+      const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
+      setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, difficulty_rating: difficulty } : a));
+
+      if (difficulty !== previouslyRated) {
+        setSessionStats(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1, ...(previouslyRated && { [previouslyRated]: prev[previouslyRated] - 1 }) }));
+        if (!previouslyRated) setReviewedCount(prev => prev + 1);
+      }
+      return;
+    }
+    
+    if (!currentSessionId) {
+      addToast("Session ID not found. Please try again.", 'error');
+      return;
+    }
+    
     try {
       const { error } = await supabase.from('review_answers').update({ difficulty_rating: difficulty }).eq('session_id', currentSessionId).eq('question_index', currentQuestionIndex);
       if (error) throw error;
@@ -762,13 +905,24 @@ const ReviewPage: React.FC = () => {
   };
 
   const handleAiReviewAnswer = async () => {
-    if (!currentQuestion || !userAnswer.trim() || !currentSessionId) {
+    if (!currentQuestion || !userAnswer.trim()) {
       addToast('Please save your answer first before requesting AI feedback.', 'warning');
       return;
     }
-
+    
     setIsAiReviewing(true);
     setAiReviewFeedback(null);
+
+    if (isReadOnlyDemo) {
+      // Simulate AI review in demo mode
+      setTimeout(() => {
+        const mockFeedback = "Great answer! You've correctly identified the key concepts and provided a clear explanation. Consider adding a brief example to illustrate your point further.";
+        setAiReviewFeedback(mockFeedback);
+        setIsAiReviewing(false);
+        addToast('AI feedback received!', 'success');
+      }, 2000);
+      return;
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -896,6 +1050,8 @@ const ReviewPage: React.FC = () => {
   if (currentStep === 'select') {
     return (
       <>
+        {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
+        
         <ReviewSetupScreen
           loadingNotes={loading}
           notesWithQuestions={notesWithQuestions}
@@ -954,12 +1110,16 @@ const ReviewPage: React.FC = () => {
 
     if (isReviewComplete) {
       return (
-        <ReviewCompleteScreen
-          userAnswersCount={userAnswers.length}
-          sessionStats={sessionStats}
-          onResetReview={resetReview}
-          onNavigateToHistory={() => navigate('/history')}
-        />
+        <>
+          {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
+          
+          <ReviewCompleteScreen
+            userAnswersCount={userAnswers.length}
+            sessionStats={sessionStats}
+            onResetReview={resetReview}
+            onNavigateToHistory={() => navigate('/history')}
+          />
+        </>
       );
     }
 
@@ -968,44 +1128,48 @@ const ReviewPage: React.FC = () => {
     const isLastQuestion = currentQuestionIndex === currentQuestions.length - 1;
 
     return (
-      <ActiveReviewScreen
-        // ReviewHeader props
-        currentQuestionIndex={currentQuestionIndex}
-        totalQuestionsInSession={currentQuestions.length}
-        currentSessionId={currentSessionId}
-        sessionName={sessionName}
-        sessionStartTime={sessionStartTime}
-        formattedDuration={formattedTime}
-        onResetReview={resetReview}
-        // QuestionDisplay props
-        currentQuestion={currentQuestion}
-        getDifficultyColor={getDifficultyColor}
-        getDifficultyIcon={getDifficultyIcon}
-        showHint={showHint}
-        onShowHint={() => setShowHint(true)}
-        // AnswerInputArea props
-        userAnswer={userAnswer}
-        onUserAnswerChange={handleUserAnswerChange}
-        isAnswerSaved={isAnswerSaved}
-        isSaving={isSaving}
-        onSaveAnswer={saveAnswer}
-        aiReviewFeedback={aiReviewFeedback}
-        isAiReviewing={isAiReviewing}
-        onAiReviewAnswer={handleAiReviewAnswer}
-        // ReviewControls props
-        onNavigatePrevious={() => handleNavigation('previous')}
-        onNavigateNext={() => handleNavigation('next')}
-        onFinishSession={finishReviewSession}
-        isFirstQuestion={isFirstQuestion}
-        isLastQuestion={isLastQuestion}
-        // DifficultyRating prop
-        onRateDifficulty={handleDifficultyResponse}
-        userAnswers={userAnswers}
-        // SessionProgressSidebar props
-        reviewedCount={reviewedCount}
-        answersSavedCount={userAnswers.length}
-        sessionStats={sessionStats}
-      />
+      <>
+        {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
+        
+        <ActiveReviewScreen
+          // ReviewHeader props
+          currentQuestionIndex={currentQuestionIndex}
+          totalQuestionsInSession={currentQuestions.length}
+          currentSessionId={currentSessionId}
+          sessionName={sessionName}
+          sessionStartTime={sessionStartTime}
+          formattedDuration={formattedTime}
+          onResetReview={resetReview}
+          // QuestionDisplay props
+          currentQuestion={currentQuestion}
+          getDifficultyColor={getDifficultyColor}
+          getDifficultyIcon={getDifficultyIcon}
+          showHint={showHint}
+          onShowHint={() => setShowHint(true)}
+          // AnswerInputArea props
+          userAnswer={userAnswer}
+          onUserAnswerChange={handleUserAnswerChange}
+          isAnswerSaved={isAnswerSaved}
+          isSaving={isSaving}
+          onSaveAnswer={saveAnswer}
+          aiReviewFeedback={aiReviewFeedback}
+          isAiReviewing={isAiReviewing}
+          onAiReviewAnswer={handleAiReviewAnswer}
+          // ReviewControls props
+          onNavigatePrevious={() => handleNavigation('previous')}
+          onNavigateNext={() => handleNavigation('next')}
+          onFinishSession={finishReviewSession}
+          isFirstQuestion={isFirstQuestion}
+          isLastQuestion={isLastQuestion}
+          // DifficultyRating prop
+          onRateDifficulty={handleDifficultyResponse}
+          userAnswers={userAnswers}
+          // SessionProgressSidebar props
+          reviewedCount={reviewedCount}
+          answersSavedCount={userAnswers.length}
+          sessionStats={sessionStats}
+        />
+      </>
     );
   }
 

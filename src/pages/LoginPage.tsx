@@ -4,10 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store';
+import { useDemoMode } from '../contexts/DemoModeContext';
 import { ArrowLeft, Sun, Moon, UserCheck, User } from 'lucide-react'; 
 import BoltBadge from '../components/BoltBadge';
-
-const isDemoMode = import.meta.env.VITE_DEMO_MODE === 'true';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -20,7 +19,8 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, signIn, signUp, forgotPassword } = useAuth();
   const { theme, toggleTheme } = useStore();
-  const [activeDemoUser, setActiveDemoUser] = useState<'power' | 'standard' | null>(null);
+  const [activeDemoUser, setActiveDemoUser] = useState<'power' | 'standard' | 'readonly' | null>(null);
+  const { isReadOnlyDemo, isDemoMode } = useDemoMode();
 
   useEffect(() => {
     if (user) {
@@ -52,11 +52,14 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = (userType: 'power' | 'standard') => {
+  const handleDemoLogin = (userType: 'power' | 'standard' | 'readonly') => {
     setActiveDemoUser(userType); 
     if (userType === 'power') {
       setEmail('demo@studymindai.me');
       setPassword('password123');
+    } else if (userType === 'readonly') {
+      setEmail('readonly@studymindai.me');
+      setPassword('readonly123');
     }
   };
 
@@ -134,21 +137,34 @@ const LoginPage: React.FC = () => {
         </div>
         
         {/* Demo Mode Information Box */}
-        {isDemoMode && (
+        {(isDemoMode || isReadOnlyDemo) && (
           <div className="bg-primary/5 dark:bg-primary/10 border-l-4 border-primary dark:border-primary-light p-4 rounded-r-lg">
             <h3 className="font-bold text-gray-800 dark:text-gray-200">Demo Environment</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Sign up is disabled. Please use the account below to explore the app.
+              {isReadOnlyDemo 
+                ? "This is a read-only demo. You can explore the app but changes won't be saved."
+                : "Sign up is disabled. Please use the account below to explore the app."}
             </p>
             <div className="mt-4 flex flex-col sm:flex-row gap-2">
-              <button
-                type="button"
-                onClick={() => handleDemoLogin('power')}
-                className={activeDemoUser === 'power' ? primaryButtonClasses : secondaryButtonClasses}
-              >
-                <UserCheck className="h-4 w-4 mr-2" />
-                Login as Demo User
-              </button>
+              {isReadOnlyDemo ? (
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('readonly')}
+                  className={activeDemoUser === 'readonly' ? primaryButtonClasses : secondaryButtonClasses}
+                >
+                  <User className="h-4 w-4 mr-2" />
+                  Login as Read-Only User
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleDemoLogin('power')}
+                  className={activeDemoUser === 'power' ? primaryButtonClasses : secondaryButtonClasses}
+                >
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  Login as Demo User
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -199,7 +215,7 @@ const LoginPage: React.FC = () => {
               </button>
             ) : (
               <>
-                {!isDemoMode && (
+                {!isDemoMode && !isReadOnlyDemo && (
                   <button
                     type="button"
                     onClick={() => {
@@ -215,7 +231,7 @@ const LoginPage: React.FC = () => {
                   </button>
                 )}
 
-                {!isSignUp && !isDemoMode && (
+                {!isSignUp && !isDemoMode && !isReadOnlyDemo && (
                   <button
                     type="button"
                     onClick={() => {

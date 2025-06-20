@@ -3,10 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
 import { PlusCircle, Clock, BookOpen, BrainCircuit } from 'lucide-react';
 import BoltBadge from '../components/BoltBadge';
+import DemoModeNotice from '../components/DemoModeNotice';
+import { useDemoMode } from '../contexts/DemoModeContext';
 
 const HomePage: React.FC = () => {
   const { notes, concepts, isLoading, error } = useStore();
   const navigate = useNavigate();
+  const { isReadOnlyDemo } = useDemoMode();
   
   useEffect(() => {
     useStore.getState().loadConcepts();
@@ -43,6 +46,11 @@ const HomePage: React.FC = () => {
     .slice(0, 3);
 
   const handleCreateNote = async () => {
+    if (isReadOnlyDemo) {
+      navigate('/notes');
+      return;
+    }
+    
     try {
       const id = Math.random().toString(36).substring(2, 11);
       const now = new Date();
@@ -75,6 +83,8 @@ const HomePage: React.FC = () => {
           </p>
         </div>
       </div>
+      
+      {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
       
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

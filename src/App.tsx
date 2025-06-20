@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastProvider, useToast } from './contexts/ToastContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { DemoModeProvider } from './contexts/DemoModeContext';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import NotesPage from './pages/NotesPage';
@@ -132,7 +133,9 @@ function App() {
       <AuthStateSynchronizer />
       <ToastProvider>
         <NotificationProvider>
-          <AppRoutes />
+          <DemoModeProvider>
+            <AppRoutes />
+          </DemoModeProvider>
         </NotificationProvider>
       </ToastProvider>
     </AuthProvider>

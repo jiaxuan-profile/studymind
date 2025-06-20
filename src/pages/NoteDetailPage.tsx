@@ -17,6 +17,7 @@ import { useStore } from '../store';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useDemoMode } from '../contexts/DemoModeContext';
 import { generateEmbeddingOnClient } from '../services/embeddingServiceClient';
 import { analyzeNote, generateQuestionsForNote, analyzeGapsForNote, findRelatedNotes } from '../services/aiService';
 import { supabase } from '../services/supabase';
@@ -25,6 +26,7 @@ import NoteHeader from '../components/note-detail/NoteHeader';
 import NoteMainContent from '../components/note-detail/NoteMainContent';
 import StudyAssistantPanel from '../components/note-detail/StudyAssistantPanel';
 import Dialog from '../components/Dialog';
+import DemoModeNotice from '../components/DemoModeNotice';
 import { Concept, KnowledgeGap, RelatedNote, Note as NoteType } from '../types';
 
 import { Subject } from '../types/index';
@@ -37,6 +39,8 @@ interface NoteSubject extends Subject {
 
 const NoteDetailPage: React.FC = () => {
   const { user, loading } = useAuth();
+  const { isReadOnlyDemo } = useDemoMode();
+  
   if (loading) {
     return <div>Loading...</div>;
   }
@@ -219,7 +223,7 @@ const NoteDetailPage: React.FC = () => {
 
   // Fetch subjects for current user
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || isReadOnlyDemo) return;
 
     const fetchSubjects = async () => {
       try {
@@ -235,7 +239,7 @@ const NoteDetailPage: React.FC = () => {
     };
 
     fetchSubjects();
-  }, [user?.id]);
+  }, [user?.id, isReadOnlyDemo]);
 
   // Add this new useEffect for cleanup
   useEffect(() => {
@@ -294,6 +298,64 @@ const NoteDetailPage: React.FC = () => {
 
   const handleGenerateAIData = async () => {
     if (!note) return;
+    
+    if (isReadOnlyDemo) {
+      // Simulate AI processing in demo mode
+      setAiProcessing(true);
+      addToast('Starting AI analysis...', 'info');
+      addNotification(`AI analysis started for "${note.title}"`, 'info', 'AI Analysis');
+      
+      // Simulate processing delay
+      setTimeout(() => {
+        // Create mock data
+        const mockConcepts: Concept[] = [
+          { id: 'c1', name: 'Learning', definition: 'The acquisition of knowledge or skills through study, experience, or being taught.' },
+          { id: 'c2', name: 'Memory', definition: 'The faculty by which the mind stores and remembers information.' },
+          { id: 'c3', name: 'Cognition', definition: 'The mental action or process of acquiring knowledge and understanding through thought, experience, and the senses.' }
+        ];
+        
+        const mockGaps: KnowledgeGap[] = [
+          {
+            id: 'g1',
+            note_id: note.id,
+            user_id: user.id,
+            concept: 'Learning',
+            gap_type: 'reinforcement',
+            reinforcement_strategy: 'Review the core principles of learning theory and practice active recall.',
+            user_mastery: 0.6,
+            priority_score: 0.7,
+            status: 'identified',
+            resources: ['Learning Theory Basics', 'Active Recall Techniques']
+          }
+        ];
+        
+        // Update state with mock data
+        setRelatedConcepts(mockConcepts);
+        setConceptsExist(true);
+        setKnowledgeGaps(mockGaps);
+        setGapsExist(true);
+        
+        // Update note with mock summary
+        const updatedNote = {
+          ...note,
+          summary: 'This note covers key concepts in learning and memory, including cognitive processes and retention strategies.',
+          tags: [...new Set([...note.tags, 'Learning', 'Memory', 'Cognition'])],
+          updatedAt: new Date()
+        };
+        
+        setNote(updatedNote);
+        updateNote(note.id, {
+          summary: updatedNote.summary,
+          tags: updatedNote.tags
+        });
+        
+        setAiProcessing(false);
+        addToast('AI analysis completed successfully!', 'success');
+        addNotification(`AI analysis completed for "${note.title}" - concepts extracted and questions generated`, 'success', 'AI Analysis');
+      }, 3000);
+      
+      return;
+    }
 
     setAiProcessing(true);
     try {
@@ -376,6 +438,11 @@ const NoteDetailPage: React.FC = () => {
   };
 
   const handleCreateSubject = async (name: string) => {
+    if (isReadOnlyDemo) {
+      addToast('Create operation not available in demo mode', 'warning');
+      return;
+    }
+    
     if (!name.trim() || !user?.id) return;
 
     setIsCreatingSubject(true);
@@ -435,6 +502,11 @@ const NoteDetailPage: React.FC = () => {
   };
 
   const handleDeleteClick = () => {
+    if (isReadOnlyDemo) {
+      addToast('Delete operation not available in demo mode', 'warning');
+      return;
+    }
+    
     setShowDeleteDialog(true);
   };
 
@@ -465,6 +537,12 @@ const NoteDetailPage: React.FC = () => {
 
   const handleSave = async () => {
     if (!note || !user) return;
+    
+    if (isReadOnlyDemo) {
+      addToast('Save operation not available in demo mode', 'warning');
+      setEditMode(false);
+      return;
+    }
 
     // Don't save if title is still "Untitled Note" and content is empty
     if (editedNote.title.trim() === 'Untitled Note' && editedNote.content.trim() === '') {
@@ -586,12 +664,11 @@ const NoteDetailPage: React.FC = () => {
 
   const handleAskAi = () => {
     if (!note) return;
+    
     setAiLoading(true);
     setAiResponse(null);
 
-    console.log(`Simulating AI call with question: "${aiQuestion}" for note: "${note.title}"`);
-
-    // Simulating AI response with a delay
+    // In demo mode, simulate AI response
     setTimeout(() => {
       let response;
       if (aiQuestion.toLowerCase().includes('summary') || aiQuestion.toLowerCase().includes('summarize')) {
@@ -642,6 +719,27 @@ const NoteDetailPage: React.FC = () => {
 
   const handleFindRelated = async () => {
     if (!note) return;
+    
+    if (isReadOnlyDemo) {
+      setIsFindingRelated(true);
+      addToast('Finding related notes...', 'info');
+      
+      // Simulate finding related notes in demo mode
+      setTimeout(() => {
+        const mockRelatedNotes: RelatedNote[] = [
+          { id: 'mock1', title: 'Learning Strategies', similarity: 0.89 },
+          { id: 'mock2', title: 'Memory Techniques', similarity: 0.76 },
+          { id: 'mock3', title: 'Study Habits', similarity: 0.68 }
+        ];
+        
+        setRelatedNotes(mockRelatedNotes);
+        addToast(`Found ${mockRelatedNotes.length} related notes`, 'success');
+        setIsFindingRelated(false);
+      }, 1500);
+      
+      return;
+    }
+    
     setIsFindingRelated(true);
     try {
       addToast('Finding related notes...', 'info');
@@ -698,13 +796,21 @@ const NoteDetailPage: React.FC = () => {
         activeTab={activeTab}
         viewMode={viewMode}
         onToggleViewMode={toggleViewMode}
-        onEdit={() => setEditMode(true)}
+        onEdit={() => {
+          if (isReadOnlyDemo) {
+            addToast('Edit operation not available in demo mode', 'warning');
+            return;
+          }
+          setEditMode(true);
+        }}
         onDelete={handleDeleteClick}
         isDeleting={isDeleting}
         onSave={handleSave}
         isSaving={isSaving}
         onCancelEdit={handleCancelEdit}
       />
+
+      {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Main content */}

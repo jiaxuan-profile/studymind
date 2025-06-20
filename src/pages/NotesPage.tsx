@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useDemoMode } from '../contexts/DemoModeContext';
 import { Plus, FileText } from 'lucide-react';
 import { useDebounce } from '../hooks/useDebounce'; 
 import { Note, Subject } from '../types';
@@ -16,12 +17,14 @@ import UploaderPanel from '../components/notes/UploaderPanel';
 import NoteList from '../components/notes/NoteList';
 import NotesPagination from '../components/notes/NotesPagination';
 import Dialog from '../components/Dialog';
+import DemoModeNotice from '../components/DemoModeNotice';
 
 const NotesPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
+  const { isReadOnlyDemo } = useDemoMode();
   const { 
     notes, 
     addNote,
@@ -53,7 +56,7 @@ const NotesPage: React.FC = () => {
 
   // Fetch subjects for current user
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id || isReadOnlyDemo) return;
 
     const fetchSubjects = async () => {
       try {
@@ -73,7 +76,7 @@ const NotesPage: React.FC = () => {
     };
 
     fetchSubjects();
-  }, [user?.id]);
+  }, [user?.id, isReadOnlyDemo]);
 
   // Single source of truth for fetching data.
   useEffect(() => {
@@ -109,6 +112,12 @@ const NotesPage: React.FC = () => {
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    
+    if (isReadOnlyDemo) {
+      addToast('Delete operation not available in demo mode', 'warning');
+      return;
+    }
+    
     setNoteToDeleteId(id);
     setShowDeleteDialog(true);
   };
@@ -135,6 +144,11 @@ const NotesPage: React.FC = () => {
   };
 
   const handleCreateNewNote = async () => {
+    if (isReadOnlyDemo) {
+      addToast('Create operation not available in demo mode', 'warning');
+      return;
+    }
+    
     try {
       const id = Math.random().toString(36).substring(2, 11);
       const now = new Date();
@@ -157,6 +171,11 @@ const NotesPage: React.FC = () => {
   };
 
   const handleCreateSubject = async (name: string) => {
+    if (isReadOnlyDemo) {
+      addToast('Create operation not available in demo mode', 'warning');
+      return;
+    }
+    
     if (!name.trim() || !user?.id) return;
 
     setIsCreatingSubject(true);
@@ -224,7 +243,13 @@ const NotesPage: React.FC = () => {
           Create Note
         </button>
         <button
-          onClick={() => setShowPdfUploader(true)}
+          onClick={() => {
+            if (isReadOnlyDemo) {
+              addToast('Upload operation not available in demo mode', 'warning');
+              return;
+            }
+            setShowPdfUploader(true);
+          }}
           className="flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
           title={'Upload a document'}
         >
@@ -232,6 +257,8 @@ const NotesPage: React.FC = () => {
           Upload Document
         </button>
       </PageHeader>
+
+      {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
 
       <NotesFilterBar
         searchTerm={searchTerm}
@@ -259,7 +286,13 @@ const NotesPage: React.FC = () => {
         isLoading={isLoading}
         searchTerm={searchTerm}
         onCreateNote={handleCreateNewNote}
-        onUploadClick={() => setShowPdfUploader(true)}
+        onUploadClick={() => {
+          if (isReadOnlyDemo) {
+            addToast('Upload operation not available in demo mode', 'warning');
+            return;
+          }
+          setShowPdfUploader(true);
+        }}
       />
       
       <NotesPagination
