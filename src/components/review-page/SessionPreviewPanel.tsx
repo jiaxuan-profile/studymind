@@ -1,6 +1,6 @@
 // src/components/review-page/SessionPreviewPanel.tsx
 import React from 'react';
-import { TrendingUp, Play, Sparkles } from 'lucide-react';
+import { Play, Sparkles } from 'lucide-react';
 
 type QuestionType = 'short' | 'mcq' | 'open';
 type QuestionCount = '5' | '10' | 'all';
@@ -39,20 +39,17 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      <div className="bg-gradient-to-r from-primary/10 to-secondary/10 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
           <span className="bg-primary text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold mr-3">4</span>
           Session Preview
         </h2>
       </div>
-
-      <div className="p-6">
+      <div className="p-4">
         {selectedNotesCount > 0 ? (
           <div className="space-y-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
-                {finalQuestionCount}
-              </div>
+              <div className="text-2xl font-bold text-primary">{finalQuestionCount}</div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
                 {selectedQuestionCount === 'all' 
                   ? 'Total Questions' 
@@ -126,7 +123,8 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
               )}
             </button>
 
-            {totalQuestions === 0 && selectedNotesCount > 0 && (
+            {/* Only show "No questions available" message when not generating new questions */}
+            {totalQuestions === 0 && selectedNotesCount > 0 && !generateNewQuestions && (
               <p className="text-xs text-red-500 dark:text-red-400 text-center">
                 No questions available for the selected difficulty level
               </p>
