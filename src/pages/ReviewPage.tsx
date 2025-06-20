@@ -8,14 +8,14 @@ interface LocationState {
 }
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { 
-  Target, Zap, Brain, HelpCircle, 
+import {
+  Target, Zap, Brain, HelpCircle,
   MessageSquare, List, FileQuestion
 } from 'lucide-react';
 import { supabase } from '../services/supabase';
 import { useDebounce } from '../hooks/useDebounce';
 import ReviewSetupScreen from '../components/review-page/ReviewSetupScreen';
-import ReviewCompleteScreen from '../components/review-page/ReviewCompleteScreen'; 
+import ReviewCompleteScreen from '../components/review-page/ReviewCompleteScreen';
 import ActiveReviewScreen from '../components/review-page/ActiveReviewScreen';
 import Dialog from '../components/Dialog';
 import { ReviewSession, ReviewAnswer } from '../types';
@@ -68,15 +68,15 @@ const ReviewPage: React.FC = () => {
   const [sessionStats, setSessionStats] = useState({ easy: 0, medium: 0, hard: 0 });
   const [loading, setLoading] = useState(false);
   const [isReviewComplete, setIsReviewComplete] = useState(false);
-  
+
   // Pro user question generation options
   const [generateNewQuestions, setGenerateNewQuestions] = useState(false);
   const [customDifficulty, setCustomDifficulty] = useState(false);
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
-  
+
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState<string>('');
-  
+
   const [userAnswer, setUserAnswer] = useState('');
   const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
   const [isAnswerSaved, setIsAnswerSaved] = useState(false);
@@ -109,10 +109,10 @@ const ReviewPage: React.FC = () => {
       localInterval = setInterval(() => {
         setSessionDuration(Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000));
       }, 1000);
-      setTimerInterval(localInterval); 
+      setTimerInterval(localInterval);
     } else {
-      if (timerInterval) clearInterval(timerInterval); 
-      setTimerInterval(null); 
+      if (timerInterval) clearInterval(timerInterval);
+      setTimerInterval(null);
       setSessionDuration(0);
     }
     return () => { if (localInterval) clearInterval(localInterval); };
@@ -161,7 +161,7 @@ const ReviewPage: React.FC = () => {
       // Create a new session with these questions
       const now = new Date();
       const sessionName = `Retry: ${session.session_name || `Session from ${now.toLocaleDateString()}`}`;
-      
+
       const { data: newSession, error: sessionError } = await supabase.from('review_sessions').insert({
         user_id: user?.id || '',
         session_name: sessionName,
@@ -226,14 +226,14 @@ const ReviewPage: React.FC = () => {
       });
     }
   }, [user, subjects.length, loadSubjects, addToast]);
-  
+
   useEffect(() => {
     loadNotesWithQuestions();
     checkForInProgressSession();
   }, [notes]);
 
   useEffect(() => {
-    if (currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) { 
+    if (currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
       const existingAnswer = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
       if (existingAnswer) {
         setUserAnswer(existingAnswer.answer);
@@ -322,8 +322,8 @@ const ReviewPage: React.FC = () => {
         0,
         Math.max(...reconstructedUserAnswers.map(a => a.questionIndex), -1)
       );
-      const nextQuestionIndex = lastAnsweredIndex < reconstructedQuestions.length - 1 
-        ? lastAnsweredIndex + 1 
+      const nextQuestionIndex = lastAnsweredIndex < reconstructedQuestions.length - 1
+        ? lastAnsweredIndex + 1
         : lastAnsweredIndex;
 
       // Set up the session state
@@ -354,17 +354,17 @@ const ReviewPage: React.FC = () => {
 
   // Filter notes for available tab (excluding already selected notes)
   const availableNotes = notesWithQuestions.filter(note => {
-    const matchesSearch = debouncedSearchTerm === '' || 
+    const matchesSearch = debouncedSearchTerm === '' ||
       note.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
       note.tags.some(tag => tag.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
-    
+
     const notAlreadySelected = !selectedNotes.includes(note.id);
-    
+
     return matchesSearch && notAlreadySelected;
   });
 
   // Filter notes for selected tab
-  const currentSelectedNotes = notesWithQuestions.filter(note => 
+  const currentSelectedNotes = notesWithQuestions.filter(note =>
     selectedNotes.includes(note.id)
   );
 
@@ -372,25 +372,25 @@ const ReviewPage: React.FC = () => {
     return selectedNotes.reduce((total, noteId) => {
       const note = notesWithQuestions.find(n => n.id === noteId);
       if (!note) return total;
-      return total + note.questions.filter(q => 
+      return total + note.questions.filter(q =>
         selectedDifficulty === 'all' || q.difficulty === selectedDifficulty
       ).length;
     }, 0);
   };
-  
+
   const loadNotesWithQuestions = async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
-      
-      const { data: allQuestions, error } = await supabase 
+
+      const { data: allQuestions, error } = await supabase
         .from('questions')
         .select('id, note_id, question, hint, connects, difficulty, mastery_context, is_default')
         .eq('user_id', user.id);
 
       if (error) throw error;
-      if (!allQuestions) { 
+      if (!allQuestions) {
         setNotesWithQuestions([]);
         setLoading(false);
         return;
@@ -401,7 +401,7 @@ const ReviewPage: React.FC = () => {
         if (!acc[q.note_id]) {
           acc[q.note_id] = [];
         }
-        acc[q.note_id].push(q as Question); 
+        acc[q.note_id].push(q as Question);
         return acc;
       }, {});
 
@@ -412,7 +412,7 @@ const ReviewPage: React.FC = () => {
             return {
               id: note.id,
               title: note.title,
-              tags: note.tags, 
+              tags: note.tags,
               questions: questionsForNote,
             };
           }
@@ -427,28 +427,28 @@ const ReviewPage: React.FC = () => {
       setLoading(false);
     }
   };
-  
+
   const finishReviewSession = async () => {
     if (!currentSessionId) return Promise.resolve();
-  
+
     const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
     const isUnsaved = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
     if (isUnsaved) {
       await saveAnswer();
     }
-  
+
     try {
       const { error } = await supabase.from('review_sessions').update({
         session_status: 'completed',
         completed_at: new Date().toISOString(),
         duration_seconds: sessionDuration,
-        questions_answered: userAnswers.filter(a => a.answer.trim() !== '').length, 
+        questions_answered: userAnswers.filter(a => a.answer.trim() !== '').length,
         questions_rated: reviewedCount,
         easy_ratings: sessionStats.easy,
         medium_ratings: sessionStats.medium,
         hard_ratings: sessionStats.hard,
       }).eq('id', currentSessionId);
-      
+
       if (error) throw error;
     } catch (error) {
       console.error('Error completing review session:', error);
@@ -465,20 +465,20 @@ const ReviewPage: React.FC = () => {
 
   const generateQuestions = async () => {
     if (!generateNewQuestions || selectedNotes.length === 0) return;
-    
+
     setIsGeneratingQuestions(true);
     addToast('Generating questions...', 'info');
     addNotification('Starting question generation for selected notes', 'info', 'Review');
-    
+
     try {
       const { generateQuestionsForNote } = await import('../services/aiService');
-      
+
       for (const noteId of selectedNotes) {
         try {
           const difficulty = customDifficulty ? 'custom' : selectedDifficulty;
-          await generateQuestionsForNote(noteId, { 
+          await generateQuestionsForNote(noteId, {
             difficulty: difficulty as any,
-            questionType: selectedQuestionType 
+            questionType: selectedQuestionType
           });
           addToast(`Generated questions for note ${notesWithQuestions.find(n => n.id === noteId)?.title || noteId}`, 'success');
         } catch (error) {
@@ -486,11 +486,11 @@ const ReviewPage: React.FC = () => {
           addToast(`Failed to generate questions for one note`, 'error');
         }
       }
-      
+
       // Reload questions after generation
       await loadNotesWithQuestions();
       addNotification('Question generation completed', 'success', 'Review');
-      
+
     } catch (error) {
       console.error('Error generating questions:', error);
       addToast('Failed to generate questions', 'error');
@@ -512,37 +512,46 @@ const ReviewPage: React.FC = () => {
       // Generate questions if needed
       if (generateNewQuestions) {
         await generateQuestions();
+
+        selectedNotes.forEach(noteId => {
+          const note = notesWithQuestions.find(n => n.id === noteId);
+          if (note) {
+            note.questions.forEach(q => {
+              console.log(`  - Q: "${q.question.substring(0, 30)}...", Difficulty: ${q.difficulty}, IsDefault: ${q.is_default} (Type: ${typeof q.is_default})`);
+            });
+          }
+        });
       }
 
       // Get all questions that match our criteria
       const questionsToReview: CurrentQuestionType[] = selectedNotes.flatMap(noteId => {
         const note = notesWithQuestions.find(n => n.id === noteId);
         if (!note) return [];
-        
+
         // Filter questions by difficulty and is_default if generating new questions
         return note.questions
           .filter(q => {
             // Filter by difficulty
             const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
-            
+
             // If generating new questions and selected count is 5, only use new questions (is_default=false)
             // For 10 or all, mix with existing questions
             const defaultMatches = generateNewQuestions
-              ? (selectedQuestionCount === '5' ? q.is_default === false : true)
+              ? (selectedQuestionCount === '5' ? !q.is_default : true)
               : true;
-            
+
             return difficultyMatches && defaultMatches;
           })
           .map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
       });
-      
+
       // Shuffle the questions
       const shuffledQuestions = questionsToReview.sort(() => Math.random() - 0.5);
-      
-      if (shuffledQuestions.length === 0) { 
-        addToast("No questions found for the selected criteria.", "warning"); 
+
+      if (shuffledQuestions.length === 0) {
+        addToast("No questions found for the selected criteria.", "warning");
         setLoading(false);
-        return; 
+        return;
       }
 
       // Apply question count limit if not "all"
@@ -553,12 +562,12 @@ const ReviewPage: React.FC = () => {
       }
 
       const now = new Date();
-      
+
       // Get year level and subject from first note
       const firstNote = notes.find(n => n.id === selectedNotes[0]);
       let yearCode = '';
       if (firstNote?.yearLevel) {
-        switch(firstNote.yearLevel) {
+        switch (firstNote.yearLevel) {
           case 1: yearCode = 'PRI'; break;
           case 2: yearCode = 'SEC'; break;
           case 3: yearCode = 'TER'; break;
@@ -587,14 +596,14 @@ const ReviewPage: React.FC = () => {
       const day = String(now.getDate()).padStart(2, '0');
       const month = now.toLocaleString('default', { month: 'short' }).toUpperCase();
       const year = now.getFullYear();
-      
+
       // Format time in 12-hour with AM/PM
       let hours = now.getHours();
       const ampm = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
       hours = hours ? hours : 12; // Convert 0 to 12
       const minutes = String(now.getMinutes()).padStart(2, '0');
-      
+
       const sessionName = `${yearCode ? yearCode + '-' : ''}${subjectNameString.replace(/\s+/g, '-')} ${day} ${month} ${year} ${hours}:${minutes} ${ampm}`;
       setSessionGeneratedName(sessionName);
 
@@ -617,7 +626,7 @@ const ReviewPage: React.FC = () => {
         user_id: user.id,
         note_id: q.noteId,
         question_text: q.question,
-        answer_text: '', 
+        answer_text: '',
         note_title: q.noteTitle,
         hint: q.hint,
         connects: q.connects,
@@ -639,7 +648,7 @@ const ReviewPage: React.FC = () => {
       setCurrentQuestionIndex(0);
       setReviewedCount(0);
       setSessionStats({ easy: 0, medium: 0, hard: 0 });
-      setUserAnswers([]); 
+      setUserAnswers([]);
       setIsReviewComplete(false);
       setCurrentStep('review');
       setAiReviewFeedback(null);
@@ -664,7 +673,7 @@ const ReviewPage: React.FC = () => {
         .eq('question_index', currentQuestionIndex);
 
       if (error) throw error;
-      
+
       const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
       if (answerExists) {
         setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim(), timestamp: new Date() } : a));
@@ -674,7 +683,7 @@ const ReviewPage: React.FC = () => {
 
       setIsAnswerSaved(true);
     } catch (error) {
-      console.error('Error saving answer:', error); 
+      console.error('Error saving answer:', error);
       alert('Failed to save answer.');
     } finally {
       setIsSaving(false);
@@ -694,23 +703,23 @@ const ReviewPage: React.FC = () => {
   };
 
   const handleDifficultyResponse = async (difficulty: 'easy' | 'medium' | 'hard') => {
-    if (!currentSessionId || !isAnswerSaved) { 
-      addToast("Please save your answer before rating.", 'warning'); 
-      return; 
+    if (!currentSessionId || !isAnswerSaved) {
+      addToast("Please save your answer before rating.", 'warning');
+      return;
     }
     try {
       const { error } = await supabase.from('review_answers').update({ difficulty_rating: difficulty }).eq('session_id', currentSessionId).eq('question_index', currentQuestionIndex);
       if (error) throw error;
-      
+
       const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
       setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, difficulty_rating: difficulty } : a));
-      
+
       if (difficulty !== previouslyRated) {
         setSessionStats(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1, ...(previouslyRated && { [previouslyRated]: prev[previouslyRated] - 1 }) }));
         if (!previouslyRated) setReviewedCount(prev => prev + 1);
       }
-    } catch (error) { 
-      console.error('Error saving difficulty rating:', error); 
+    } catch (error) {
+      console.error('Error saving difficulty rating:', error);
       addToast('Failed to save difficulty rating.', 'error');
     }
   };
@@ -751,7 +760,7 @@ const ReviewPage: React.FC = () => {
       }
 
       const data = await response.json();
-      
+
       if (data.feedbacks && data.feedbacks.length > 0) {
         const feedback = data.feedbacks[0];
         setAiReviewFeedback(feedback.feedback);
@@ -832,12 +841,12 @@ const ReviewPage: React.FC = () => {
 
   const currentQuestion = currentQuestions[currentQuestionIndex];
   const totalQuestions = calculateTotalQuestions();
-  
+
   // Modified condition: Enable the button if generateNewQuestions is true, regardless of totalQuestions
-  const startReviewDisabled = selectedNotes.length === 0 || 
-                             selectedQuestionType !== 'short' || 
-                             (totalQuestions === 0 && !generateNewQuestions) || 
-                             isGeneratingQuestions;
+  const startReviewDisabled = selectedNotes.length === 0 ||
+    selectedQuestionType !== 'short' ||
+    (totalQuestions === 0 && !generateNewQuestions) ||
+    isGeneratingQuestions;
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {

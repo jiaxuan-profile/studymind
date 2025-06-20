@@ -25,10 +25,30 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': {
+      '/api/generate-embedding': {
         target: 'https://studymindai.me/.netlify/functions',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/api/', '/api-'),
+        rewrite: (path) => path.replace('/api/generate-embedding', '/generate-embedding'),
+      },
+      '/api/analyze-concepts': {
+        target: 'https://studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/analyze-concepts', '/analyze-concepts'),
+      },
+      '/api/summarize': {
+        target: 'https://studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/summarize', '/summarize'),
+      },
+      '/api/generate-questions': {
+        target: 'https://studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/generate-questions', '/generate-questions'),
+      },
+      '/api/analyze-gaps': {
+        target: 'https://studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/analyze-gaps', '/analyze-gaps'),
       },
     },
   },
