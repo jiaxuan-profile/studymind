@@ -79,6 +79,16 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
                     </button>
                   ))}
                 </div>
+                {selectedQuestionCount === '5' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Selecting 5 will show only new questions (not previously reviewed)
+                  </p>
+                )}
+                {selectedQuestionCount !== '5' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                    Selecting {selectedQuestionCount} will mix new and existing questions
+                  </p>
+                )}
               </div>
             )}
 

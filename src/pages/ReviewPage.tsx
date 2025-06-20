@@ -55,6 +55,7 @@ const ReviewPage: React.FC = () => {
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
   const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>('short');
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<'5' | '10' | 'all'>('all');
+  const [showQuestionCountTooltip, setShowQuestionCountTooltip] = useState(false);
   const [notesWithQuestions, setNotesWithQuestions] = useState<NoteWithQuestions[]>([]);
   const [currentQuestions, setCurrentQuestions] = useState<CurrentQuestionType[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -428,8 +429,11 @@ const ReviewPage: React.FC = () => {
             // Filter by difficulty
             const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
             
-            // If generating new questions, only use default questions
-            const defaultMatches = generateNewQuestions ? (q.is_default === true) : true;
+            // If generating new questions and selected count is 5, only use new questions (is_default=false)
+            // For 10 or all, mix with existing questions
+            const defaultMatches = generateNewQuestions
+              ? (selectedQuestionCount === '5' ? q.is_default === false : true)
+              : true;
             
             return difficultyMatches && defaultMatches;
           })
@@ -768,6 +772,12 @@ const ReviewPage: React.FC = () => {
           isGeneratingQuestions={isGeneratingQuestions}
           selectedQuestionCount={selectedQuestionCount}
           setSelectedQuestionCount={setSelectedQuestionCount}
+          showQuestionCountTooltip={showQuestionCountTooltip}
+          setShowQuestionCountTooltip={setShowQuestionCountTooltip}
+          showQuestionCountTooltip={showQuestionCountTooltip}
+          setShowQuestionCountTooltip={setShowQuestionCountTooltip}
+          showQuestionCountTooltip={showQuestionCountTooltip}
+          setShowQuestionCountTooltip={setShowQuestionCountTooltip}
         />
 
         {/* Resume Session Dialog */}

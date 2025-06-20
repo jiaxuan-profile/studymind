@@ -40,7 +40,7 @@ const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
                 className="rounded border-gray-300 text-primary focus:ring-primary"
               />
               <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                Generate new questions for this session
+                Generate 5 new questions for this session
               </span>
             </label>
             

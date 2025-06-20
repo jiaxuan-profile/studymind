@@ -15,6 +15,7 @@ interface PaginationState {
 }
 
 interface State {
+  loadSubjects: () => Promise<void>;
   notes: Note[];
   concepts: Concept[];
   relationships: ConceptRelationship[];

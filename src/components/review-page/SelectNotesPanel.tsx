@@ -212,7 +212,7 @@ const SelectNotesPanel: React.FC<SelectNotesPanelProps> = ({
               </div>
 
               {/* Tab Content */}
-              <div className="space-y-3 max-h-96 overflow-y-auto">
+              <div className="space-y-3 max-h-[50rem] overflow-y-auto">
                 {activeNoteSelectionTab === 'available' ? (
                   availableNotes.length > 0 ? (
                     availableNotes.map((note) => (

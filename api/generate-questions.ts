@@ -61,13 +61,20 @@ const handler: Handler = async (event) => {
     if (noteError || !note) throw new Error(`Note not found or permission denied for id: ${noteId}.`);
 
     const { data: noteConceptsData, error: conceptsError } = await supabase
-        .from('note_concepts')
-        .select('concepts ( id, name )') 
-        .eq('note_id', noteId);
+      .from('note_concepts')
+      .select('concepts ( id, name )')
+      .eq('note_id', noteId);
 
     if (conceptsError) throw new Error(`Could not fetch concepts for note: ${conceptsError.message}`);
 
-    const conceptsInThisNote = noteConceptsData?.map(nc => nc.concepts).filter(Boolean) || [];
+    interface Concept {
+      id: string;
+      name: string;
+    }
+
+    const conceptsInThisNote = (noteConceptsData || [])
+      .map(nc => nc.concepts as unknown as Concept | null)
+      .filter((c): c is Concept => c !== null);
     
     if (conceptsInThisNote.length === 0) {
         return { statusCode: 200, headers, body: JSON.stringify({ questions: [], message: "No concepts found on this note to generate questions." }) };
@@ -165,22 +172,41 @@ const handler: Handler = async (event) => {
     // Generate, parse, and save the questions
     const result = await model.generateContent(prompt);
     const rawText = extractJSONFromMarkdown(result.response.text());
-    const generatedQuestions: Question[] = JSON.parse(rawText);
+    let generatedQuestions: Question[] = [];
+    try {
+      generatedQuestions = JSON.parse(rawText);
+      if (!Array.isArray(generatedQuestions)) {
+        throw new Error('Generated questions is not an array');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse generated questions:', {
+        rawText,
+        error: parseError
+      });
+      throw new Error('Failed to parse AI response');
+    }
 
-    const questionsToInsert = generatedQuestions.map(q => ({
-      id: `q_${noteId}_${Math.random().toString(36).substring(2, 9)}`,
-      note_id: noteId,
-      user_id: note.user_id,
-      question: q.question,
-      hint: q.hint,
-      connects: q.connects,
-      difficulty: q.difficulty,
-      mastery_context: q.mastery_context,
-      question_type: questionTypeFilter || 'short',
-      options: q.options || null,
-      answer: q.answer || null,
-      is_default: true, // Mark these questions as default since they're generated during AI analysis
-    }));
+    const questionsToInsert = generatedQuestions.map(q => {
+      // Validate difficulty matches allowed values
+      const validDifficulty = ['easy', 'medium', 'hard'].includes(q.difficulty)
+        ? q.difficulty
+        : 'medium';
+        
+      return {
+        id: `q_${noteId}_${Math.random().toString(36).substring(2, 9)}`,
+        note_id: noteId,
+        user_id: note.user_id,
+        question: q.question,
+        hint: q.hint,
+        connects: q.connects,
+        difficulty: validDifficulty,
+        mastery_context: q.mastery_context,
+        question_type: questionTypeFilter || 'short',
+        options: q.options || null,
+        answer: q.answer || null,
+        is_default: false, // Mark these questions as non-default since they're generated on demand
+      };
+    });
 
     if (questionsToInsert.length > 0) {
       const { error: insertError } = await supabase.from('questions').insert(questionsToInsert);
@@ -194,11 +220,24 @@ const handler: Handler = async (event) => {
     };
 
   } catch (error: any) {
-    console.error("Critical error in generate-questions handler:", error);
+    console.error("Critical error in generate-questions handler:", {
+      message: error.message,
+      stack: error.stack,
+      noteId: event.queryStringParameters?.noteId,
+      difficulty: event.queryStringParameters?.difficulty,
+      questionType: event.queryStringParameters?.questionType,
+      supabaseUrl: process.env.VITE_SUPABASE_URL ? 'set' : 'missing',
+      geminiKey: process.env.GEMINI_API_KEY ? 'set' : 'missing'
+    });
+    
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ error: error.message }),
+      body: JSON.stringify({
+        error: error.message,
+        noteId: event.queryStringParameters?.noteId,
+        location: error.stack?.split('\n')[0]
+      }),
     };
   }
 };

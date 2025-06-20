@@ -29,6 +29,8 @@ interface NoteWithQuestions {
 type QuestionType = 'short' | 'mcq' | 'open';
 
 interface ReviewSetupScreenProps {
+  showQuestionCountTooltip: boolean;
+  setShowQuestionCountTooltip: (value: boolean) => void;
   loadingNotes: boolean;
   notesWithQuestions: NoteWithQuestions[];
   searchTerm: string;
