@@ -1,11 +1,7 @@
 // src/pages/ReviewPage.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useStore } from '../store';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-interface LocationState {
-  retrySessionId?: string;
-}
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import {
@@ -47,11 +43,15 @@ interface UserAnswer {
   difficulty_rating?: 'easy' | 'medium' | 'hard';
 }
 
+interface LocationState {
+  retrySessionId?: string;
+}
+
 type QuestionType = 'short' | 'mcq' | 'open';
 type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 
 const ReviewPage: React.FC = () => {
-  const { notes, subjects, user, loadSubjects } = useStore();
+  const { notes, subjects, user, loadSubjects: storeLoadSubjects } = useStore();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
@@ -102,6 +102,12 @@ const ReviewPage: React.FC = () => {
   const [sessionGeneratedName, setSessionGeneratedName] = useState<string>('');
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const isRetryingSessionRef = useRef(false);
+
+  const loadSubjects = useCallback(() => {
+    return storeLoadSubjects();
+  }, [storeLoadSubjects]);
 
   useEffect(() => {
     let localInterval: NodeJS.Timeout | null = null;
@@ -126,8 +132,9 @@ const ReviewPage: React.FC = () => {
   };
 
   const retrySession = async (sessionId: string) => {
+    setIsLoadingSession(true);
+
     try {
-      setIsLoadingSession(true);
       const { data: session, error } = await supabase
         .from('review_sessions')
         .select('*')
@@ -146,9 +153,8 @@ const ReviewPage: React.FC = () => {
 
       if (answersError) throw answersError;
 
-      // Reconstruct questions from the saved answers
       const questionsToRetry: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
-        id: `${answer.session_id}-${answer.question_index}`,
+        id: `${new Date().getTime()}-${answer.question_index}-${Math.random()}`, // Make ID more unique for React keys if needed
         question: answer.question_text,
         hint: answer.hint,
         connects: answer.connects,
@@ -158,22 +164,28 @@ const ReviewPage: React.FC = () => {
         noteTitle: answer.note_title
       }));
 
-      // Create a new session with these questions
-      const now = new Date();
-      const sessionName = `Retry: ${session.session_name || `Session from ${now.toLocaleDateString()}`}`;
+      if (questionsToRetry.length === 0) {
+        addToast("No questions found in the session to retry.", "warning");
+        setCurrentStep('select');
+        return;
+      }
 
-      const { data: newSession, error: sessionError } = await supabase.from('review_sessions').insert({
+      const now = new Date();
+      const newSessionName = `Re: ${session.session_name || `Session from ${now.toLocaleDateString()}`}`;
+
+      const { data: newSession, error: newSessionError } = await supabase.from('review_sessions').insert({
         user_id: user?.id || '',
-        session_name: sessionName,
+        session_name: newSessionName,
         selected_notes: session.selected_notes,
         selected_difficulty: session.selected_difficulty,
         total_questions: questionsToRetry.length,
         session_status: 'in_progress',
+        started_at: now.toISOString(),
       }).select().single();
 
-      if (sessionError) throw sessionError;
+      if (newSessionError) throw newSessionError;
+      if (!newSession) throw new Error("Failed to create new session for retry.");
 
-      // Insert placeholder answers for the new session
       const placeholderAnswers = questionsToRetry.map((q, index) => ({
         session_id: newSession.id,
         question_index: index,
@@ -191,9 +203,9 @@ const ReviewPage: React.FC = () => {
       const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
       if (answersInsertError) throw answersInsertError;
 
-      // Start the new session
+      // Set up state for the new retry session
       setCurrentSessionId(newSession.id);
-      setSessionName(sessionName);
+      setSessionName(newSessionName);
       setSessionStartTime(now);
       setCurrentQuestions(questionsToRetry);
       setCurrentQuestionIndex(0);
@@ -201,39 +213,64 @@ const ReviewPage: React.FC = () => {
       setSessionStats({ easy: 0, medium: 0, hard: 0 });
       setUserAnswers([]);
       setIsAnswerSaved(false);
+      setIsReviewComplete(false);
+      setAiReviewFeedback(null);
+
       setCurrentStep('review');
       addToast('Retry session started!', 'success');
+
     } catch (error) {
       console.error('Error retrying session:', error);
-      addToast('Failed to retry session', 'error');
-    } finally {
-      setIsLoadingSession(false);
+      addToast(`Failed to retry session: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
+      setCurrentStep('select');
     }
   };
 
   useEffect(() => {
-    // Check for retry session in location state
-    if (location.state?.retrySessionId) {
-      retrySession(location.state.retrySessionId);
-      return;
-    }
+    const state = location.state as LocationState | null;
 
-    if (user && user.id && subjects.length === 0) {
-      console.log("ReviewPage: User is available, attempting to load subjects.");
+    if (state?.retrySessionId && !isRetryingSessionRef.current && !isLoadingSession) {
+      const currentRetryId = state.retrySessionId;
+
+      isRetryingSessionRef.current = true; // Mark as retrying
+      setIsLoadingSession(true); // Indicate general loading for session setup
+
+      // Clear retrySessionId from location.state
+      const { retrySessionId, ...restOfState } = state;
+      navigate(location.pathname, { replace: true, state: restOfState });
+      // The navigate call above will trigger a re-render.
+      // The `retrySession` will run, and then in its `finally` (or after it), we reset the ref.
+
+      // Call retrySession. It will handle its own internal state, but not isLoadingSession or the ref directly.
+      retrySession(currentRetryId).finally(() => {
+        isRetryingSessionRef.current = false;
+        setIsLoadingSession(false);
+      });
+
+    } else if (user && user.id && subjects.length === 0 && !state?.retrySessionId && !isRetryingSessionRef.current && !isLoadingSession) {
+      // ... loadSubjects logic
       loadSubjects().catch((error: any) => {
         console.error("ReviewPage: Failed to load subjects:", error);
         addToast('Could not load subject data. Session names might be affected.', 'warning');
       });
     }
-  }, [user, subjects.length, loadSubjects, addToast]);
+  }, [location, user, subjects.length, loadSubjects, addToast, navigate]);
 
   useEffect(() => {
+    const state = location.state as LocationState | null;
+
+    if (state?.retrySessionId || isRetryingSessionRef.current || isLoadingSession) { // Check ref here too
+      return;
+    }
+
     loadNotesWithQuestions();
-    checkForInProgressSession();
-  }, [notes]);
+    if (currentStep === 'select' && !inProgressSession && !showResumeDialog) {
+      checkForInProgressSession();
+    }
+  }, [notes, location, isLoadingSession, currentStep, inProgressSession, showResumeDialog]);
 
   useEffect(() => {
-    if (currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
+    if (currentStep === 'review' && currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
       const existingAnswer = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
       if (existingAnswer) {
         setUserAnswer(existingAnswer.answer);
@@ -243,19 +280,24 @@ const ReviewPage: React.FC = () => {
         setIsAnswerSaved(false);
       }
       setShowHint(false);
-      setAiReviewFeedback(null); // Clear AI feedback when changing questions
+      setAiReviewFeedback(null);
     }
-  }, [currentQuestionIndex, currentQuestions, userAnswers]);
+  }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
 
   const checkForInProgressSession = async () => {
+    const state = location.state as LocationState | null;
+    if (state?.retrySessionId || isLoadingSession || showResumeDialog) {
+      return;
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) return;
 
       const { data: sessions, error } = await supabase
         .from('review_sessions')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', authUser.id)
         .eq('session_status', 'in_progress')
         .order('started_at', { ascending: false })
         .limit(1);
@@ -514,12 +556,7 @@ const ReviewPage: React.FC = () => {
         await generateQuestions();
 
         selectedNotes.forEach(noteId => {
-          const note = notesWithQuestions.find(n => n.id === noteId);
-          if (note) {
-            note.questions.forEach(q => {
-              console.log(`  - Q: "${q.question.substring(0, 30)}...", Difficulty: ${q.difficulty}, IsDefault: ${q.is_default} (Type: ${typeof q.is_default})`);
-            });
-          }
+          notesWithQuestions.find(n => n.id === noteId);
         });
       }
 
@@ -604,7 +641,7 @@ const ReviewPage: React.FC = () => {
       hours = hours ? hours : 12; // Convert 0 to 12
       const minutes = String(now.getMinutes()).padStart(2, '0');
 
-      const sessionName = `${yearCode ? yearCode + '-' : ''}${subjectNameString.replace(/\s+/g, '-')} ${day} ${month} ${year} ${hours}:${minutes} ${ampm}`;
+      const sessionName = `${yearCode ? yearCode + '-' : ''}${subjectNameString.replace(/\s+/g, '-')} ${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
       setSessionGeneratedName(sessionName);
 
       const { data: sessionData, error: sessionError } = await supabase.from('review_sessions').insert({
@@ -848,6 +885,13 @@ const ReviewPage: React.FC = () => {
     (totalQuestions === 0 && !generateNewQuestions) ||
     isGeneratingQuestions;
 
+  if (isLoadingSession && (isRetryingSessionRef.current || (currentStep === 'select' && !showResumeDialog))) {
+    if (isRetryingSessionRef.current) {
+      return <div className="text-center p-12">Setting up retry session...</div>;
+    }
+    return <div className="text-center p-12">Loading session...</div>;
+  }
+
   // RENDER SELECT STEP
   if (currentStep === 'select') {
     return (
@@ -904,6 +948,10 @@ const ReviewPage: React.FC = () => {
 
   // RENDER REVIEW STEP
   if (currentStep === 'review') {
+    if (isLoadingSession || (isRetryingSessionRef.current && !currentQuestions.length)) {
+      return <div className="text-center p-12">Loading questions for review...</div>;
+    }
+
     if (isReviewComplete) {
       return (
         <ReviewCompleteScreen
@@ -913,9 +961,6 @@ const ReviewPage: React.FC = () => {
           onNavigateToHistory={() => navigate('/history')}
         />
       );
-    }
-    if (!currentQuestions.length || !currentQuestion) {
-      return <div className="text-center p-12">Loading question or no questions available...</div>;
     }
 
     const formattedTime = formatDuration(sessionDuration);

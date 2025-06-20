@@ -88,7 +88,7 @@ const ViewSessionPage: React.FC = () => {
 
     } catch (error) {
       console.error('Error loading session data:', error);
-      setSession(null); // Clear session on error
+      setSession(null); 
     } finally {
       setLoading(false);
     }
@@ -97,15 +97,9 @@ const ViewSessionPage: React.FC = () => {
   const handleRetrySession = () => {
     if (!session) return;
     
-    // Navigate to review page with session data
     navigate('/review', {
       state: {
-        retrySessionData: {
-          selectedNotes: session.selected_notes,
-          selectedDifficulty: session.selected_difficulty,
-          selectedQuestionType: 'short', // Default to short answer
-          sessionName: `Retry: ${session.session_name || 'Review Session'}`
-        }
+        retrySessionId: session.id
       }
     });
   };
@@ -148,7 +142,7 @@ const ViewSessionPage: React.FC = () => {
         completedAt={session.completed_at}
         durationSeconds={session.duration_seconds}
         sessionId={session.id}
-        onRetrySession={() => navigate('/review', { state: { retrySessionId: session.id } })}
+        onRetrySession={handleRetrySession}
         onBackToHistory={handleBackToHistory}
       />
 
