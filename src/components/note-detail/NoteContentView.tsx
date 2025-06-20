@@ -1,21 +1,28 @@
 // src/components/note-detail/NoteContentView.tsx
 import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import 'katex/dist/katex.min.css';
 import { FileText, Sparkles, CheckCircle, AlertTriangle, Volume2, VolumeX } from 'lucide-react';
 import { getAllSubjects } from '../../services/databaseService';
 import PDFViewer from '../PDFViewer';
 import { Note, YEAR_LEVEL_OPTIONS } from '../../types';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 interface NoteContentViewProps {
   note: Note;
   viewMode: 'text' | 'pdf';
   isPdfAvailable: boolean;
+  rehypePlugins?: any[];
+  remarkPlugins?: any[];
 }
 
 const NoteContentView: React.FC<NoteContentViewProps> = ({
   note,
   viewMode,
   isPdfAvailable,
+  rehypePlugins = [rehypeKatex], 
+  remarkPlugins = [remarkMath],
 }) => {
   const [subjectName, setSubjectName] = useState<string>(
     note.subjectId ? `Subject ${note.subjectId}` : 'No subject'
@@ -28,7 +35,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
           setSubjectName('No subject');
           return;
         }
-        
+
         const subjects = await getAllSubjects(note.userId);
         const subject = subjects.find(s => s.id === parseInt(note.subjectId!, 10));
         setSubjectName(subject?.name || `Subject ${note.subjectId}`);
@@ -92,7 +99,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
 
     // Create a new speech synthesis utterance
     const utterance = new SpeechSynthesisUtterance(note.summary);
-    
+
     // Configure the utterance with increased speed
     utterance.rate = 1.3; // Increased from 0.9 to 1.3 for faster playback
     utterance.pitch = 1.2;
@@ -120,7 +127,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">{note.title}</h1>
-        {isPdfAvailable && ( 
+        {isPdfAvailable && (
           <div className="flex items-center space-x-2">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">
               <FileText className="h-3 w-3 mr-1" />
@@ -132,7 +139,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
           </div>
         )}
       </div>
-      
+
       {/* Subject and Year Level */}
       <div className="flex flex-wrap gap-4 mb-4">
         {note.subjectId && (
@@ -195,45 +202,48 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
                 )}
               </div>
               <div className="text-sm text-blue-800 dark:text-blue-300 prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown>{note.summary}</ReactMarkdown>
+                <ReactMarkdown rehypePlugins={rehypePlugins}>{note.summary}</ReactMarkdown>
               </div>
             </div>
           </div>
         </div>
       )}
-      
+
       {viewMode === 'text' || !isPdfAvailable ? (
         <div className="prose prose-indigo dark:prose-invert max-w-none note-content">
-          <ReactMarkdown>{note.content}</ReactMarkdown>
+          <ReactMarkdown 
+            remarkPlugins={remarkPlugins}
+            rehypePlugins={rehypePlugins}
+          >{note.content}</ReactMarkdown>
         </div>
       ) : (
-        <PDFViewer 
-          pdfUrl={note.pdfPublicUrl!} 
+        <PDFViewer
+          pdfUrl={note.pdfPublicUrl!}
           fileName={note.originalFilename || 'document.pdf'}
         />
       )}
-      
+
       {/* Footer Metadata */}
       <div className="mt-6 pt-6 border-t border-gray-100 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
         <p>Created: {new Date(note.createdAt).toLocaleDateString()}</p>
         <p>Last updated: {new Date(note.updatedAt).toLocaleDateString()}</p>
-        {note.tags.includes('PDF') && ( 
-            <p className="flex items-center mt-1">
-              {isPdfAvailable ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
-                  <span>Original PDF stored and available for viewing.</span>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
-                  <span>
-                    PDF could not be loaded or was not stored.
-                    {note.originalFilename ? ` (Original: ${note.originalFilename})` : ''} Only text may be available.
-                  </span>
-                </>
-              )}
-            </p>
+        {note.tags.includes('PDF') && (
+          <p className="flex items-center mt-1">
+            {isPdfAvailable ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-1 text-green-600" />
+                <span>Original PDF stored and available for viewing.</span>
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="h-4 w-4 mr-1 text-red-600" />
+                <span>
+                  PDF could not be loaded or was not stored.
+                  {note.originalFilename ? ` (Original: ${note.originalFilename})` : ''} Only text may be available.
+                </span>
+              </>
+            )}
+          </p>
         )}
       </div>
     </div>

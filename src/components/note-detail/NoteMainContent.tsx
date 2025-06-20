@@ -1,17 +1,20 @@
 // src/components/note-detail/NoteMainContent.tsx
 import React from 'react';
+import 'katex/dist/katex.min.css';
 import { FileText, Map as MapIcon } from 'lucide-react';
 import NoteEditForm from './NoteEditForm';
 import NoteContentView from './NoteContentView';
-import NoteMindMap from './NoteMindMap'; 
+import NoteMindMap from './NoteMindMap';
 import { Note, Subject } from '../../types';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
 
 interface NoteMainContentProps {
   note: Note;
   editMode: boolean;
-  editedNote: { 
-    title: string; 
-    content: string; 
+  editedNote: {
+    title: string;
+    content: string;
     tags: string;
     subject_id: number | null;
     year_level: string | null;
@@ -39,6 +42,9 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
   onCreateSubject,
   isCreatingSubject,
 }) => {
+  const rehypePlugins = [rehypeKatex];
+  const remarkPlugins = [remarkMath];
+
   if (editMode) {
     // In edit mode, we always show the form, tabs are not relevant for editing UI
     return (
@@ -61,11 +67,10 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
         <nav className="flex space-x-8 px-6 pt-4" aria-label="Tabs">
           <button
             onClick={() => onTabChange('content')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'content'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
-            }`}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'content'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
           >
             <div className="flex items-center">
               <FileText className="h-4 w-4 mr-2" />
@@ -74,11 +79,10 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
           </button>
           <button
             onClick={() => onTabChange('mindmap')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'mindmap'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
-            }`}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'mindmap'
+              ? 'border-primary text-primary'
+              : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
+              }`}
           >
             <div className="flex items-center">
               <MapIcon className="h-4 w-4 mr-2" />
@@ -94,10 +98,27 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
           note={note}
           viewMode={viewMode}
           isPdfAvailable={isPdfAvailable}
+          rehypePlugins={rehypePlugins}
+          remarkPlugins={remarkPlugins}
         />
       ) : (
-        <div className="flex-1 p-1"> 
-          <NoteMindMap 
+        <div className="flex-1 p-1">
+          <NoteMindMap
+            noteId={note.id}
+            noteTitle={note.title}
+            noteContent={note.content}
+          />
+        </div>
+      )}
+      {activeTab === 'content' ? (
+        <NoteContentView
+          note={note}
+          viewMode={viewMode}
+          isPdfAvailable={isPdfAvailable}
+        />
+      ) : (
+        <div className="flex-1 p-1">
+          <NoteMindMap
             noteId={note.id}
             noteTitle={note.title}
             noteContent={note.content}
