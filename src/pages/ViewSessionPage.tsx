@@ -121,7 +121,7 @@ const ViewSessionPage: React.FC = () => {
             id: 'mock-answer-3',
             question_index: 2,
             question_text: 'How does spaced repetition enhance long-term retention?',
-            answer_text: 'Spaced repetition enhances long-term retention by scheduling reviews at increasing intervals, just as memories begin to fade. This technique leverages the spacing effect, where information is better remembered when studied over spaced intervals rather than all at once. It aligns with the forgetting curve, ensuring information is reviewed before it's forgotten.',
+            answer_text: 'Spaced repetition enhances long-term retention by scheduling reviews at increasing intervals, just as memories begin to fade. This technique leverages the spacing effect, where information is better remembered when studied over spaced intervals rather than all at once. It aligns with the forgetting curve, ensuring information is reviewed before it\'s forgotten.',
             difficulty_rating: 'hard',
             note_id: 'note2',
             note_title: 'Advanced Study Techniques',
