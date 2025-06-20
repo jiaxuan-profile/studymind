@@ -147,7 +147,8 @@ const ViewSessionPage: React.FC = () => {
         startedAt={session.started_at}
         completedAt={session.completed_at}
         durationSeconds={session.duration_seconds}
-        onRetrySession={handleRetrySession}
+        sessionId={session.id}
+        onRetrySession={() => navigate('/review', { state: { retrySessionId: session.id } })}
         onBackToHistory={handleBackToHistory}
       />
 

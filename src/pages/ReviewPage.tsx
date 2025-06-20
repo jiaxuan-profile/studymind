@@ -1,7 +1,11 @@
 // src/pages/ReviewPage.tsx
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+
+interface LocationState {
+  retrySessionId?: string;
+}
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { 
@@ -121,7 +125,99 @@ const ReviewPage: React.FC = () => {
     return [h > 0 ? `${h}h` : '', m > 0 ? `${m}m` : '', `${s}s`].filter(Boolean).join(' ');
   };
 
+  const retrySession = async (sessionId: string) => {
+    try {
+      setIsLoadingSession(true);
+      const { data: session, error } = await supabase
+        .from('review_sessions')
+        .select('*')
+        .eq('id', sessionId)
+        .single();
+
+      if (error) throw error;
+      if (!session) throw new Error('Session not found');
+
+      // Fetch all answers for this session
+      const { data: sessionAnswers, error: answersError } = await supabase
+        .from('review_answers')
+        .select('*')
+        .eq('session_id', session.id)
+        .order('question_index', { ascending: true });
+
+      if (answersError) throw answersError;
+
+      // Reconstruct questions from the saved answers
+      const questionsToRetry: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
+        id: `${answer.session_id}-${answer.question_index}`,
+        question: answer.question_text,
+        hint: answer.hint,
+        connects: answer.connects,
+        difficulty: answer.original_difficulty as 'easy' | 'medium' | 'hard' || 'medium',
+        mastery_context: answer.mastery_context,
+        noteId: answer.note_id,
+        noteTitle: answer.note_title
+      }));
+
+      // Create a new session with these questions
+      const now = new Date();
+      const sessionName = `Retry: ${session.session_name || `Session from ${now.toLocaleDateString()}`}`;
+      
+      const { data: newSession, error: sessionError } = await supabase.from('review_sessions').insert({
+        user_id: user?.id || '',
+        session_name: sessionName,
+        selected_notes: session.selected_notes,
+        selected_difficulty: session.selected_difficulty,
+        total_questions: questionsToRetry.length,
+        session_status: 'in_progress',
+      }).select().single();
+
+      if (sessionError) throw sessionError;
+
+      // Insert placeholder answers for the new session
+      const placeholderAnswers = questionsToRetry.map((q, index) => ({
+        session_id: newSession.id,
+        question_index: index,
+        user_id: user?.id || '',
+        note_id: q.noteId,
+        question_text: q.question,
+        answer_text: '',
+        note_title: q.noteTitle,
+        hint: q.hint,
+        connects: q.connects,
+        mastery_context: q.mastery_context,
+        original_difficulty: q.difficulty,
+      }));
+
+      const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
+      if (answersInsertError) throw answersInsertError;
+
+      // Start the new session
+      setCurrentSessionId(newSession.id);
+      setSessionName(sessionName);
+      setSessionStartTime(now);
+      setCurrentQuestions(questionsToRetry);
+      setCurrentQuestionIndex(0);
+      setReviewedCount(0);
+      setSessionStats({ easy: 0, medium: 0, hard: 0 });
+      setUserAnswers([]);
+      setIsAnswerSaved(false);
+      setCurrentStep('review');
+      addToast('Retry session started!', 'success');
+    } catch (error) {
+      console.error('Error retrying session:', error);
+      addToast('Failed to retry session', 'error');
+    } finally {
+      setIsLoadingSession(false);
+    }
+  };
+
   useEffect(() => {
+    // Check for retry session in location state
+    if (location.state?.retrySessionId) {
+      retrySession(location.state.retrySessionId);
+      return;
+    }
+
     if (user && user.id && subjects.length === 0) {
       console.log("ReviewPage: User is available, attempting to load subjects.");
       loadSubjects().catch((error: any) => {
@@ -772,10 +868,6 @@ const ReviewPage: React.FC = () => {
           isGeneratingQuestions={isGeneratingQuestions}
           selectedQuestionCount={selectedQuestionCount}
           setSelectedQuestionCount={setSelectedQuestionCount}
-          showQuestionCountTooltip={showQuestionCountTooltip}
-          setShowQuestionCountTooltip={setShowQuestionCountTooltip}
-          showQuestionCountTooltip={showQuestionCountTooltip}
-          setShowQuestionCountTooltip={setShowQuestionCountTooltip}
           showQuestionCountTooltip={showQuestionCountTooltip}
           setShowQuestionCountTooltip={setShowQuestionCountTooltip}
         />

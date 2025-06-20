@@ -8,7 +8,8 @@ interface SessionOverviewProps {
   startedAt: string;
   completedAt?: string;
   durationSeconds?: number;
-  onRetrySession: () => void;
+  sessionId?: string;
+  onRetrySession: (sessionId: string) => void;
   onBackToHistory: () => void;
 }
 
@@ -17,6 +18,7 @@ const SessionOverview: React.FC<SessionOverviewProps> = ({
   startedAt,
   completedAt,
   durationSeconds,
+  sessionId,
   onRetrySession,
   onBackToHistory,
 }) => {
@@ -46,8 +48,12 @@ const SessionOverview: React.FC<SessionOverviewProps> = ({
       )}
       
       <button
-        onClick={onRetrySession}
+        onClick={(e) => {
+          e.preventDefault();
+          if (sessionId) onRetrySession(sessionId);
+        }}
         className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+        disabled={!sessionId}
       >
         <RefreshCw className="h-4 w-4 mr-2" />
         Retry Session
