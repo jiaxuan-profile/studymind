@@ -6,6 +6,7 @@ import { FileText, Sparkles, CheckCircle, AlertTriangle, Volume2, VolumeX } from
 import { getAllSubjects } from '../../services/databaseService';
 import PDFViewer from '../PDFViewer';
 import { Note, YEAR_LEVEL_OPTIONS } from '../../types';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
@@ -22,7 +23,7 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
   viewMode,
   isPdfAvailable,
   rehypePlugins = [rehypeKatex], 
-  remarkPlugins = [remarkMath],
+  remarkPlugins = [remarkMath, remarkGfm],
 }) => {
   const [subjectName, setSubjectName] = useState<string>(
     note.subjectId ? `Subject ${note.subjectId}` : 'No subject'
@@ -211,10 +212,12 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
 
       {viewMode === 'text' || !isPdfAvailable ? (
         <div className="prose prose-indigo dark:prose-invert max-w-none note-content">
-          <ReactMarkdown 
+          <ReactMarkdown
             remarkPlugins={remarkPlugins}
             rehypePlugins={rehypePlugins}
-          >{note.content}</ReactMarkdown>
+          >
+            {note.content}
+          </ReactMarkdown>
         </div>
       ) : (
         <PDFViewer

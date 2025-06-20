@@ -6,6 +6,7 @@ import NoteEditForm from './NoteEditForm';
 import NoteContentView from './NoteContentView';
 import NoteMindMap from './NoteMindMap';
 import { Note, Subject } from '../../types';
+import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 
@@ -43,7 +44,7 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
   isCreatingSubject,
 }) => {
   const rehypePlugins = [rehypeKatex];
-  const remarkPlugins = [remarkMath];
+  const remarkPlugins = [remarkGfm, remarkMath];
 
   if (editMode) {
     // In edit mode, we always show the form, tabs are not relevant for editing UI
@@ -100,21 +101,6 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
           isPdfAvailable={isPdfAvailable}
           rehypePlugins={rehypePlugins}
           remarkPlugins={remarkPlugins}
-        />
-      ) : (
-        <div className="flex-1 p-1">
-          <NoteMindMap
-            noteId={note.id}
-            noteTitle={note.title}
-            noteContent={note.content}
-          />
-        </div>
-      )}
-      {activeTab === 'content' ? (
-        <NoteContentView
-          note={note}
-          viewMode={viewMode}
-          isPdfAvailable={isPdfAvailable}
         />
       ) : (
         <div className="flex-1 p-1">
