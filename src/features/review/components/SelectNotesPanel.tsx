@@ -1,8 +1,23 @@
 // src/components/review-page/SelectNotesPanel.tsx
-import { BookOpen, CheckCircle, FileText, Search, X } from 'lucide-react';
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { NoteWithQuestions } from '../../types/reviewTypes'
+import { Search, X, FileText, BookOpen, CheckCircle } from 'lucide-react';
+
+interface Question {
+  id: string;
+  question: string;
+  hint?: string;
+  connects?: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  mastery_context?: string;
+}
+
+interface NoteWithQuestions {
+  id: string;
+  title: string;
+  tags: string[];
+  questions: Question[];
+}
 
 interface NoteSelectionCardProps {
   note: NoteWithQuestions;
@@ -21,10 +36,11 @@ const NoteSelectionCard: React.FC<NoteSelectionCardProps> = ({
 }) => {
   return (
     <div
-      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${isSelected
-        ? 'border-primary bg-primary/5'
-        : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-        }`}
+      className={`p-4 rounded-lg border-2 cursor-pointer transition-all ${
+        isSelected
+          ? 'border-primary bg-primary/5'
+          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+      }`}
       onClick={() => onToggleSelection(note.id)}
     >
       <div className="flex items-center justify-between">
@@ -62,10 +78,11 @@ const NoteSelectionCard: React.FC<NoteSelectionCardProps> = ({
           </div>
         </div>
         <div className="ml-4">
-          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected
-            ? 'border-primary bg-primary'
-            : 'border-gray-300 dark:border-gray-600'
-            }`}>
+          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${
+            isSelected
+              ? 'border-primary bg-primary'
+              : 'border-gray-300 dark:border-gray-600'
+          }`}>
             {isSelected && (
               <CheckCircle className="h-4 w-4 text-white" />
             )}
@@ -78,44 +95,36 @@ const NoteSelectionCard: React.FC<NoteSelectionCardProps> = ({
 
 
 interface SelectNotesPanelProps {
-  availableNotes: NoteWithQuestions[];
-  currentSelectedNotes: NoteWithQuestions[];
-  selectedNotes: string[];
-  activeNoteSelectionTab: 'available' | 'selected';
+  loading: boolean;
+  notesWithQuestions: NoteWithQuestions[];
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   debouncedSearchTerm: string;
-  loading: boolean;
+  activeNoteSelectionTab: 'available' | 'selected';
   setActiveNoteSelectionTab: (tab: 'available' | 'selected') => void;
+  availableNotes: NoteWithQuestions[];
+  currentSelectedNotes: NoteWithQuestions[];
   handleNoteSelection: (noteId: string) => void;
   getDifficultyColor: (difficulty: string) => string;
   getDifficultyIcon: (difficulty: string) => React.ReactNode;
   selectedNotesCount: number;
 }
 
-const SelectNotesPanel: React.FC<SelectNotesPanelProps> = (props) => {
-  const {
-    availableNotes,
-    currentSelectedNotes,
-    selectedNotes,
-    activeNoteSelectionTab,
-    searchTerm,
-    setSearchTerm,
-    debouncedSearchTerm,
-    loading,
-    setActiveNoteSelectionTab,
-    handleNoteSelection,
-    getDifficultyColor,
-    getDifficultyIcon,
-    selectedNotesCount,
-  } = props;
-
-  const notesToDisplay = activeNoteSelectionTab === 'available'
-    ? availableNotes
-    : currentSelectedNotes;
-
-  const showInitialEmptyState = !loading && availableNotes.length === 0 && currentSelectedNotes.length === 0 && searchTerm === '';
-
+const SelectNotesPanel: React.FC<SelectNotesPanelProps> = ({
+  loading,
+  notesWithQuestions,
+  searchTerm,
+  setSearchTerm,
+  debouncedSearchTerm,
+  activeNoteSelectionTab,
+  setActiveNoteSelectionTab,
+  availableNotes,
+  currentSelectedNotes,
+  handleNoteSelection,
+  getDifficultyColor,
+  getDifficultyIcon,
+  selectedNotesCount,
+}) => {
   return (
     <div className="lg:col-span-2">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -135,14 +144,14 @@ const SelectNotesPanel: React.FC<SelectNotesPanelProps> = (props) => {
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="ml-3 text-gray-600 dark:text-gray-300">Loading notes...</span>
+              <span className="ml-3 text-gray-600 dark:text-gray-300">Loading notes with questions...</span>
             </div>
-          ) : showInitialEmptyState ? (
+          ) : notesWithQuestions.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Notes with Questions</h3>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Review Questions Available</h3>
               <p className="text-gray-600 dark:text-gray-300 mb-4">
-                It seems you don't have any notes with generated review questions yet.
+                Upload documents with AI analysis enabled to generate review questions.
               </p>
               <Link
                 to="/notes"
@@ -181,19 +190,21 @@ const SelectNotesPanel: React.FC<SelectNotesPanelProps> = (props) => {
                 <nav className="flex space-x-8" aria-label="Tabs">
                   <button
                     onClick={() => setActiveNoteSelectionTab('available')}
-                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeNoteSelectionTab === 'available'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
-                      }`}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeNoteSelectionTab === 'available'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
+                    }`}
                   >
                     Available Notes ({availableNotes.length})
                   </button>
                   <button
                     onClick={() => setActiveNoteSelectionTab('selected')}
-                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeNoteSelectionTab === 'selected'
-                      ? 'border-primary text-primary'
-                      : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
-                      }`}
+                    className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeNoteSelectionTab === 'selected'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-gray-500'
+                    }`}
                   >
                     Selected Notes ({currentSelectedNotes.length})
                   </button>
@@ -208,7 +219,7 @@ const SelectNotesPanel: React.FC<SelectNotesPanelProps> = (props) => {
                       <NoteSelectionCard
                         key={note.id}
                         note={note}
-                        isSelected={selectedNotes.includes(note.id)}
+                        isSelected={false} // In available tab, notes are not yet "globally" selected for the review
                         onToggleSelection={handleNoteSelection}
                         getDifficultyColor={getDifficultyColor}
                         getDifficultyIcon={getDifficultyIcon}
@@ -220,18 +231,20 @@ const SelectNotesPanel: React.FC<SelectNotesPanelProps> = (props) => {
                       <p className="text-gray-500 dark:text-gray-400">
                         {debouncedSearchTerm
                           ? `No notes found matching "${debouncedSearchTerm}"`
-                          : 'No available notes matching your criteria, or all have been selected.'
+                          : notesWithQuestions.length > 0 && availableNotes.length === 0 // implies all available notes are selected
+                          ? 'All available notes have been selected'
+                          : 'No notes available or all selected'
                         }
                       </p>
                     </div>
                   )
-                ) : (  // Selected Tab
+                ) : (
                   currentSelectedNotes.length > 0 ? (
                     currentSelectedNotes.map((note) => (
                       <NoteSelectionCard
                         key={note.id}
                         note={note}
-                        isSelected={true}
+                        isSelected={true} // In selected tab, these are the globally selected notes
                         onToggleSelection={handleNoteSelection}
                         getDifficultyColor={getDifficultyColor}
                         getDifficultyIcon={getDifficultyIcon}
@@ -241,7 +254,7 @@ const SelectNotesPanel: React.FC<SelectNotesPanelProps> = (props) => {
                     <div className="text-center py-8">
                       <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-gray-500 dark:text-gray-400">
-                        No notes selected yet.
+                        No notes selected yet. Switch to "Available Notes" to select notes for review.
                       </p>
                     </div>
                   )

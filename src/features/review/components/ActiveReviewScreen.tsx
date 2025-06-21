@@ -1,5 +1,5 @@
 // src/components/review-page/ActiveReviewScreen.tsx
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 
 import ReviewHeader from './ReviewHeader';
 import QuestionDisplay from './QuestionDisplay';
@@ -35,9 +35,11 @@ interface ActiveReviewScreenProps {
   onResetReview: () => void;
 
   // Props for QuestionDisplay
-  currentQuestion: CurrentQuestionType | undefined;
+  currentQuestion: CurrentQuestionType | undefined; 
   getDifficultyColor: (difficulty: string) => string;
   getDifficultyIcon: (difficulty: string) => React.ReactNode;
+  showHint: boolean;
+  onShowHint: () => void;
 
   // Props for AnswerInputArea
   userAnswer: string;
@@ -66,44 +68,38 @@ interface ActiveReviewScreenProps {
   sessionStats: { easy: number; medium: number; hard: number };
 }
 
-const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
-  const {
-    currentQuestionIndex,
-    totalQuestionsInSession,
-    currentSessionId,
-    sessionStartTime,
-    sessionName,
-    formattedDuration,
-    onResetReview,
-    currentQuestion,
-    getDifficultyColor,
-    getDifficultyIcon,
-    userAnswer,
-    onUserAnswerChange,
-    isAnswerSaved,
-    isSaving,
-    onSaveAnswer,
-    aiReviewFeedback,
-    isAiReviewing,
-    onAiReviewAnswer,
-    onNavigatePrevious,
-    onNavigateNext,
-    onFinishSession,
-    isFirstQuestion,
-    isLastQuestion,
-    onRateDifficulty,
-    userAnswers,
-    reviewedCount,
-    answersSavedCount,
-    sessionStats,
-  } = props;
-
-  const [showHint, setShowHint] = useState(false);
-
-  useEffect(() => {
-    setShowHint(false);
-  }, [currentQuestion]);
-
+const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = ({
+  currentQuestionIndex,
+  totalQuestionsInSession,
+  currentSessionId,
+  sessionStartTime,
+  sessionName,
+  formattedDuration,
+  onResetReview,
+  currentQuestion,
+  getDifficultyColor,
+  getDifficultyIcon,
+  showHint,
+  onShowHint,
+  userAnswer,
+  onUserAnswerChange,
+  isAnswerSaved,
+  isSaving,
+  onSaveAnswer,
+  aiReviewFeedback,
+  isAiReviewing,
+  onAiReviewAnswer,
+  onNavigatePrevious,
+  onNavigateNext,
+  onFinishSession,
+  isFirstQuestion,
+  isLastQuestion,
+  onRateDifficulty,
+  userAnswers,
+  reviewedCount,
+  answersSavedCount,
+  sessionStats,
+}) => {
   if (!currentQuestion) {
     return <div className="text-center p-12">Loading question or no questions available...</div>;
   }
@@ -134,10 +130,10 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
               getDifficultyColor={getDifficultyColor}
               getDifficultyIcon={getDifficultyIcon}
               showHint={showHint}
-              onShowHint={() => setShowHint(true)}
+              onShowHint={onShowHint}
             />
-
-            <div className="p-6">
+            
+            <div className="p-6"> 
               <AnswerInputArea
                 userAnswer={userAnswer}
                 onUserAnswerChange={onUserAnswerChange}
@@ -148,7 +144,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 isAiReviewing={isAiReviewing}
                 onAiReviewAnswer={onAiReviewAnswer}
               />
-
+              
               <ReviewControls
                 onNavigatePrevious={onNavigatePrevious}
                 onNavigateNext={onNavigateNext}
@@ -156,7 +152,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 isFirstQuestion={isFirstQuestion}
                 isLastQuestion={isLastQuestion}
               />
-
+              
               {isAnswerSaved && (
                 <DifficultyRating
                   onRateDifficulty={onRateDifficulty}

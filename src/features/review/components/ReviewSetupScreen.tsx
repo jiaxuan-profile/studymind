@@ -1,19 +1,38 @@
 // src/components/review-page/ReviewSetupScreen.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { History } from 'lucide-react';
 
-import PageHeader from '../PageHeader';
+import PageHeader from '../PageHeader'; 
 import SelectNotesPanel from './SelectNotesPanel';
 import SelectDifficultyPanel from './SelectDifficultyPanel';
 import SelectQuestionTypePanel from './SelectQuestionTypePanel';
 import SessionPreviewPanel from './SessionPreviewPanel';
-import { NoteWithQuestions } from '../../types/reviewTypes';
+
+interface Question {
+  id: string;
+  question: string;
+  hint?: string;
+  connects?: string[];
+  difficulty: 'easy' | 'medium' | 'hard';
+  mastery_context?: string;
+  is_default?: boolean;
+}
+
+interface NoteWithQuestions {
+  id: string;
+  title: string;
+  tags: string[];
+  questions: Question[];
+}
 
 type QuestionType = 'short' | 'mcq' | 'open';
 
 interface ReviewSetupScreenProps {
+  showQuestionCountTooltip: boolean;
+  setShowQuestionCountTooltip: (value: boolean) => void;
   loadingNotes: boolean;
+  notesWithQuestions: NoteWithQuestions[];
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   debouncedSearchTerm: string;
@@ -24,19 +43,19 @@ interface ReviewSetupScreenProps {
   handleNoteSelection: (noteId: string) => void;
   getDifficultyColor: (difficulty: string) => string;
   getDifficultyIcon: (difficulty: string) => React.ReactNode;
-  selectedNotes: string[];
-
+  selectedNotes: string[]; 
+  
   generateNewQuestions: boolean;
   setGenerateNewQuestions: (value: boolean) => void;
   customDifficulty: boolean;
   setCustomDifficulty: (value: boolean) => void;
   selectedDifficulty: 'all' | 'easy' | 'medium' | 'hard';
   setSelectedDifficulty: (difficulty: 'all' | 'easy' | 'medium' | 'hard') => void;
-
+  
   selectedQuestionType: QuestionType;
   setSelectedQuestionType: (type: QuestionType) => void;
   getQuestionTypeIcon: (type: QuestionType) => React.ReactNode;
-
+  
   getQuestionTypeColor: (type: QuestionType) => string;
   totalQuestions: number;
   onStartReview: () => void;
@@ -46,43 +65,43 @@ interface ReviewSetupScreenProps {
   setSelectedQuestionCount: (count: '5' | '10' | 'all') => void;
 }
 
-const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
-  const {
-    loadingNotes,
-    searchTerm,
-    setSearchTerm,
-    debouncedSearchTerm,
-    activeNoteSelectionTab,
-    setActiveNoteSelectionTab,
-    availableNotes,
-    currentSelectedNotes,
-    handleNoteSelection,
-    getDifficultyColor,
-    getDifficultyIcon,
-    selectedNotes,
-    generateNewQuestions,
-    setGenerateNewQuestions,
-    customDifficulty,
-    setCustomDifficulty,
-    selectedDifficulty,
-    setSelectedDifficulty,
-    selectedQuestionType,
-    setSelectedQuestionType,
-    getQuestionTypeIcon,
-    getQuestionTypeColor,
-    totalQuestions,
-    onStartReview,
-    startReviewDisabled,
-    isGeneratingQuestions,
-    selectedQuestionCount,
-    setSelectedQuestionCount,
-  } = props;
+const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = ({
+  loadingNotes,
+  notesWithQuestions,
+  searchTerm,
+  setSearchTerm,
+  debouncedSearchTerm,
+  activeNoteSelectionTab,
+  setActiveNoteSelectionTab,
+  availableNotes,
+  currentSelectedNotes,
+  handleNoteSelection,
+  getDifficultyColor,
+  getDifficultyIcon,
+  selectedNotes, 
 
-  const [showQuestionCountTooltip, setShowQuestionCountTooltip] = useState(false);
+  generateNewQuestions,
+  setGenerateNewQuestions,
+  customDifficulty,
+  setCustomDifficulty,
+  selectedDifficulty,
+  setSelectedDifficulty,
 
+  selectedQuestionType,
+  setSelectedQuestionType,
+  getQuestionTypeIcon,
+
+  getQuestionTypeColor,
+  totalQuestions,
+  onStartReview,
+  startReviewDisabled,
+  isGeneratingQuestions = false,
+  selectedQuestionCount,
+  setSelectedQuestionCount,
+}) => {
   return (
     <div className="fade-in">
-      <PageHeader
+      <PageHeader 
         title="Review Session Setup"
         subtitle="Select notes, difficulty level, and question type to start your review session"
       >
@@ -93,20 +112,20 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <SelectNotesPanel
           loading={loadingNotes}
+          notesWithQuestions={notesWithQuestions}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           debouncedSearchTerm={debouncedSearchTerm}
           activeNoteSelectionTab={activeNoteSelectionTab}
           setActiveNoteSelectionTab={setActiveNoteSelectionTab}
           availableNotes={availableNotes}
-          selectedNotes={selectedNotes}
           currentSelectedNotes={currentSelectedNotes}
           handleNoteSelection={handleNoteSelection}
           getDifficultyColor={getDifficultyColor}
           getDifficultyIcon={getDifficultyIcon}
           selectedNotesCount={selectedNotes.length}
         />
-
+        
         <div className="space-y-6">
           <SelectDifficultyPanel
             generateNewQuestions={generateNewQuestions}
@@ -136,11 +155,9 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
             generateNewQuestions={generateNewQuestions}
             selectedQuestionCount={selectedQuestionCount}
             setSelectedQuestionCount={setSelectedQuestionCount}
-            showQuestionCountTooltip={showQuestionCountTooltip}
-            setShowQuestionCountTooltip={setShowQuestionCountTooltip}
           />
         </div>
-      </div>
+      </div>      
     </div>
   );
 };

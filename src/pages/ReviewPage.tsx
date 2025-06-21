@@ -1,456 +1,205 @@
 // src/pages/ReviewPage.tsx
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useToast } from '../contexts/ToastContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useDemoMode } from '../contexts/DemoModeContext';
-import {
-  Target, Zap, Brain, HelpCircle,
-  MessageSquare, List, FileQuestion
-} from 'lucide-react';
 import { supabase } from '../services/supabase';
-import { useDebounce } from '../hooks/useDebounce';
+import { useReviewSessionResume } from '../hooks/useReviewSessionResume';
+import { useReviewSessionRetry } from '../hooks/useReviewSessionRetry';
+import { useReviewSessionManagement } from '../hooks/useReviewSessionManagement';
+import { useReviewSetup } from '../hooks/useReviewSetup';
 import ReviewSetupScreen from '../components/review-page/ReviewSetupScreen';
 import ReviewCompleteScreen from '../components/review-page/ReviewCompleteScreen';
 import ActiveReviewScreen from '../components/review-page/ActiveReviewScreen';
 import Dialog from '../components/Dialog';
 import DemoModeNotice from '../components/DemoModeNotice';
-import { ReviewSession, ReviewAnswer } from '../types';
-
-// Interfaces specific to the review process
-interface Question {
-  id: string;
-  question: string;
-  hint?: string;
-  connects?: string[];
-  difficulty: 'easy' | 'medium' | 'hard';
-  mastery_context?: string;
-  ai_feedback?: string;
-  ai_reviewed?: boolean;
-  is_default?: boolean;
-}
-
-interface NoteWithQuestions {
-  id: string;
-  title: string;
-  tags: string[];
-  questions: Question[];
-}
-
-interface UserAnswer {
-  questionIndex: number;
-  answer: string;
-  timestamp: Date;
-  difficulty_rating?: 'easy' | 'medium' | 'hard';
-}
-
-interface LocationState {
-  retrySessionId?: string;
-}
-
-type QuestionType = 'short' | 'mcq' | 'open';
-type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
+import { User } from '../types';
+import { Question, CurrentQuestionType, ReviewUserAnswer, LocationState, NoteWithQuestions } from '../types/reviewTypes';
+import {
+  formatDuration,
+  getDifficultyColor,
+  getDifficultyIcon,
+  getQuestionTypeIcon,
+  getQuestionTypeColor
+} from '../utils/reviewUtils';
 
 const ReviewPage: React.FC = () => {
   const { notes, subjects, user, loadSubjects: storeLoadSubjects } = useStore();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
   const { isReadOnlyDemo } = useDemoMode();
+
   const [currentStep, setCurrentStep] = useState<'select' | 'review'>('select');
-  const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
-  const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
-  const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>('short');
-  const [selectedQuestionCount, setSelectedQuestionCount] = useState<'5' | '10' | 'all'>('all');
-  const [showQuestionCountTooltip, setShowQuestionCountTooltip] = useState(false);
-  const [notesWithQuestions, setNotesWithQuestions] = useState<NoteWithQuestions[]>([]);
+
+  const [notesWithQuestionsData, setNotesWithQuestionsData] = useState<NoteWithQuestions[]>([]);
   const [currentQuestions, setCurrentQuestions] = useState<CurrentQuestionType[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [showHint, setShowHint] = useState(false);
   const [reviewedCount, setReviewedCount] = useState(0);
   const [sessionStats, setSessionStats] = useState({ easy: 0, medium: 0, hard: 0 });
   const [loading, setLoading] = useState(false);
   const [isReviewComplete, setIsReviewComplete] = useState(false);
 
-  // Pro user question generation options
-  const [generateNewQuestions, setGenerateNewQuestions] = useState(false);
-  const [customDifficulty, setCustomDifficulty] = useState(false);
+  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
+
   const [isGeneratingQuestions, setIsGeneratingQuestions] = useState(false);
 
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [sessionName, setSessionName] = useState<string>('');
+  const [sessionGeneratedName, setSessionGeneratedName] = useState<string>('');
 
   const [userAnswer, setUserAnswer] = useState('');
-  const [userAnswers, setUserAnswers] = useState<UserAnswer[]>([]);
+  const [userAnswers, setUserAnswers] = useState<ReviewUserAnswer[]>([]);
   const [isAnswerSaved, setIsAnswerSaved] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingAnswer, setIsSavingAnswer] = useState(false);
 
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [sessionDuration, setSessionDuration] = useState(0);
-  const [timerInterval, setTimerInterval] = useState<NodeJS.Timeout | null>(null);
 
-  // AI Review state
   const [aiReviewFeedback, setAiReviewFeedback] = useState<string | null>(null);
   const [isAiReviewing, setIsAiReviewing] = useState(false);
 
-  // Search and tab state
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeNoteSelectionTab, setActiveNoteSelectionTab] = useState<'available' | 'selected'>('available');
-  const debouncedSearchTerm = useDebounce(searchTerm, 300);
-
-  // Resume session state
-  const [inProgressSession, setInProgressSession] = useState<ReviewSession | null>(null);
-  const [showResumeDialog, setShowResumeDialog] = useState(false);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
-  const [sessionGeneratedName, setSessionGeneratedName] = useState<string>('');
+  const [loadingReviewProcess, setLoadingReviewProcess] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
-  const isRetryingSessionRef = useRef(false);
 
-  const loadSubjects = useCallback(() => {
-    return storeLoadSubjects();
-  }, [storeLoadSubjects]);
+  const {
+    selectedNotes,
+    selectedDifficulty,
+    selectedQuestionType,
+    selectedQuestionCount,
+    generateNewQuestions,
+    customDifficulty,
+    searchTerm,
+    activeNoteSelectionTab,
+    debouncedSearchTerm,
+    setSelectedNotes,
+    setSelectedDifficulty,
+    setSelectedQuestionType,
+    setSelectedQuestionCount,
+    setGenerateNewQuestions,
+    setCustomDifficulty,
+    setSearchTerm,
+    setActiveNoteSelectionTab,
+    availableNotes,
+    currentSelectedNotesDisplay,
+    displayTotalQuestions,
+    handleNoteSelection,
+    resetSetupSelections,
+  } = useReviewSetup({ allNotesWithQuestions: notesWithQuestionsData });
 
-  useEffect(() => {
-    let localInterval: NodeJS.Timeout | null = null;
-    if (sessionStartTime) {
-      localInterval = setInterval(() => {
-        setSessionDuration(Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000));
-      }, 1000);
-      setTimerInterval(localInterval);
-    } else {
-      if (timerInterval) clearInterval(timerInterval);
-      setTimerInterval(null);
-      setSessionDuration(0);
-    }
-    return () => { if (localInterval) clearInterval(localInterval); };
-  }, [sessionStartTime]);
-
-  const formatDuration = (seconds: number) => {
-    const h = Math.floor(seconds / 3600);
-    const m = Math.floor((seconds % 3600) / 60);
-    const s = seconds % 60;
-    return [h > 0 ? `${h}h` : '', m > 0 ? `${m}m` : '', `${s}s`].filter(Boolean).join(' ');
-  };
-
-  const retrySession = async (sessionId: string) => {
-    if (isReadOnlyDemo) {
-      addToast('Retry operation not available in demo mode', 'warning');
-      navigate('/history');
-      return;
-    }
-    
-    setIsLoadingSession(true);
-
-    try {
-      const { data: session, error } = await supabase
-        .from('review_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single();
-
-      if (error) throw error;
-      if (!session) throw new Error('Session not found');
-
-      // Fetch all answers for this session
-      const { data: sessionAnswers, error: answersError } = await supabase
-        .from('review_answers')
-        .select('*')
-        .eq('session_id', session.id)
-        .order('question_index', { ascending: true });
-
-      if (answersError) throw answersError;
-
-      const questionsToRetry: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
-        id: `${new Date().getTime()}-${answer.question_index}-${Math.random()}`, // Make ID more unique for React keys if needed
-        question: answer.question_text,
-        hint: answer.hint,
-        connects: answer.connects,
-        difficulty: answer.original_difficulty as 'easy' | 'medium' | 'hard' || 'medium',
-        mastery_context: answer.mastery_context,
-        noteId: answer.note_id,
-        noteTitle: answer.note_title
-      }));
-
-      if (questionsToRetry.length === 0) {
-        addToast("No questions found in the session to retry.", "warning");
-        setCurrentStep('select');
-        return;
-      }
-
-      const now = new Date();
-      const newSessionName = `Re: ${session.session_name || `Session from ${now.toLocaleDateString()}`}`;
-
-      const { data: newSession, error: newSessionError } = await supabase.from('review_sessions').insert({
-        user_id: user?.id || '',
-        session_name: newSessionName,
-        selected_notes: session.selected_notes,
-        selected_difficulty: session.selected_difficulty,
-        total_questions: questionsToRetry.length,
-        session_status: 'in_progress',
-        started_at: now.toISOString(),
-      }).select().single();
-
-      if (newSessionError) throw newSessionError;
-      if (!newSession) throw new Error("Failed to create new session for retry.");
-
-      const placeholderAnswers = questionsToRetry.map((q, index) => ({
-        session_id: newSession.id,
-        question_index: index,
-        user_id: user?.id || '',
-        note_id: q.noteId,
-        question_text: q.question,
-        answer_text: '',
-        note_title: q.noteTitle,
-        hint: q.hint,
-        connects: q.connects,
-        mastery_context: q.mastery_context,
-        original_difficulty: q.difficulty,
-      }));
-
-      const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
-      if (answersInsertError) throw answersInsertError;
-
-      // Set up state for the new retry session
-      setCurrentSessionId(newSession.id);
-      setSessionName(newSessionName);
-      setSessionStartTime(now);
-      setCurrentQuestions(questionsToRetry);
-      setCurrentQuestionIndex(0);
-      setReviewedCount(0);
-      setSessionStats({ easy: 0, medium: 0, hard: 0 });
-      setUserAnswers([]);
-      setIsAnswerSaved(false);
-      setIsReviewComplete(false);
-      setAiReviewFeedback(null);
-
-      setCurrentStep('review');
-      addToast('Retry session started!', 'success');
-
-    } catch (error) {
-      console.error('Error retrying session:', error);
-      addToast(`Failed to retry session: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
-      setCurrentStep('select');
-    }
-  };
-
-  useEffect(() => {
-    const state = location.state as LocationState | null;
-
-    if (state?.retrySessionId && !isRetryingSessionRef.current && !isLoadingSession) {
-      const currentRetryId = state.retrySessionId;
-
-      isRetryingSessionRef.current = true; // Mark as retrying
-      setIsLoadingSession(true); // Indicate general loading for session setup
-
-      // Clear retrySessionId from location.state
-      const { retrySessionId, ...restOfState } = state;
-      navigate(location.pathname, { replace: true, state: restOfState });
-      // The navigate call above will trigger a re-render.
-      // The `retrySession` will run, and then in its `finally` (or after it), we reset the ref.
-
-      // Call retrySession. It will handle its own internal state, but not isLoadingSession or the ref directly.
-      retrySession(currentRetryId).finally(() => {
-        isRetryingSessionRef.current = false;
-        setIsLoadingSession(false);
-      });
-
-    } else if (user && user.id && subjects.length === 0 && !state?.retrySessionId && !isRetryingSessionRef.current && !isLoadingSession) {
-      // ... loadSubjects logic
-      loadSubjects().catch((error: any) => {
-        console.error("ReviewPage: Failed to load subjects:", error);
-        addToast('Could not load subject data. Session names might be affected.', 'warning');
-      });
-    }
-  }, [location, user, subjects.length, loadSubjects, addToast, navigate]);
-
-  useEffect(() => {
-    const state = location.state as LocationState | null;
-
-    if (state?.retrySessionId || isRetryingSessionRef.current || isLoadingSession) { // Check ref here too
-      return;
-    }
-
-    loadNotesWithQuestions();
-    if (currentStep === 'select' && !inProgressSession && !showResumeDialog) {
-      checkForInProgressSession();
-    }
-  }, [notes, location, isLoadingSession, currentStep, inProgressSession, showResumeDialog]);
-
-  useEffect(() => {
-    if (currentStep === 'review' && currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
-      const existingAnswer = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
-      if (existingAnswer) {
-        setUserAnswer(existingAnswer.answer);
-        setIsAnswerSaved(true);
-      } else {
-        setUserAnswer('');
-        setIsAnswerSaved(false);
-      }
-      setShowHint(false);
-      setAiReviewFeedback(null);
-    }
-  }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
-
-  const checkForInProgressSession = async () => {
-    if (isReadOnlyDemo) return;
-    
-    const state = location.state as LocationState | null;
-    if (state?.retrySessionId || isLoadingSession || showResumeDialog) {
-      return;
-    }
-
-    try {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) return;
-
-      const { data: sessions, error } = await supabase
-        .from('review_sessions')
-        .select('*')
-        .eq('user_id', authUser.id)
-        .eq('session_status', 'in_progress')
-        .order('started_at', { ascending: false })
-        .limit(1);
-
-      if (error) throw error;
-
-      if (sessions && sessions.length > 0) {
-        setInProgressSession(sessions[0] as ReviewSession);
-        setShowResumeDialog(true);
-      }
-    } catch (error) {
-      console.error('Error checking for in-progress session:', error);
-    }
-  };
-
-  const resumeSession = async () => {
-    if (!inProgressSession) return;
-    
-    if (isReadOnlyDemo) {
-      addToast('Resume operation not available in demo mode', 'warning');
-      setShowResumeDialog(false);
-      return;
-    }
-
-    setIsLoadingSession(true);
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // Fetch all answers for this session
-      const { data: sessionAnswers, error: answersError } = await supabase
-        .from('review_answers')
-        .select('*')
-        .eq('session_id', inProgressSession.id)
-        .order('question_index', { ascending: true });
-
-      if (answersError) throw answersError;
-
-      // Reconstruct questions from the saved answers
-      const reconstructedQuestions: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
-        id: `${answer.session_id}-${answer.question_index}`,
-        question: answer.question_text,
-        hint: answer.hint,
-        connects: answer.connects,
-        difficulty: answer.original_difficulty as 'easy' | 'medium' | 'hard' || 'medium',
-        mastery_context: answer.mastery_context,
-        noteId: answer.note_id,
-        noteTitle: answer.note_title
-      }));
-
-      // Reconstruct user answers
-      const reconstructedUserAnswers: UserAnswer[] = (sessionAnswers as ReviewAnswer[])
-        .filter(answer => answer.answer_text.trim() !== '')
-        .map(answer => ({
-          questionIndex: answer.question_index,
-          answer: answer.answer_text,
-          timestamp: new Date(answer.updated_at),
-          difficulty_rating: answer.difficulty_rating as 'easy' | 'medium' | 'hard' | undefined
-        }));
-
-      // Calculate session stats from existing ratings
-      const sessionStats = {
-        easy: (sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating === 'easy').length,
-        medium: (sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating === 'medium').length,
-        hard: (sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating === 'hard').length
-      };
-
-      // Find the last answered question or start from the beginning
-      const lastAnsweredIndex = Math.max(
-        0,
-        Math.max(...reconstructedUserAnswers.map(a => a.questionIndex), -1)
-      );
-      const nextQuestionIndex = lastAnsweredIndex < reconstructedQuestions.length - 1
-        ? lastAnsweredIndex + 1
-        : lastAnsweredIndex;
-
-      // Set up the session state
-      setCurrentSessionId(inProgressSession.id);
-      setSessionStartTime(new Date(inProgressSession.started_at));
-      setSessionName(inProgressSession.session_name || `Resumed Session ${new Date(inProgressSession.started_at).toLocaleString()}`);
-      setCurrentQuestions(reconstructedQuestions);
-      setCurrentQuestionIndex(nextQuestionIndex);
-      setUserAnswers(reconstructedUserAnswers);
-      setReviewedCount((sessionAnswers as ReviewAnswer[]).filter(a => a.difficulty_rating).length);
-      setSessionStats(sessionStats);
-      setSelectedNotes(inProgressSession.selected_notes);
-      setSelectedDifficulty(inProgressSession.selected_difficulty as 'easy' | 'medium' | 'hard' | 'all');
-      setIsReviewComplete(false);
-      setCurrentStep('review');
-
-      setShowResumeDialog(false);
-      setInProgressSession(null);
-      addToast('Session resumed successfully!', 'success');
-
-    } catch (error) {
-      console.error('Error resuming session:', error);
-      addToast('Failed to resume session. Please try again.', 'error');
-    } finally {
-      setIsLoadingSession(false);
-    }
-  };
-
-  // Filter notes for available tab (excluding already selected notes)
-  const availableNotes = notesWithQuestions.filter(note => {
-    const matchesSearch = debouncedSearchTerm === '' ||
-      note.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-      note.tags.some(tag => tag.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
-
-    const notAlreadySelected = !selectedNotes.includes(note.id);
-
-    return matchesSearch && notAlreadySelected;
+  const {
+    inProgressSession,
+    showResumeDialog,
+    resumeSessionHandler,
+    closeResumeDialogHandler,
+  } = useReviewSessionResume({
+    isReadOnlyDemo,
+    user: user as User | null,
+    currentStep,
+    location,
+    isLoadingSessionFromPage: isLoadingSession,
+    addToast,
+    setIsLoadingSession,
+    setCurrentSessionId,
+    setSessionStartTime,
+    setSessionName,
+    setCurrentQuestions,
+    setCurrentQuestionIndex,
+    setUserAnswers,
+    setReviewedCount,
+    setSessionStats,
+    setSelectedNotes,
+    setSelectedDifficulty,
+    setIsReviewComplete,
+    setCurrentStepState: setCurrentStep,
   });
 
-  // Filter notes for selected tab
-  const currentSelectedNotes = notesWithQuestions.filter(note =>
-    selectedNotes.includes(note.id)
-  );
+  const { isRetryingSession } = useReviewSessionRetry({
+    isReadOnlyDemo,
+    user: user as User | null,
+    location,
+    addToast,
+    setIsLoadingSession,
+    setCurrentSessionId,
+    setSessionName,
+    setSessionStartTime,
+    setCurrentQuestions,
+    setCurrentQuestionIndex,
+    setReviewedCount,
+    setSessionStats,
+    setUserAnswers,
+    setIsAnswerSaved,
+    setIsReviewComplete,
+    setAiReviewFeedback,
+    setCurrentStep,
+    isLoadingSessionFromPage: isLoadingSession,
+  });
 
-  const calculateTotalQuestions = () => {
-    return selectedNotes.reduce((total, noteId) => {
-      const note = notesWithQuestions.find(n => n.id === noteId);
-      if (!note) return total;
-      return total + note.questions.filter(q =>
-        selectedDifficulty === 'all' || q.difficulty === selectedDifficulty
-      ).length;
-    }, 0);
-  };
+  const {
+    handleStartReviewProcess,
+    saveAnswerHandler,
+    handleDifficultyResponseHandler,
+    finishReviewSessionHandler,
+    handleAiReviewAnswerHandler,
+  } = useReviewSessionManagement({
+    user: user as User | null,
+    notes: notes,
+    subjects: subjects,
+    selectedNotes,
+    notesWithQuestions: notesWithQuestionsData,
+    selectedDifficulty,
+    selectedQuestionCount,
+    generateNewQuestions,
+    sessionGeneratedName,
+    setSessionGeneratedName,
+    isReadOnlyDemo,
+    setLoading: setLoadingReviewProcess,
+    addToast,
+    setCurrentSessionId,
+    setSessionName,
+    setSessionStartTime,
+    setCurrentQuestions,
+    setCurrentQuestionIndex,
+    setReviewedCount,
+    setSessionStats,
+    setUserAnswers,
+    setIsReviewComplete,
+    setCurrentStep,
+    setAiReviewFeedback,
+    setIsSavingAnswer,
+    setIsAiReviewing,
+    setIsAnswerSaved,
+    currentSessionId,
+    currentQuestionIndex,
+    currentQuestion: currentQuestions[currentQuestionIndex],
+    userAnswer,
+    userAnswers,
+    sessionDuration,
+    isAnswerSaved,
+    reviewedCount,
+    sessionStats,
+  });
 
-  const loadNotesWithQuestions = async () => {
+  const loadSubjects = useCallback(() => { return storeLoadSubjects() }, [storeLoadSubjects]);
+
+  const loadNotesWithQuestions = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser) throw new Error('User not authenticated');
 
       const { data: allQuestions, error } = await supabase
         .from('questions')
         .select('id, note_id, question, hint, connects, difficulty, mastery_context, is_default')
-        .eq('user_id', user.id);
+        .eq('user_id', authUser.id);
 
       if (error) throw error;
       if (!allQuestions) {
-        setNotesWithQuestions([]);
+        setNotesWithQuestionsData([]);
         setLoading(false);
         return;
       }
@@ -464,7 +213,7 @@ const ReviewPage: React.FC = () => {
         return acc;
       }, {});
 
-      const notesWithQuestionsData: NoteWithQuestions[] = notes
+      const notesWithQuestionsDataResult: NoteWithQuestions[] = notes
         .map(note => {
           const questionsForNote = questionsByNoteId[note.id];
           if (questionsForNote && questionsForNote.length > 0) {
@@ -479,56 +228,70 @@ const ReviewPage: React.FC = () => {
         })
         .filter((n): n is NoteWithQuestions => n !== null);
 
-      setNotesWithQuestions(notesWithQuestionsData);
+      setNotesWithQuestionsData(notesWithQuestionsDataResult);
     } catch (error) {
       console.error('Error loading notes with questions:', error);
+      addToast('Failed to load questions.', 'error');
     } finally {
       setLoading(false);
     }
-  };
+  }, [notes, addToast, setNotesWithQuestionsData]);
 
-  const finishReviewSession = async () => {
-    if (!currentSessionId) return Promise.resolve();
-    
-    if (isReadOnlyDemo) {
-      setIsReviewComplete(true);
-      return Promise.resolve();
+  useEffect(() => {
+    // Timer logic remains the same
+    let localInterval: NodeJS.Timeout | null = null;
+    if (sessionStartTime) {
+      localInterval = setInterval(() => {
+        setSessionDuration(Math.floor((new Date().getTime() - sessionStartTime.getTime()) / 1000));
+      }, 1000);
+      setTimerInterval(localInterval);
+    } else {
+      if (timerInterval) clearInterval(timerInterval);
+      setTimerInterval(null);
+      setSessionDuration(0);
     }
+    return () => { if (localInterval) clearInterval(localInterval); };
+  }, [sessionStartTime]);
 
-    const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
-    const isUnsaved = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
-    if (isUnsaved) {
-      await saveAnswer();
+  useEffect(() => {
+    const state = location.state as LocationState | null;
+    if (user && user.id && subjects.length === 0 && !state?.retrySessionId && !isRetryingSession && !isLoadingSession) {
+      loadSubjects().catch((error: any) => {
+        console.error("ReviewPage: Failed to load subjects:", error);
+        addToast('Could not load subject data. Session names might be affected.', 'warning');
+      });
     }
+  }, [user, subjects.length, loadSubjects, addToast, location.state, isRetryingSession, isLoadingSession]);
 
-    try {
-      const { error } = await supabase.from('review_sessions').update({
-        session_status: 'completed',
-        completed_at: new Date().toISOString(),
-        duration_seconds: sessionDuration,
-        questions_answered: userAnswers.filter(a => a.answer.trim() !== '').length,
-        questions_rated: reviewedCount,
-        easy_ratings: sessionStats.easy,
-        medium_ratings: sessionStats.medium,
-        hard_ratings: sessionStats.hard,
-      }).eq('id', currentSessionId);
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error completing review session:', error);
-    } finally {
-      setSessionStartTime(null);
-      setIsReviewComplete(true);
+  useEffect(() => {
+    if (isRetryingSession || isLoadingSession || showResumeDialog) {
+      return;
     }
-    return Promise.resolve();
-  };
+    if (currentStep === 'select') {
+      loadNotesWithQuestions();
+    }
+  }, [notes, isLoadingSession, currentStep, showResumeDialog, isRetryingSession, loadNotesWithQuestions, user]);
 
-  const handleNoteSelection = (noteId: string) => {
-    setSelectedNotes(prev => prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]);
-  };
+  useEffect(() => {
+    if (currentStep === 'review' && currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
+      const existingAnswer = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+      if (existingAnswer) {
+        setUserAnswer(existingAnswer.answer);
+        setIsAnswerSaved(true);
+      } else {
+        setUserAnswer('');
+        setIsAnswerSaved(false);
+      }
+      setAiReviewFeedback(null);
+    }
+  }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
 
   const generateQuestions = async () => {
     if (!generateNewQuestions || selectedNotes.length === 0) return;
+    if (isReadOnlyDemo) {
+      addToast('Question generation is not available in demo mode.', 'warning');
+      return;
+    }
 
     setIsGeneratingQuestions(true);
     addToast('Generating questions...', 'info');
@@ -544,7 +307,7 @@ const ReviewPage: React.FC = () => {
             difficulty: difficulty as any,
             questionType: selectedQuestionType
           });
-          addToast(`Generated questions for note ${notesWithQuestions.find(n => n.id === noteId)?.title || noteId}`, 'success');
+          addToast(`Generated questions for note ${notesWithQuestionsData.find(n => n.id === noteId)?.title || noteId}`, 'success');
         } catch (error) {
           console.warn(`Failed to generate questions for note ${noteId}:`, error);
           addToast(`Failed to generate questions for one note`, 'error');
@@ -564,191 +327,13 @@ const ReviewPage: React.FC = () => {
     }
   };
 
-  const handleStartReviewProcess = async () => {
-    try {
+  const handleInitiateReview = async () => {
+    if (generateNewQuestions) {
       setLoading(true);
-      if (!user || !user.id) {
-        addToast('User not authenticated. Please log in.', 'error');
-        setLoading(false);
-        return;
-      }
-
-      // Generate questions if needed
-      if (generateNewQuestions) {
-        await generateQuestions();
-
-        selectedNotes.forEach(noteId => {
-          notesWithQuestions.find(n => n.id === noteId);
-        });
-      }
-
-      // Get all questions that match our criteria
-      const questionsToReview: CurrentQuestionType[] = selectedNotes.flatMap(noteId => {
-        const note = notesWithQuestions.find(n => n.id === noteId);
-        if (!note) return [];
-
-        // Filter questions by difficulty and is_default if generating new questions
-        return note.questions
-          .filter(q => {
-            // Filter by difficulty
-            const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
-
-            // If generating new questions and selected count is 5, only use new questions (is_default=false)
-            // For 10 or all, mix with existing questions
-            const defaultMatches = generateNewQuestions
-              ? (selectedQuestionCount === '5' ? !q.is_default : true)
-              : true;
-
-            return difficultyMatches && defaultMatches;
-          })
-          .map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
-      });
-
-      // Shuffle the questions
-      const shuffledQuestions = questionsToReview.sort(() => Math.random() - 0.5);
-
-      if (shuffledQuestions.length === 0) {
-        addToast("No questions found for the selected criteria.", "warning");
-        setLoading(false);
-        return;
-      }
-
-      // Apply question count limit if not "all"
-      let finalQuestions = shuffledQuestions;
-      if (selectedQuestionCount !== 'all') {
-        const count = parseInt(selectedQuestionCount);
-        finalQuestions = shuffledQuestions.slice(0, Math.min(count, shuffledQuestions.length));
-      }
-
-      const now = new Date();
-
-      // Get year level and subject from first note
-      const firstNote = notes.find(n => n.id === selectedNotes[0]);
-      let yearCode = '';
-      if (firstNote?.yearLevel) {
-        switch (firstNote.yearLevel) {
-          case 1: yearCode = 'PRI'; break;
-          case 2: yearCode = 'SEC'; break;
-          case 3: yearCode = 'TER'; break;
-          case 4: yearCode = 'PRO'; break;
-          default: yearCode = '';
-        }
-      }
-
-      let subjectNameString = 'General';
-      if (firstNote?.subjectId) {
-        if (subjects.length > 0) {
-          const foundSubject = subjects.find(s => s?.id && String(s.id) === String(firstNote.subjectId));
-          if (foundSubject) {
-            subjectNameString = foundSubject.name;
-          } else {
-            addToast(`Note's subject (ID: ${firstNote.subjectId}) not found. Using 'General'.`, 'info');
-            subjectNameString = 'General';
-          }
-        } else {
-          addToast("Subjects not loaded yet. Using 'General' for session name.", 'info');
-          subjectNameString = 'General';
-        }
-      }
-
-      // Format date as dd-mmm-yyyy hh:mm am/pm
-      const day = String(now.getDate()).padStart(2, '0');
-      const month = now.toLocaleString('default', { month: 'short' }).toUpperCase();
-      const year = now.getFullYear();
-
-      // Format time in 12-hour with AM/PM
-      let hours = now.getHours();
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12; // Convert 0 to 12
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-
-      const sessionName = `${yearCode ? yearCode + '-' : ''}${subjectNameString.replace(/\s+/g, '-')} ${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
-      setSessionGeneratedName(sessionName);
-
-      const { data: sessionData, error: sessionError } = await supabase.from('review_sessions').insert({
-        user_id: user.id,
-        session_name: sessionName,
-        selected_notes: selectedNotes,
-        selected_difficulty: selectedDifficulty,
-        total_questions: finalQuestions.length,
-        session_status: 'in_progress',
-      }).select().single();
-
-      if (sessionError) throw sessionError;
-      if (!sessionData) throw new Error("Failed to create session.");
-      const newSessionId = sessionData.id;
-
-      const placeholderAnswers = finalQuestions.map((q, index) => ({
-        session_id: newSessionId,
-        question_index: index,
-        user_id: user.id,
-        note_id: q.noteId,
-        question_text: q.question,
-        answer_text: '',
-        note_title: q.noteTitle,
-        hint: q.hint,
-        connects: q.connects,
-        mastery_context: q.mastery_context,
-        original_difficulty: q.difficulty,
-      }));
-
-      const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
-
-      if (answersInsertError) {
-        console.error("Supabase insert error details:", answersInsertError);
-        throw answersInsertError;
-      }
-
-      setCurrentSessionId(newSessionId);
-      setSessionName(sessionName);
-      setSessionStartTime(new Date());
-      setCurrentQuestions(finalQuestions);
-      setCurrentQuestionIndex(0);
-      setReviewedCount(0);
-      setSessionStats({ easy: 0, medium: 0, hard: 0 });
-      setUserAnswers([]);
-      setIsReviewComplete(false);
-      setCurrentStep('review');
-      setAiReviewFeedback(null);
-
-    } catch (error) {
-      setSessionStartTime(null);
-      console.error('Error starting review:', error);
-      alert('Failed to start review session. Please try again.');
-    } finally {
-      setLoading(false);
+      await generateQuestions();
+      setLoadingReviewProcess(false);
     }
-  };
-
-  const saveAnswer = async () => {
-    if (!userAnswer.trim() || !currentSessionId) return Promise.resolve();
-    
-    setIsSaving(true);
-    try {
-      const { error } = await supabase
-        .from('review_answers')
-        .update({ answer_text: userAnswer.trim() })
-        .eq('session_id', currentSessionId)
-        .eq('question_index', currentQuestionIndex);
-
-      if (error) throw error;
-
-      const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
-      if (answerExists) {
-        setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim(), timestamp: new Date() } : a));
-      } else {
-        setUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
-      }
-
-      setIsAnswerSaved(true);
-    } catch (error) {
-      console.error('Error saving answer:', error);
-      alert('Failed to save answer.');
-    } finally {
-      setIsSaving(false);
-    }
-    return Promise.resolve();
+    await handleStartReviewProcess();
   };
 
   const handleUserAnswerChange = (newAnswer: string) => {
@@ -757,102 +342,17 @@ const ReviewPage: React.FC = () => {
   };
 
   const handleNavigation = async (direction: 'next' | 'previous') => {
-    if (userAnswer.trim() && !isAnswerSaved) await saveAnswer();
+    if (userAnswer.trim() && !isAnswerSaved) await saveAnswerHandler();
     if (direction === 'next' && currentQuestionIndex < currentQuestions.length - 1) setCurrentQuestionIndex(prev => prev + 1);
     else if (direction === 'previous' && currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1);
-  };
-
-  const handleDifficultyResponse = async (difficulty: 'easy' | 'medium' | 'hard') => {
-    if (!isAnswerSaved) {
-      addToast("Please save your answer before rating.", 'warning');
-      return;
-    }
-    
-    if (!currentSessionId) {
-      addToast("Session ID not found. Please try again.", 'error');
-      return;
-    }
-    
-    try {
-      const { error } = await supabase.from('review_answers').update({ difficulty_rating: difficulty }).eq('session_id', currentSessionId).eq('question_index', currentQuestionIndex);
-      if (error) throw error;
-
-      const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
-      setUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, difficulty_rating: difficulty } : a));
-
-      if (difficulty !== previouslyRated) {
-        setSessionStats(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1, ...(previouslyRated && { [previouslyRated]: prev[previouslyRated] - 1 }) }));
-        if (!previouslyRated) setReviewedCount(prev => prev + 1);
-      }
-    } catch (error) {
-      console.error('Error saving difficulty rating:', error);
-      addToast('Failed to save difficulty rating.', 'error');
-    }
-  };
-
-  const handleAiReviewAnswer = async () => {
-    if (!currentQuestion || !userAnswer.trim()) {
-      addToast('Please save your answer first before requesting AI feedback.', 'warning');
-      return;
-    }
-    
-    setIsAiReviewing(true);
-    setAiReviewFeedback(null);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("User not authenticated for AI review.");
-
-      const payload = {
-        answers: [{
-          questionId: currentQuestion.id,
-          answerText: userAnswer.trim()
-        }],
-        noteId: currentQuestion.noteId
-      };
-
-      const response = await fetch('/api/review-answers', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to get AI feedback');
-      }
-
-      const data = await response.json();
-
-      if (data.feedbacks && data.feedbacks.length > 0) {
-        const feedback = data.feedbacks[0];
-        setAiReviewFeedback(feedback.feedback);
-        addToast('AI feedback received!', 'success');
-      } else {
-        throw new Error('No feedback received from AI');
-      }
-
-    } catch (error) {
-      console.error('Error getting AI review:', error);
-      addToast('Failed to get AI feedback. Please try again.', 'error');
-    } finally {
-      setIsAiReviewing(false);
-    }
   };
 
   const resetReview = () => {
     setSessionStartTime(null);
     setCurrentStep('select');
-    setSelectedNotes([]);
-    setSelectedDifficulty('all');
-    setSelectedQuestionType('short');
-    setSelectedQuestionCount('all');
+    resetSetupSelections();
     setCurrentQuestions([]);
     setCurrentQuestionIndex(0);
-    setShowHint(false);
     setReviewedCount(0);
     setSessionStats({ easy: 0, medium: 0, hard: 0 });
     setIsReviewComplete(false);
@@ -860,82 +360,41 @@ const ReviewPage: React.FC = () => {
     setUserAnswers([]);
     setIsAnswerSaved(false);
     setCurrentSessionId(null);
-    setGenerateNewQuestions(false);
-    setCustomDifficulty(false);
-    setSearchTerm('');
-    setActiveNoteSelectionTab('available');
     setAiReviewFeedback(null);
     setIsAiReviewing(false);
     setIsGeneratingQuestions(false);
+    setIsSavingAnswer(false);
+    setLoadingReviewProcess(false);
   };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'text-green-600 bg-green-50 border-green-200 dark:text-green-400 dark:bg-green-900/30 dark:border-green-700/50';
-      case 'medium': return 'text-yellow-600 bg-yellow-50 border-yellow-200 dark:text-yellow-400 dark:bg-yellow-900/30 dark:border-yellow-700/50';
-      case 'hard': return 'text-red-600 bg-red-50 border-red-200 dark:text-red-400 dark:bg-red-900/30 dark:border-red-700/50';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600';
-    }
-  };
-
-  const getDifficultyIcon = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return <Target className="h-4 w-4" />;
-      case 'medium': return <Zap className="h-4 w-4" />;
-      case 'hard': return <Brain className="h-4 w-4" />;
-      default: return <HelpCircle className="h-4 w-4" />;
-    }
-  };
-
-  const getQuestionTypeIcon = (type: QuestionType) => {
-    switch (type) {
-      case 'short': return <MessageSquare className="h-4 w-4" />;
-      case 'mcq': return <List className="h-4 w-4" />;
-      case 'open': return <FileQuestion className="h-4 w-4" />;
-      default: return <MessageSquare className="h-4 w-4" />;
-    }
-  };
-
-  const getQuestionTypeColor = (type: QuestionType) => {
-    switch (type) {
-      case 'short': return 'text-blue-600 bg-blue-50 border-blue-200 dark:text-blue-400 dark:bg-blue-900/30 dark:border-blue-700/50';
-      case 'mcq': return 'text-purple-600 bg-purple-50 border-purple-200 dark:text-purple-400 dark:bg-purple-900/30 dark:border-purple-700/50';
-      case 'open': return 'text-indigo-600 bg-indigo-50 border-indigo-200 dark:text-indigo-400 dark:bg-indigo-900/30 dark:border-indigo-700/50';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200 dark:text-gray-400 dark:bg-gray-700 dark:border-gray-600';
-    }
-  };
-
-  const currentQuestion = currentQuestions[currentQuestionIndex];
-  const totalQuestions = calculateTotalQuestions();
 
   const startReviewDisabled = isReadOnlyDemo || selectedNotes.length === 0 ||
-    selectedQuestionType !== 'short' ||
-    (totalQuestions === 0 && !generateNewQuestions) ||
-    isGeneratingQuestions;
+    (displayTotalQuestions === 0 && !generateNewQuestions) ||
+    isGeneratingQuestions || loadingReviewProcess || loading;
 
-  if (isLoadingSession && (isRetryingSessionRef.current || (currentStep === 'select' && !showResumeDialog))) {
-    if (isRetryingSessionRef.current) {
+  if (isLoadingSession && (isRetryingSession || (currentStep === 'select' && !showResumeDialog))) {
+    if (isRetryingSession) {
       return <div className="text-center p-12">Setting up retry session...</div>;
     }
     return <div className="text-center p-12">Loading session...</div>;
   }
+
+  const currentQuestionForDisplay = currentQuestions[currentQuestionIndex];
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {
     return (
       <>
         {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
-        
+
         <ReviewSetupScreen
           loadingNotes={loading}
-          notesWithQuestions={notesWithQuestions}
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
           debouncedSearchTerm={debouncedSearchTerm}
           activeNoteSelectionTab={activeNoteSelectionTab}
           setActiveNoteSelectionTab={setActiveNoteSelectionTab}
           availableNotes={availableNotes}
-          currentSelectedNotes={currentSelectedNotes}
+          currentSelectedNotes={currentSelectedNotesDisplay}
           handleNoteSelection={handleNoteSelection}
           getDifficultyColor={getDifficultyColor}
           getDifficultyIcon={getDifficultyIcon}
@@ -950,24 +409,22 @@ const ReviewPage: React.FC = () => {
           setSelectedQuestionType={setSelectedQuestionType}
           getQuestionTypeIcon={getQuestionTypeIcon}
           getQuestionTypeColor={getQuestionTypeColor}
-          totalQuestions={totalQuestions}
-          onStartReview={handleStartReviewProcess}
+          totalQuestions={displayTotalQuestions}
+          onStartReview={handleInitiateReview}
           startReviewDisabled={startReviewDisabled}
-          isGeneratingQuestions={isGeneratingQuestions}
+          isGeneratingQuestions={isGeneratingQuestions || loadingReviewProcess}
           selectedQuestionCount={selectedQuestionCount}
           setSelectedQuestionCount={setSelectedQuestionCount}
-          showQuestionCountTooltip={showQuestionCountTooltip}
-          setShowQuestionCountTooltip={setShowQuestionCountTooltip}
         />
 
         {/* Resume Session Dialog */}
         <Dialog
           isOpen={showResumeDialog}
-          onClose={() => setShowResumeDialog(false)}
+          onClose={closeResumeDialogHandler}
           title="Resume Previous Session"
-          message={`You have an unfinished review session "${sessionGeneratedName || inProgressSession?.session_name || 'Untitled'}" from ${inProgressSession ? new Date(inProgressSession.started_at).toLocaleString() : 'recently'}. Would you like to resume it or start a new session?`}
-          onConfirm={resumeSession}
-          confirmText={isLoadingSession ? 'Resuming...' : 'Resume Session'}
+          message={`You have an unfinished review session "${inProgressSession?.session_name || 'Untitled Session'}" from ${inProgressSession ? new Date(inProgressSession.started_at).toLocaleString() : 'recently'}. Would you like to resume it or start a new session?`} // Use inProgressSession from hook. sessionGeneratedName is for new sessions.
+          onConfirm={resumeSessionHandler}
+          confirmText={isLoadingSession ? 'Resuming...' : 'Resume Session'} // isLoadingSession is still the page's state, updated by hook
           cancelText="Start New Session"
           loading={isLoadingSession}
           variant="default"
@@ -978,7 +435,7 @@ const ReviewPage: React.FC = () => {
 
   // RENDER REVIEW STEP
   if (currentStep === 'review') {
-    if (isLoadingSession || (isRetryingSessionRef.current && !currentQuestions.length)) {
+    if (isLoadingSession && !currentQuestions.length) {
       return <div className="text-center p-12">Loading questions for review...</div>;
     }
 
@@ -986,7 +443,6 @@ const ReviewPage: React.FC = () => {
       return (
         <>
           {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
-          
           <ReviewCompleteScreen
             userAnswersCount={userAnswers.length}
             sessionStats={sessionStats}
@@ -998,13 +454,11 @@ const ReviewPage: React.FC = () => {
     }
 
     const formattedTime = formatDuration(sessionDuration);
-    const isFirstQuestion = currentQuestionIndex === 0;
-    const isLastQuestion = currentQuestionIndex === currentQuestions.length - 1;
 
     return (
       <>
         {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
-        
+
         <ActiveReviewScreen
           // ReviewHeader props
           currentQuestionIndex={currentQuestionIndex}
@@ -1015,28 +469,26 @@ const ReviewPage: React.FC = () => {
           formattedDuration={formattedTime}
           onResetReview={resetReview}
           // QuestionDisplay props
-          currentQuestion={currentQuestion}
+          currentQuestion={currentQuestionForDisplay}
           getDifficultyColor={getDifficultyColor}
           getDifficultyIcon={getDifficultyIcon}
-          showHint={showHint}
-          onShowHint={() => setShowHint(true)}
           // AnswerInputArea props
           userAnswer={userAnswer}
           onUserAnswerChange={handleUserAnswerChange}
           isAnswerSaved={isAnswerSaved}
-          isSaving={isSaving}
-          onSaveAnswer={saveAnswer}
+          isSaving={isSavingAnswer}
+          onSaveAnswer={saveAnswerHandler}
           aiReviewFeedback={aiReviewFeedback}
           isAiReviewing={isAiReviewing}
-          onAiReviewAnswer={handleAiReviewAnswer}
+          onAiReviewAnswer={handleAiReviewAnswerHandler}
           // ReviewControls props
           onNavigatePrevious={() => handleNavigation('previous')}
           onNavigateNext={() => handleNavigation('next')}
-          onFinishSession={finishReviewSession}
-          isFirstQuestion={isFirstQuestion}
-          isLastQuestion={isLastQuestion}
+          onFinishSession={finishReviewSessionHandler}
+          isFirstQuestion={currentQuestionIndex === 0}
+          isLastQuestion={currentQuestionIndex === currentQuestions.length - 1}
           // DifficultyRating prop
-          onRateDifficulty={handleDifficultyResponse}
+          onRateDifficulty={handleDifficultyResponseHandler}
           userAnswers={userAnswers}
           // SessionProgressSidebar props
           reviewedCount={reviewedCount}
