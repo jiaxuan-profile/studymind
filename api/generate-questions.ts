@@ -126,7 +126,7 @@ const handler: Handler = async (event) => {
           - For concepts with mastery between 0.4 and 0.8, create 'medium' questions.
           - For concepts with mastery > 0.8, create 'hard' questions.`;
     
-    if (difficultyFilter && difficultyFilter !== 'mixed') {
+    if (difficultyFilter && difficultyFilter !== 'custom') {
         difficultyInstruction = `2.  DIFFICULTY: The user has requested only '${difficultyFilter}' difficulty questions. Ensure all generated questions have this difficulty level.`;
     }
 
