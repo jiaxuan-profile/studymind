@@ -5,8 +5,6 @@ import { AllConceptsData, Subject, KnowledgeGap } from '../types';
 
 export async function getAllConcepts(): Promise<AllConceptsData> {
   try {
-    console.log("Database Service: Fetching all concept data");
-
     // Parallelize requests for better performance
     const [
       { data: concepts, error: conceptsError },
@@ -25,11 +23,6 @@ export async function getAllConcepts(): Promise<AllConceptsData> {
       throw new Error(`Concept data fetch failed: ${error.message}`);
     }
 
-    console.log(`Database Service: Found ${concepts?.length || 0
-      } concepts, ${relationships?.length || 0
-      } relationships, ${noteConcepts?.length || 0
-      } note-concept links`);
-
     return {
       concepts: concepts ?? [],
       relationships: relationships ?? [],
@@ -44,8 +37,6 @@ export async function getAllConcepts(): Promise<AllConceptsData> {
 
 export async function getAllSubjects(userId: string): Promise<Subject[]> {
   try {
-    console.log(`Database Service: Fetching subjects for user ID: ${userId}`);
-
     const { data, error } = await supabase
       .from('subjects')
       .select('*')
@@ -57,7 +48,6 @@ export async function getAllSubjects(userId: string): Promise<Subject[]> {
       throw new Error(`Failed to fetch subjects: ${error.message}`);
     }
 
-    console.log("Database Service: Subjects fetched successfully:", data?.length || 0);
     return data as Subject[] || [];
 
   } catch (error) {
@@ -68,8 +58,6 @@ export async function getAllSubjects(userId: string): Promise<Subject[]> {
 
 export async function getKnowledgeGapsForNote(noteId: string): Promise<KnowledgeGap[]> {
   try {
-    console.log(`Database Service: Fetching knowledge gaps for note ID: ${noteId}`);
-
     const { data, error } = await supabase
       .from('knowledge_gaps')
       .select('*')
@@ -81,7 +69,6 @@ export async function getKnowledgeGapsForNote(noteId: string): Promise<Knowledge
       throw new Error(`Failed to fetch knowledge gaps: ${error.message}`);
     }
 
-    console.log(`Database Service: Found ${data?.length || 0} knowledge gaps for note ${noteId}`);
     return data as KnowledgeGap[] || [];
 
   } catch (error) {

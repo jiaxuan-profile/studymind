@@ -46,11 +46,6 @@ const HomePage: React.FC = () => {
     .slice(0, 3);
 
   const handleCreateNote = async () => {
-    if (isReadOnlyDemo) {
-      navigate('/notes');
-      return;
-    }
-    
     try {
       const id = Math.random().toString(36).substring(2, 11);
       const now = new Date();
@@ -90,7 +85,8 @@ const HomePage: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <button
           onClick={handleCreateNote}
-          className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
+          className={`flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow ${isReadOnlyDemo ? 'opacity-50 cursor-not-allowed' : ''}`}
+          disabled={isReadOnlyDemo}
         >
           <div className="h-12 w-12 bg-primary-light/10 rounded-full flex items-center justify-center mb-3">
             <PlusCircle className="h-6 w-6 text-primary" />

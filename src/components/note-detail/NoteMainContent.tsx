@@ -9,6 +9,7 @@ import { Note, Subject } from '../../types';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { KatexOptions } from 'katex';
 
 interface NoteMainContentProps {
   note: Note;
@@ -43,7 +44,10 @@ const NoteMainContent: React.FC<NoteMainContentProps> = ({
   onCreateSubject,
   isCreatingSubject,
 }) => {
-  const rehypePlugins = [rehypeKatex];
+  const katexOptions: KatexOptions = {
+    strict: false, // or 'ignore'
+  };
+  const rehypePlugins = [[rehypeKatex, katexOptions]];
   const remarkPlugins = [remarkGfm, remarkMath];
 
   if (editMode) {

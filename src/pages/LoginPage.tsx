@@ -19,7 +19,7 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, signIn, signUp, forgotPassword } = useAuth();
   const { theme, toggleTheme } = useStore();
-  const [activeDemoUser, setActiveDemoUser] = useState<'power' | 'standard' | 'readonly' | null>(null);
+  const [activeDemoUser, setActiveDemoUser] = useState<'power' | 'standard' | 'free' | 'readonly' | null>(null);
   const { isReadOnlyDemo, isDemoMode } = useDemoMode();
 
   useEffect(() => {
@@ -52,14 +52,11 @@ const LoginPage: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = (userType: 'power' | 'standard' | 'readonly') => {
+  const handleDemoLogin = (userType: 'power' | 'standard' | 'free' | 'readonly') => {
     setActiveDemoUser(userType); 
-    if (userType === 'power') {
+    if (userType === 'power' || userType === 'readonly') {
       setEmail('demo@studymindai.me');
       setPassword('password123');
-    } else if (userType === 'readonly') {
-      setEmail('readonly@studymindai.me');
-      setPassword('readonly123');
     }
   };
 

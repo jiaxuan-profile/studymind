@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Sparkles, Info } from 'lucide-react';
+import { Play, Sparkles, Info, Lock } from 'lucide-react';
 
 type QuestionType = 'short' | 'mcq' | 'open';
 type QuestionCount = '5' | '10' | 'all';
@@ -134,6 +134,13 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
                 </>
               )}
             </button>
+
+            {startReviewDisabled && (
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center flex items-center">
+                  <Lock className="h-3 w-3 mr-1" />
+                  This feature is disabled in demo mode.
+                </p>
+              )}
 
             {/* Only show "No questions available" message when not generating new questions */}
             {totalQuestions === 0 && selectedNotesCount > 0 && !generateNewQuestions && (

@@ -71,7 +71,6 @@ function AppRoutes() {
   }, [theme]);
 
   const loadNotes = useCallback(() => {
-    console.log('AppRoutes: Triggering notes load.');
     storeLoadNotes(1, 12, {});
   }, [storeLoadNotes]);
 
@@ -87,7 +86,6 @@ function AppRoutes() {
       navigate('/login');
     } catch (error) {
       addToast('Failed to logout', 'error');
-      console.error('Logout error:', error);
     }
   }, [signOut, addToast, navigate]);
 

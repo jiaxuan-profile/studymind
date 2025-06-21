@@ -18,7 +18,7 @@ const DemoModeNotice: React.FC<DemoModeNoticeProps> = ({ className = '' }) => {
         <div>
           <h4 className="text-sm font-medium text-amber-800 dark:text-amber-200">Read-Only Demo Mode</h4>
           <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
-            You're viewing StudyMind in read-only demo mode. Changes won't be saved, and AI features are simulated.
+            You're viewing StudyMind in read-only demo mode. Changes won't be saved, and AI features are disabled.
           </p>
         </div>
       </div>

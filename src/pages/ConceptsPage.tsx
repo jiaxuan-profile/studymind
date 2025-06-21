@@ -68,74 +68,19 @@ const ConceptsPage: React.FC = () => {
 
   useEffect(() => {
     const loadUserConceptGraph = async () => {
-      console.log("CONCEPTS_PAGE: Starting loadUserConceptGraph...");
       try {
         setLoading(true);
         setError(null);
         setSelectedConcept(null);
 
-        if (isReadOnlyDemo) {
-          // Create mock data for demo mode
-          const mockNodes: GraphNode[] = [
-            { id: 'c1', name: 'Learning', definition: 'The acquisition of knowledge or skills through study, experience, or being taught.', val: 3, color: '#6366F1', category: 'Education', hasDefinition: true, masteryLevel: 0.8, confidenceScore: 0.7 },
-            { id: 'c2', name: 'Memory', definition: 'The faculty by which the mind stores and remembers information.', val: 2.5, color: '#10B981', category: 'Cognition', hasDefinition: true, masteryLevel: 0.6, confidenceScore: 0.5 },
-            { id: 'c3', name: 'Cognition', definition: 'The mental action or process of acquiring knowledge and understanding through thought, experience, and the senses.', val: 2.8, color: '#F59E0B', category: 'Psychology', hasDefinition: true, masteryLevel: 0.4, confidenceScore: 0.6 },
-            { id: 'c4', name: 'Active Recall', definition: 'A study method that involves actively stimulating memory during the learning process.', val: 2.2, color: '#6366F1', category: 'Education', hasDefinition: true, masteryLevel: 0.7, confidenceScore: 0.8 },
-            { id: 'c5', name: 'Spaced Repetition', definition: 'A learning technique that involves increasing intervals of time between subsequent review of previously learned material.', val: 2.3, color: '#6366F1', category: 'Education', hasDefinition: true, masteryLevel: 0.9, confidenceScore: 0.9 }
-          ];
-          
-          const mockLinks: EnhancedGraphLink[] = [
-            { source: 'c1', target: 'c2', value: 0.8, relationshipType: 'related' },
-            { source: 'c1', target: 'c3', value: 0.7, relationshipType: 'related' },
-            { source: 'c1', target: 'c4', value: 0.9, relationshipType: 'builds-upon' },
-            { source: 'c1', target: 'c5', value: 0.9, relationshipType: 'builds-upon' },
-            { source: 'c2', target: 'c3', value: 0.8, relationshipType: 'related' },
-            { source: 'c4', target: 'c2', value: 0.7, relationshipType: 'prerequisite' }
-          ];
-          
-          // Create mastery map
-          const masteryMap = new Map<string, UserMastery>();
-          mockNodes.forEach(node => {
-            masteryMap.set(node.id as string, {
-              concept_id: node.id as string,
-              mastery_level: node.masteryLevel || 0.5,
-              confidence_score: node.confidenceScore || 0.5,
-              review_count: Math.floor(Math.random() * 10) + 1
-            });
-          });
-          
-          setUserMasteryData(masteryMap);
-          
-          // Calculate mastery statistics
-          const totalConcepts = mockNodes.length;
-          const masteredConcepts = mockNodes.filter(n => (n.masteryLevel || 0) >= 0.7).length;
-          const averageMastery = mockNodes.reduce((sum, n) => sum + (n.masteryLevel || 0.5), 0) / mockNodes.length;
-          const highConfidenceConcepts = mockNodes.filter(n => (n.confidenceScore || 0) >= 0.8).length;
-          
-          setMasteryStats({
-            totalConcepts,
-            masteredConcepts,
-            averageMastery,
-            highConfidenceConcepts
-          });
-          
-          setGraphData({ nodes: mockNodes, links: mockLinks });
-          setLoading(false);
-          return;
-        }
-
-        console.log("CONCEPTS_PAGE: Fetching user...");
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not authenticated.");
-        console.log("CONCEPTS_PAGE: User fetched.");
 
-        console.log("CONCEPTS_PAGE: Fetching user notes...");
         const { data: userNotes, error: notesError } = await supabase
           .from('notes')
           .select('id, tags')
           .eq('user_id', user.id);
         if (notesError) throw notesError;
-        console.log("CONCEPTS_PAGE: User notes fetched:", userNotes?.length); 
 
         const userNoteIds = userNotes.map(n => n.id);
         if (userNoteIds.length === 0) {
@@ -162,7 +107,6 @@ const ConceptsPage: React.FC = () => {
         const learnedConceptIdsArray = Array.from(learnedConceptIdSet);
 
         // Fetch user mastery data for these concepts
-        console.log("CONCEPTS_PAGE: Fetching user mastery data...");
         const { data: masteryData, error: masteryError } = await supabase
           .from('user_concept_mastery')
           .select('concept_id, mastery_level, confidence_score, last_reviewed_at, review_count')
@@ -274,9 +218,7 @@ const ConceptsPage: React.FC = () => {
             relationshipType: rel.relationship_type,
         }));
 
-        console.log("CONCEPTS_PAGE: Setting graph data.");
         setGraphData({ nodes, links });
-        console.log("CONCEPTS_PAGE: Graph data set.");
 
       } catch (err: any) {
         console.error('Error loading concept graph:', err);
@@ -354,31 +296,6 @@ const ConceptsPage: React.FC = () => {
         return;
     }
 
-    if (isReadOnlyDemo) {
-      // Create mock concept details for demo mode
-      const mockConcept: ConceptDetails = {
-        id: node.id,
-        name: node.name,
-        definition: node.definition || "No definition available.",
-        noteIds: ['mock-note-1', 'mock-note-2'],
-        relatedConceptIds: graphData.links
-          .filter(link => 
-            (link.source === node.id || (typeof link.source === 'object' && link.source.id === node.id)) ||
-            (link.target === node.id || (typeof link.target === 'object' && link.target.id === node.id))
-          )
-          .map(link => {
-            const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-            const targetId = typeof link.target === 'object' ? link.target.id : link.target;
-            return sourceId === node.id ? targetId : sourceId;
-          }),
-        masteryLevel: node.masteryLevel,
-        confidenceScore: node.confidenceScore
-      };
-      
-      setSelectedConcept(mockConcept);
-      return;
-    }
-
     const mastery = userMasteryData.get(node.id);
     setSelectedConcept({
         id: node.id,
@@ -420,7 +337,7 @@ const ConceptsPage: React.FC = () => {
         console.error('Error fetching concept details:', err);
         setSelectedConcept(prev => prev ? { ...prev, definition: "Could not load concept details." } : null);
     }
-  }, [userMasteryData, isReadOnlyDemo, graphData.links]);
+  }, [userMasteryData]);
 
   const handleClearSelection = () => {
     setSelectedConcept(null);
@@ -495,17 +412,17 @@ const ConceptsPage: React.FC = () => {
       max-width: 300px;
       font-family: system-ui, -apple-system, sans-serif;
     ">
-      <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: ${headingColor};">${n.name}</div>
-      <div style="color: ${textColor}; font-size: 14px; line-height: 1.4; margin-bottom: 8px;">${n.definition}</div>
+      <div style="font-weight: bold; font-size: 16px; margin-bottom: 8px; color: ${textColor};">${n.name}</div>
+      <div style="color: ${definitionColor}; font-size: 14px; line-height: 1.4; margin-bottom: 8px;">${n.definition}</div>
       ${!n.isRoot ? `
       <div style="border-top: 1px solid ${borderColor}; padding-top: 8px; margin-top: 8px;">
         <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
-          <span style="font-size: 12px; color: ${textColor};">Mastery:</span>
+          <span style="font-size: 12px; color: ${definitionColor};">Mastery:</span>
           <span style="font-size: 12px; font-weight: bold; color: ${masteryTier.color};">${Math.round(masteryLevel * 100)}%</span>
         </div>
         <div style="display: flex; justify-content: space-between;">
-          <span style="font-size: 12px; color: ${textColor};">Confidence:</span>
-          <span style="font-size: 12px; font-weight: bold; color: ${headingColor};">${Math.round(confidenceScore * 100)}%</span>
+          <span style="font-size: 12px; color: ${definitionColor};">Confidence:</span>
+          <span style="font-size: 12px; font-weight: bold; color: ${textColor};">${Math.round(confidenceScore * 100)}%</span>
         </div>
       </div>
       ` : ''}
