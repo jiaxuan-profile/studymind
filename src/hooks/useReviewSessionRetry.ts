@@ -113,10 +113,30 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
                 connects: q.connects,
                 mastery_context: q.mastery_context,
                 original_difficulty: q.difficulty,
+                original_question_id: q.id,
+                ai_response_text: null,
+                is_correct: null
             }));
 
-            const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
+            const { data: insertedAnswers, error: answersInsertError } = await supabase
+                .from('review_answers')
+                .insert(placeholderAnswers)
+                .select('id, question_index');
+                
             if (answersInsertError) throw answersInsertError;
+
+            // Initialize userAnswers with the database-generated IDs
+            const initialUserAnswers: ReviewUserAnswer[] = [];
+            if (insertedAnswers) {
+                insertedAnswers.forEach(answer => {
+                    initialUserAnswers.push({
+                        id: answer.id,
+                        questionIndex: answer.question_index,
+                        answer: '',
+                        timestamp: new Date(),
+                    });
+                });
+            }
 
             setCurrentSessionId(newSession.id);
             setSessionName(newSessionName);
@@ -125,7 +145,7 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
             setCurrentQuestionIndex(0);
             setReviewedCount(0);
             setSessionStats({ easy: 0, medium: 0, hard: 0 });
-            setUserAnswers([]);
+            setUserAnswers(initialUserAnswers);
             setIsAnswerSaved(false);
             setIsReviewComplete(false);
             setAiReviewFeedback(null);

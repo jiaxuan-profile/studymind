@@ -21,6 +21,7 @@ export interface NoteWithQuestions {
 export type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 
 export interface ReviewUserAnswer {
+    id?: string; // ID of the review_answers record in the database
     questionIndex: number;
     answer: string;
     timestamp: Date;

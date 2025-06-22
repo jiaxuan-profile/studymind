@@ -5,12 +5,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Handler } from '@netlify/functions';
 
 interface SubmittedAnswer {
-  questionId: string;
+  reviewAnswerId: string; // Changed from questionId to reviewAnswerId
   answerText: string;
 }
 
 interface Feedback {
-  questionId: string;
+  questionId: string; // This will now contain the review_answers.id
   isCorrect: boolean;
   feedback: string;
 }
@@ -172,22 +172,48 @@ const handler: Handler = async (event) => {
     if (noteError || !noteContext) throw new Error(`Could not fetch note context: ${noteError?.message || 'Note not found'}`);
 
     console.log("Submitted Answers (from client):", JSON.stringify(submittedAnswers, null, 2));
-    const questionIds = submittedAnswers.map((a: SubmittedAnswer) => a.questionId);
-    console.log("Extracted Question IDs for DB query:", JSON.stringify(questionIds, null, 2));
+    
+    // Get the review answer IDs from the submitted answers
+    const reviewAnswerIds = submittedAnswers.map((a: SubmittedAnswer) => a.reviewAnswerId);
+    console.log("Review Answer IDs for DB query:", JSON.stringify(reviewAnswerIds, null, 2));
 
-    const { data: originalQuestionsData, error: questionsError } = await supabase
-      .from('questions')
-      .select('id, question, answer, difficulty, connects')
-      .in('id', questionIds) as { data: QuestionData[] | null, error: any };
-    console.log("Original Questions Data (from DB):", JSON.stringify(originalQuestionsData, null, 2));
-    if (questionsError) throw new Error(`Could not fetch questions: ${questionsError.message}`);
-    if (!originalQuestionsData || originalQuestionsData.length === 0) { // Check length too
-      // If originalQuestionsData is empty but questionIds was not, then the IDs weren't found.
-      console.error("Critical: No original questions found in DB for IDs:", JSON.stringify(questionIds));
-      throw new Error('No original questions found for the provided IDs.');
+    // Fetch the full review_answers records using the review answer IDs
+    const { data: reviewAnswersData, error: reviewAnswersError } = await supabase
+      .from('review_answers')
+      .select('id, question_text, original_question_id, difficulty_rating, connects, hint, mastery_context, original_difficulty')
+      .in('id', reviewAnswerIds);
+      
+    console.log("Review Answers Data (from DB):", JSON.stringify(reviewAnswersData, null, 2));
+    if (reviewAnswersError) throw new Error(`Could not fetch review answers: ${reviewAnswersError.message}`);
+    if (!reviewAnswersData || reviewAnswersData.length === 0) {
+      console.error("Critical: No review answers found in DB for IDs:", JSON.stringify(reviewAnswerIds));
+      throw new Error('No review answers found for the provided IDs.');
     }
 
-    const questionsMap = new Map(originalQuestionsData.map(q => [q.id, q]));
+    // Create a map of review answer records by ID for easy lookup
+    const reviewAnswersMap = new Map(reviewAnswersData.map(ra => [ra.id, ra]));
+
+    // Fetch the original questions if needed (for additional context)
+    const originalQuestionIds = reviewAnswersData
+      .map(ra => ra.original_question_id)
+      .filter(Boolean) as string[];
+      
+    let originalQuestionsData: QuestionData[] = [];
+    if (originalQuestionIds.length > 0) {
+      const { data: questionsData, error: questionsError } = await supabase
+        .from('questions')
+        .select('id, question, answer, difficulty, connects')
+        .in('id', originalQuestionIds);
+        
+      if (questionsError) {
+        console.warn("Warning: Could not fetch original questions:", questionsError.message);
+      } else {
+        originalQuestionsData = questionsData as QuestionData[];
+      }
+    }
+
+    // Create a map of original questions by ID for easy lookup
+    const originalQuestionsMap = new Map(originalQuestionsData.map(q => [q.id, q]));
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
@@ -202,15 +228,24 @@ const handler: Handler = async (event) => {
 
       QUESTIONS AND STUDENT'S ANSWERS:
       ${submittedAnswers.map((ans: SubmittedAnswer) => {
-      const q = questionsMap.get(ans.questionId);
-      console.log(`For client ans.questionId: ${ans.questionId}, found q in questionsMap: ${q ? q.id : 'NOT FOUND'}`);
-      return `
-          Question ID: "${q?.id}"
-          Question: "${q?.question}"
-          Correct Answer (if available for MCQ): "${q?.answer || 'N/A (Not an MCQ or answer not provided)'}"
+        const reviewAnswer = reviewAnswersMap.get(ans.reviewAnswerId);
+        if (!reviewAnswer) {
+          console.log(`For client ans.reviewAnswerId: ${ans.reviewAnswerId}, review answer not found in DB`);
+          return '';
+        }
+        
+        // Get additional context from the original question if available
+        const originalQuestion = reviewAnswer.original_question_id 
+          ? originalQuestionsMap.get(reviewAnswer.original_question_id) 
+          : null;
+          
+        return `
+          Review Answer ID: "${reviewAnswer.id}"
+          Question: "${reviewAnswer.question_text}"
+          Correct Answer (if available for MCQ): "${originalQuestion?.answer || 'N/A (Not an MCQ or answer not provided)'}"
           Student's Answer: "${ans.answerText}"
           `;
-    }).join('\n')}
+      }).join('\n')}
 
       YOUR TASK: For each question, evaluate the student's answer.
       RULES:
@@ -235,34 +270,23 @@ const handler: Handler = async (event) => {
 
     const { data: userRatedAnswersData } = await supabase
       .from('review_answers')
-      .select('question_text, difficulty_rating')
+      .select('id, difficulty_rating, original_difficulty')
       .eq('user_id', user.id)
-      .in('question_id', questionIds);
+      .in('id', reviewAnswerIds);
 
     const userRatingsMap = new Map<string, DifficultyLevel | null | undefined>();
     if (userRatedAnswersData) {
       userRatedAnswersData.forEach(ura => {
-        const originalQuestion = originalQuestionsData.find(oq => oq.question === ura.question_text);
-        if (originalQuestion) {
-          userRatingsMap.set(originalQuestion.id, ura.difficulty_rating as DifficultyLevel);
-        }
+        userRatingsMap.set(ura.id, ura.difficulty_rating as DifficultyLevel);
       });
     }
 
     for (const fb of aiFeedbacks) {
-      const question = questionsMap.get(fb.questionId);
-      if (!question || !question.connects || question.connects.length === 0) {
-        console.warn(`Skipping mastery update for questionId ${fb.questionId}: no data or no concepts.`);
+      const reviewAnswer = reviewAnswersMap.get(fb.questionId);
+      if (!reviewAnswer) {
+        console.warn(`Skipping mastery update for reviewAnswerId ${fb.questionId}: review answer not found.`);
         continue;
       }
-
-      const questionDifficulty = question.difficulty as DifficultyLevel | null | undefined;
-      const userRatedDifficulty = userRatingsMap.get(fb.questionId);
-
-      let masteryChange = calculateBaseMasteryChange(fb.isCorrect, questionDifficulty);
-      masteryChange = adjustMasteryChangeBasedOnUserPerception(masteryChange, fb.isCorrect, questionDifficulty, userRatedDifficulty);
-
-      const confidenceAdj = calculateConfidenceChange(fb.isCorrect, questionDifficulty, userRatedDifficulty);
 
       // Update the review_answers table with AI feedback
       const { error: updateError } = await supabase
@@ -271,14 +295,26 @@ const handler: Handler = async (event) => {
           ai_response_text: fb.feedback,
           is_correct: fb.isCorrect
         })
-        .eq('original_question_id', fb.questionId)
-        .eq('user_id', user.id);
+        .eq('id', fb.questionId);
 
       if (updateError) {
         console.error(`Error updating review_answers with AI feedback: ${updateError.message}`);
       }
 
-      for (const conceptName of question.connects) {
+      if (!reviewAnswer.connects || reviewAnswer.connects.length === 0) {
+        console.warn(`Skipping mastery update for reviewAnswerId ${fb.questionId}: no concepts.`);
+        continue;
+      }
+
+      const questionDifficulty = reviewAnswer.original_difficulty as DifficultyLevel | null | undefined;
+      const userRatedDifficulty = userRatingsMap.get(fb.questionId);
+
+      let masteryChange = calculateBaseMasteryChange(fb.isCorrect, questionDifficulty);
+      masteryChange = adjustMasteryChangeBasedOnUserPerception(masteryChange, fb.isCorrect, questionDifficulty, userRatedDifficulty);
+
+      const confidenceAdj = calculateConfidenceChange(fb.isCorrect, questionDifficulty, userRatedDifficulty);
+
+      for (const conceptName of reviewAnswer.connects) {
         const { data: concept } = await supabase.from('concepts').select('id').eq('name', conceptName).single();
         if (concept) {
           const { data: currentMastery } = await supabase

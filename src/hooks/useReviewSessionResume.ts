@@ -156,12 +156,14 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
             }));
 
             const reconstructedUserAnswers: ReviewUserAnswer[] = (sessionAnswers as ReviewAnswer[])
-                .filter(answer => answer.answer_text && answer.answer_text.trim() !== '')
                 .map(answer => ({
+                    id: answer.id, // Include the review_answers.id
                     questionIndex: answer.question_index,
-                    answer: answer.answer_text,
+                    answer: answer.answer_text || '',
                     timestamp: new Date(answer.updated_at),
                     difficulty_rating: answer.difficulty_rating as 'easy' | 'medium' | 'hard' | undefined,
+                    ai_response_text: answer.ai_response_text || null,
+                    is_correct: answer.is_correct !== undefined ? answer.is_correct : null,
                 }));
 
             const currentSessionStats = {
@@ -172,7 +174,9 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
 
             const lastAnsweredIndex = Math.max(
                 -1, // Ensure -1 if no answers, so 0 is next.
-                ...reconstructedUserAnswers.map(a => a.questionIndex)
+                ...reconstructedUserAnswers
+                    .filter(a => a.answer && a.answer.trim() !== '')
+                    .map(a => a.questionIndex)
             );
 
             let nextQuestionIndex = 0;
@@ -183,7 +187,6 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
                 // Ensure index is within bounds, especially if lastAnsweredIndex was -1 or last question
                 nextQuestionIndex = Math.max(0, Math.min(nextQuestionIndex, reconstructedQuestions.length - 1));
             }
-
 
             setCurrentSessionId(internalInProgressSession.id);
             setSessionStartTime(new Date(internalInProgressSession.started_at));

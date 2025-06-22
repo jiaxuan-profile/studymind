@@ -174,13 +174,29 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 mastery_context: q.mastery_context,
                 original_difficulty: q.difficulty,
                 original_question_id: q.id,
-                // difficulty_rating is not set here, will be set on user interaction
-                ai_response_text: null, // Initialize AI feedback fields
+                ai_response_text: null,
                 is_correct: null
             }));
 
-            const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
+            const { data: insertedAnswers, error: answersInsertError } = await supabase
+                .from('review_answers')
+                .insert(placeholderAnswers)
+                .select('id, question_index');
+                
             if (answersInsertError) throw answersInsertError;
+
+            // Initialize userAnswers with the database-generated IDs
+            const initialUserAnswers: ReviewUserAnswer[] = [];
+            if (insertedAnswers) {
+                insertedAnswers.forEach(answer => {
+                    initialUserAnswers.push({
+                        id: answer.id,
+                        questionIndex: answer.question_index,
+                        answer: '',
+                        timestamp: new Date(),
+                    });
+                });
+            }
 
             setCurrentSessionId(newSessionIdVal);
             setSessionName(newSessionName);
@@ -189,12 +205,12 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             setCurrentQuestionIndex(0);
             setReviewedCount(0);
             setSessionStats({ easy: 0, medium: 0, hard: 0 });
-            pageSetUserAnswers([]); // Reset local user answers state
+            pageSetUserAnswers(initialUserAnswers); // Initialize with IDs from database
             setIsReviewComplete(false);
             setCurrentStep('review');
             setAiReviewFeedback(null);
 
-        } catch (error) {
+        } catch (error: any) {
             setSessionStartTime(null);
             console.error('Error starting review:', error);
             addToast(`Failed to start review session: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`, 'error');
@@ -233,7 +249,6 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             return Promise.resolve(); // Don't proceed if no answer text and not demo, or no session
         }
 
-
         if (isReadOnlyDemo) {
             pageSetUserAnswers(prev => {
                const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
@@ -253,13 +268,17 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
         setIsSavingAnswer(true);
         try {
-            // In live mode, update the answer_text in the database.
-            // The row for (session_id, question_index) should already exist.
+            // Find the review_answers.id for the current question
+            const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+            if (!currentAnswerRecord || !currentAnswerRecord.id) {
+                throw new Error("Could not find review answer ID for the current question");
+            }
+
+            // In live mode, update the answer_text in the database using the review_answers.id
             const { error } = await supabase
                 .from('review_answers')
                 .update({ answer_text: userAnswer.trim() })
-                .eq('session_id', currentSessionId)
-                .eq('question_index', currentQuestionIndex);
+                .eq('id', currentAnswerRecord.id);
 
             if (error) throw error;
 
@@ -283,6 +302,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                     return [
                         ...prev,
                         {
+                            id: currentAnswerRecord.id, // Use the ID from the found record
                             questionIndex: currentQuestionIndex,
                             ...newAnswerData,
                             // difficulty_rating would be undefined here if not previously set
@@ -300,7 +320,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         return Promise.resolve();
     }, [
         userAnswer, currentSessionId, isReadOnlyDemo, currentQuestionIndex, // userAnswers is not strictly needed here as we find and update/create
-        pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer,
+        pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer, userAnswers
     ]);
 
     const handleDifficultyResponseHandler = useCallback(async (difficulty: 'easy' | 'medium' | 'hard') => {
@@ -309,7 +329,8 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             return;
         }
 
-        const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
+        const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+        const previouslyRated = currentAnswerRecord?.difficulty_rating;
 
         if (isReadOnlyDemo) {
             pageSetUserAnswers(prevAnswers => {
@@ -355,11 +376,15 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
         // Live mode
         try {
-            // Update the difficulty rating in the database
+            // Find the review_answers.id for the current question
+            if (!currentAnswerRecord || !currentAnswerRecord.id) {
+                throw new Error("Could not find review answer ID for the current question");
+            }
+
+            // Update the difficulty rating in the database using the review_answers.id
             const { error } = await supabase.from('review_answers')
                 .update({ difficulty_rating: difficulty })
-                .eq('session_id', currentSessionId)
-                .eq('question_index', currentQuestionIndex);
+                .eq('id', currentAnswerRecord.id);
 
             if (error) throw error;
 
@@ -376,6 +401,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                     return [
                         ...prevAnswers,
                         {
+                            id: currentAnswerRecord.id,
                             questionIndex: currentQuestionIndex,
                             answer: userAnswer, // Capture current input field value if creating new
                             difficulty_rating: difficulty,
@@ -466,10 +492,32 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             return;
         }
 
+        // Find the review_answers.id for the current question
+        const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+        if (!currentAnswerRecord || !currentAnswerRecord.id) {
+            addToast('Could not find the answer record. Please try saving your answer again.', 'error');
+            return;
+        }
 
         if (isReadOnlyDemo) {
             setAiReviewFeedback("AI feedback is not available in demo mode.");
             setAiReviewIsCorrect(null);
+            
+            // Update local state with AI feedback for demo mode
+            pageSetUserAnswers(prev => {
+                const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
+                if (existingIndex > -1) {
+                    const updatedAnswers = [...prev];
+                    updatedAnswers[existingIndex] = {
+                        ...updatedAnswers[existingIndex],
+                        ai_response_text: "AI feedback is not available in demo mode.",
+                        is_correct: null
+                    };
+                    return updatedAnswers;
+                }
+                return prev;
+            });
+            
             addToast("AI Review (Demo Mode)", "info");
             return;
         }
@@ -479,13 +527,12 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         setAiReviewIsCorrect(null);
 
         try {
-            const { data: { session: authSession } } = await supabase.auth.getSession();
-            if (!authSession) throw new Error("User not authenticated for AI review.");
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error("User not authenticated for AI review.");
 
             const payload = {
                 answers: [{
-                    questionId: currentQuestion.id,
-                    // Use the `userAnswer` from the state, which should be the saved one due to the check above
+                    reviewAnswerId: currentAnswerRecord.id, // Use review_answers.id instead of original_question_id
                     answerText: userAnswer.trim()
                 }],
                 noteId: currentQuestion.noteId
@@ -495,15 +542,16 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authSession.access_token}`
+                    'Authorization': `Bearer ${session.access_token}`
                 },
                 body: JSON.stringify(payload)
             });
-
+            
             if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.error || `Failed to get AI feedback (${response.status})`);
+                const errorText = await response.text();
+                throw new Error(`Failed to get AI feedback: ${errorText}`);
             }
+          
             const data = await response.json();
             if (data.feedbacks && data.feedbacks.length > 0) {
                 const feedbackItem = data.feedbacks[0];
@@ -539,8 +587,8 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             setIsAiReviewing(false);
         }
     }, [
-        currentQuestion, userAnswer, isReadOnlyDemo, isAnswerSaved, // isAnswerSaved and userAnswer are key for this logic
-        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing, pageSetUserAnswers, currentQuestionIndex
+        currentQuestion, userAnswer, isReadOnlyDemo, isAnswerSaved, userAnswers, currentQuestionIndex,
+        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing, pageSetUserAnswers
     ]);
 
     return {
