@@ -62,41 +62,72 @@ const PomodoroWidget: React.FC = () => {
     };
   }, []);
 
-  // Update audio source when state changes
   useEffect(() => {
-    if (!audioRef.current) return;
-
     let audioSrc = '';
     switch (currentState) {
       case 'work':
-        audioSrc = '/assets/focus_time.mp3';
+        audioSrc = '/assets/break_time.mp3';
         break;
       case 'shortBreak':
-        audioSrc = '/assets/short_break_time.mp3';
-        break;
       case 'longBreak':
-        audioSrc = '/assets/long_break_time.mp3';
+        audioSrc = '/assets/focus_time.mp3';
         break;
       default:
         audioSrc = '/assets/focus_time.mp3';
     }
 
-    setAudioReady(false);
-    audioRef.current.src = audioSrc;
-    audioRef.current.load();
+    const audio = new Audio(audioSrc);
+    audioRef.current = audio;
+
+    const handleCanPlay = () => setAudioReady(true);
+    const handleError = () => {
+      console.error("Audio loading error");
+      setAudioReady(false);
+    };
+
+    audio.addEventListener('canplaythrough', handleCanPlay);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('canplaythrough', handleCanPlay);
+      audio.removeEventListener('error', handleError);
+    };
   }, [currentState]);
 
   const playNotificationSound = useCallback(async () => {
-    if (!audioRef.current) return;
+    if (!canPlay) return;
 
     try {
-      console.log('Attempting to play sound');
-      await audioRef.current.play();
-      console.log('Sound played successfully');
+      let audioSrc = '';
+      switch (currentState) {
+        case 'work':
+          audioSrc = '/assets/focus_time.mp3';
+          break;
+        case 'shortBreak':
+        case 'longBreak':
+          audioSrc = '/assets/break_time.mp3';
+          break;
+        default:
+          audioSrc = '/assets/focus_time.mp3';
+      }
+
+      const audio = new Audio(audioSrc);
+      audio.currentTime = 0;
+      audio.muted = false;
+      audio.volume = 1.0;
+
+      const playPromise = audio.play();
+
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          console.error("Error playing notification sound:", error);
+        });
+      }
+
     } catch (error) {
       console.error("Error playing notification sound:", error);
     }
-  }, []);
+  }, [canPlay, currentState]);
 
   useEffect(() => {
     if (timeLeft === 0 && audioReady) {
@@ -128,51 +159,43 @@ const PomodoroWidget: React.FC = () => {
     setCanPlay(true);
 
     if (audioRef.current) {
-      audioRef.current.volume = 0;
-      audioRef.current.play().then(() => {
-        audioRef.current?.pause();
-      });
+      audioRef.current.volume = 1.0;
     }
   };
 
   const handleTimerComplete = () => {
     setIsRunning(false);
-    playNotificationSound();
 
-    if (currentState === 'work') {
-      const newStats = {
-        ...stats,
-        completedPomodoros: stats.completedPomodoros + 1,
-        totalFocusTime: stats.totalFocusTime + pomodoroSettings.workDuration,
-        currentStreak: stats.currentStreak + 1
-      };
-      saveStats(newStats);
+    if (canPlay) {
+      playNotificationSound();
+    }
 
-      setCompletedCycles(prev => prev + 1);
+    setTimeout(() => {
+      if (currentState === 'work') {
+        const newStats = {
+          ...stats,
+          completedPomodoros: stats.completedPomodoros + 1,
+          totalFocusTime: stats.totalFocusTime + pomodoroSettings.workDuration,
+          currentStreak: stats.currentStreak + 1
+        };
+        saveStats(newStats);
 
-      // Determine next break type
-      if (currentCycle >= pomodoroSettings.cyclesBeforeLongBreak) {
-        setCurrentState('longBreak');
-        setTimeLeft(pomodoroSettings.longBreakDuration * 60);
-        setCurrentCycle(1);
+        setCompletedCycles(prev => prev + 1);
+
+        if (currentCycle >= pomodoroSettings.cyclesBeforeLongBreak) {
+          setCurrentState('longBreak');
+          setTimeLeft(pomodoroSettings.longBreakDuration * 60);
+          setCurrentCycle(1);
+        } else {
+          setCurrentState('shortBreak');
+          setTimeLeft(pomodoroSettings.shortBreakDuration * 60);
+          setCurrentCycle(prev => prev + 1);
+        }
       } else {
-        setCurrentState('shortBreak');
-        setTimeLeft(pomodoroSettings.shortBreakDuration * 60);
-        setCurrentCycle(prev => prev + 1);
+        setCurrentState('work');
+        setTimeLeft(pomodoroSettings.workDuration * 60);
       }
-    } else {
-      // Break completed, start work
-      setCurrentState('work');
-      setTimeLeft(pomodoroSettings.workDuration * 60);
-    }
-
-    // Show notification
-    if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('Pomodoro Timer', {
-        body: currentState === 'work' ? 'Work session complete! Time for a break.' : 'Break time over! Ready to focus?',
-        icon: '/favicon.svg'
-      });
-    }
+    }, 1000);
   };
 
   // Load stats from localStorage on mount
