@@ -24,3 +24,11 @@ CREATE INDEX IF NOT EXISTS idx_questions_is_default ON public.questions(is_defau
 
 -- Add comment for documentation
 COMMENT ON COLUMN public.questions.is_default IS 'Indicates if this question was generated during AI analysis (true) or created manually (false)';
+
+-- In a new migration file for Supabase, or modify existing one if appropriate
+ALTER TABLE review_answers
+ADD COLUMN original_question_id TEXT REFERENCES questions(id) ON DELETE SET NULL ON UPDATE CASCADE; 
+-- ON DELETE SET NULL: If original question is deleted, we keep the answer but lose the link.
+-- Or ON DELETE CASCADE if you want to delete answers when questions are deleted.
+-- Consider adding an index on this new column if you query by it often.
+CREATE INDEX IF NOT EXISTS idx_review_answers_original_question_id ON review_answers(original_question_id);

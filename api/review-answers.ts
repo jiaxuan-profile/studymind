@@ -171,13 +171,21 @@ const handler: Handler = async (event) => {
       .single();
     if (noteError || !noteContext) throw new Error(`Could not fetch note context: ${noteError?.message || 'Note not found'}`);
 
+    console.log("Submitted Answers (from client):", JSON.stringify(submittedAnswers, null, 2));
     const questionIds = submittedAnswers.map((a: SubmittedAnswer) => a.questionId);
+    console.log("Extracted Question IDs for DB query:", JSON.stringify(questionIds, null, 2));
+
     const { data: originalQuestionsData, error: questionsError } = await supabase
       .from('questions')
       .select('id, question, answer, difficulty, connects')
-      .in('id', questionIds) as { data: QuestionData[] | null, error: any }; // Type assertion for clarity
+      .in('id', questionIds) as { data: QuestionData[] | null, error: any };
+    console.log("Original Questions Data (from DB):", JSON.stringify(originalQuestionsData, null, 2));
     if (questionsError) throw new Error(`Could not fetch questions: ${questionsError.message}`);
-    if (!originalQuestionsData) throw new Error('No original questions found for the given IDs.');
+    if (!originalQuestionsData || originalQuestionsData.length === 0) { // Check length too
+      // If originalQuestionsData is empty but questionIds was not, then the IDs weren't found.
+      console.error("Critical: No original questions found in DB for IDs:", JSON.stringify(questionIds));
+      throw new Error('No original questions found for the provided IDs.');
+    }
 
     const questionsMap = new Map(originalQuestionsData.map(q => [q.id, q]));
 
@@ -195,6 +203,7 @@ const handler: Handler = async (event) => {
       QUESTIONS AND STUDENT'S ANSWERS:
       ${submittedAnswers.map((ans: SubmittedAnswer) => {
       const q = questionsMap.get(ans.questionId);
+      console.log(`For client ans.questionId: ${ans.questionId}, found q in questionsMap: ${q ? q.id : 'NOT FOUND'}`);
       return `
           Question ID: "${q?.id}"
           Question: "${q?.question}"
@@ -220,7 +229,9 @@ const handler: Handler = async (event) => {
 
     const result = await model.generateContent(prompt);
     const rawText = extractJSONFromMarkdown(result.response.text());
+    console.log("Raw AI Response Text for Feedback:", rawText);
     const aiFeedbacks: Feedback[] = JSON.parse(rawText);
+    console.log("Parsed AI Feedbacks:", JSON.stringify(aiFeedbacks, null, 2));
 
     const { data: userRatedAnswersData } = await supabase
       .from('review_answers')

@@ -11,7 +11,8 @@ interface AnswerInputAreaProps {
   aiReviewFeedback?: string | null;
   aiReviewIsCorrect: boolean | null;
   isAiReviewing?: boolean;
-  onAiReviewAnswer?: () => void;
+  onAiReviewAnswer: () => Promise<void>;
+  isReadOnly?: boolean;
 }
 
 const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
@@ -24,7 +25,12 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
   aiReviewIsCorrect,
   isAiReviewing = false,
   onAiReviewAnswer,
+  isReadOnly,
 }) => {
+
+  const canRequestAiFeedback = userAnswer.trim() !== '' && isAnswerSaved;
+  const aiFeedbackAlreadyExists = aiReviewFeedback !== null;
+
   return (
     <div className="mb-8">
       <div className="flex items-center justify-between mb-4">
@@ -44,9 +50,10 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
         <textarea
           value={userAnswer}
           onChange={(e) => onUserAnswerChange(e.target.value)}
-          placeholder="Type your answer here... Take your time to think through the question and provide a detailed response."
+          readOnly={isReadOnly}
+          disabled={isReadOnly}
+          placeholder={isReadOnly ? "Answer locked after AI review." : "Type your answer here..."}
           className="w-full h-40 p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-          disabled={isSaving}
         />
 
         <div className="flex justify-between items-center">
@@ -59,19 +66,17 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
             {onAiReviewAnswer && (
               <button
                 onClick={onAiReviewAnswer}
-                disabled={!isAnswerSaved || isAiReviewing}
+                disabled={isAiReviewing || !canRequestAiFeedback || aiFeedbackAlreadyExists}
                 className="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-600 rounded-lg shadow-sm text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAiReviewing ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600 mr-2"></div>
-                    Getting Feedback...
+                    Processing...
                   </>
+                ) : aiFeedbackAlreadyExists ? (
+                  'AI Feedback Received'
                 ) : (
-                  <>
-                    <Brain className="h-4 w-4 mr-2" />
-                    Get AI Feedback
-                  </>
+                  'Get AI Feedback'
                 )}
               </button>
             )}
@@ -102,12 +107,12 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
 
       {aiReviewFeedback && (
         <div className={`mt-4 p-4 rounded-md border ${aiReviewIsCorrect === true ? 'bg-green-50 border-green-300 dark:bg-green-900/30 dark:border-green-700' :
-            aiReviewIsCorrect === false ? 'bg-red-50 border-red-300 dark:bg-red-900/30 dark:border-red-700' :
-              'bg-gray-50 border-gray-300 dark:bg-gray-700/30 dark:border-gray-600' // Neutral if isCorrect is null
+          aiReviewIsCorrect === false ? 'bg-red-50 border-red-300 dark:bg-red-900/30 dark:border-red-700' :
+            'bg-gray-50 border-gray-300 dark:bg-gray-700/30 dark:border-gray-600' // Neutral if isCorrect is null
           }`}>
           {aiReviewIsCorrect !== null && ( // Only show Correct/Incorrect if evaluated
             <h4 className={`text-sm font-semibold mb-1 ${aiReviewIsCorrect === true ? 'text-green-700 dark:text-green-300' :
-                'text-red-700 dark:text-red-300'
+              'text-red-700 dark:text-red-300'
               }`}>
               {aiReviewIsCorrect ? 'Correct' : 'Needs Improvement'}
             </h4>

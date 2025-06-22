@@ -148,24 +148,6 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
             setSessionGeneratedName(newSessionName); // Store for potential resume dialog display
 
-            if (isReadOnlyDemo) {
-                // Simulate session start for demo mode without DB calls
-                setCurrentSessionId(`demo-${Date.now()}`);
-                setSessionName(newSessionName);
-                setSessionStartTime(new Date());
-                setCurrentQuestions(finalQuestions);
-                setCurrentQuestionIndex(0);
-                setReviewedCount(0);
-                setSessionStats({ easy: 0, medium: 0, hard: 0 });
-                pageSetUserAnswers([]);
-                setIsReviewComplete(false);
-                setCurrentStep('review');
-                setAiReviewFeedback(null);
-                addToast('Demo review session started!', 'info');
-                props.setLoading(false);
-                return;
-            }
-
             const { data: sessionData, error: sessionError } = await supabase.from('review_sessions').insert({
                 user_id: user.id,
                 session_name: newSessionName,
@@ -191,6 +173,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 connects: q.connects,
                 mastery_context: q.mastery_context,
                 original_difficulty: q.difficulty,
+                original_question_id: q.id,
             }));
 
             const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);

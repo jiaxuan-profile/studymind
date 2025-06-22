@@ -49,6 +49,7 @@ interface ActiveReviewScreenProps {
   aiReviewIsCorrect: boolean | null;
   isAiReviewing?: boolean;
   onAiReviewAnswer?: () => void;
+  aiFeedbackCompleted: boolean;
 
   // Props for ReviewControls
   onNavigatePrevious: () => void;
@@ -88,6 +89,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
     aiReviewIsCorrect,
     isAiReviewing,
     onAiReviewAnswer,
+    aiFeedbackCompleted,
     onNavigatePrevious,
     onNavigateNext,
     onFinishSession,
@@ -150,6 +152,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 aiReviewIsCorrect={aiReviewIsCorrect}
                 isAiReviewing={isAiReviewing}
                 onAiReviewAnswer={onAiReviewAnswer}
+                isReadOnly={aiFeedbackCompleted}
               />
 
               <ReviewControls
@@ -160,12 +163,12 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 isLastQuestion={isLastQuestion}
               />
 
-              {isAnswerSaved && (
-                <DifficultyRating
-                  onRateDifficulty={onRateDifficulty}
-                  selectedRating={selectedRating}
-                />
-              )}
+              <DifficultyRating
+                onRateDifficulty={onRateDifficulty}
+                currentQuestionIndex={currentQuestionIndex}
+                userAnswers={userAnswers}
+                isReadOnly={aiFeedbackCompleted} 
+              />
             </div>
           </div>
         </div>

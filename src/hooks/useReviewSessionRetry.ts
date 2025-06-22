@@ -62,14 +62,14 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
 
             const { data: sessionAnswers, error: answersError } = await supabase
                 .from('review_answers')
-                .select('*')
+                .select('*, original_question_id')
                 .eq('session_id', session.id)
                 .order('question_index', { ascending: true });
 
             if (answersError) throw answersError;
 
             const questionsToRetry: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
-                id: `${new Date().getTime()}-${answer.question_index}-${Math.random()}`,
+                id: answer.original_question_id || `${new Date().getTime()}-${answer.question_index}-${Math.random()}`,
                 question: answer.question_text,
                 hint: answer.hint,
                 connects: answer.connects,

@@ -406,6 +406,7 @@ const ReviewPage: React.FC = () => {
   }
 
   const currentQuestionForDisplay = currentQuestions[currentQuestionIndex];
+  const aiFeedbackCompletedForCurrentQuestion = aiReviewFeedback !== null;
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {
@@ -508,6 +509,7 @@ const ReviewPage: React.FC = () => {
           aiReviewIsCorrect={aiReviewIsCorrect}
           isAiReviewing={isAiReviewing}
           onAiReviewAnswer={handleAiReviewAnswerHandler}
+          aiFeedbackCompleted={aiFeedbackCompletedForCurrentQuestion}
           // ReviewControls props
           onNavigatePrevious={() => handleNavigation('previous')}
           onNavigateNext={() => handleNavigation('next')}

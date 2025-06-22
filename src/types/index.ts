@@ -154,6 +154,7 @@ export interface ReviewAnswer {
   user_id: string;
   created_at: string;
   updated_at: string;
+  original_question_id?: string | null;
 }
 
 // Data model for a review session.

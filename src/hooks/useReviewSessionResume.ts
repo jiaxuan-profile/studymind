@@ -138,14 +138,14 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
 
             const { data: sessionAnswers, error: answersError } = await supabase
                 .from('review_answers')
-                .select('*')
+                .select('*, original_question_id')
                 .eq('session_id', internalInProgressSession.id)
                 .order('question_index', { ascending: true });
 
             if (answersError) throw answersError;
 
             const reconstructedQuestions: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
-                id: `${answer.session_id}-${answer.question_index}`,
+                id: answer.original_question_id || `${answer.session_id}-${answer.question_index}`, 
                 question: answer.question_text,
                 hint: answer.hint,
                 connects: answer.connects,
@@ -219,18 +219,18 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
     ]);
 
     const closeResumeDialogHandler = useCallback(() => {
-    // When user explicitly closes the dialog (via "X" or "Start New Session")
-    if (internalInProgressSession) {
-      dismissedSessionIdRef.current = internalInProgressSession.id;
-    }
-    setInternalShowResumeDialog(false);
-    setInternalInProgressSession(null); // User chose not to resume this session instance.
-  }, [internalInProgressSession /* setInternalShowResumeDialog, setInternalInProgressSession are stable */]);
+        // When user explicitly closes the dialog (via "X" or "Start New Session")
+        if (internalInProgressSession) {
+            dismissedSessionIdRef.current = internalInProgressSession.id;
+        }
+        setInternalShowResumeDialog(false);
+        setInternalInProgressSession(null); // User chose not to resume this session instance.
+    }, [internalInProgressSession /* setInternalShowResumeDialog, setInternalInProgressSession are stable */]);
 
-  return {
-    inProgressSession: internalInProgressSession,
-    showResumeDialog: internalShowResumeDialog,
-    resumeSessionHandler,
-    closeResumeDialogHandler,
-  };
+    return {
+        inProgressSession: internalInProgressSession,
+        showResumeDialog: internalShowResumeDialog,
+        resumeSessionHandler,
+        closeResumeDialogHandler,
+    };
 };
