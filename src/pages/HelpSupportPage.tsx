@@ -1,19 +1,21 @@
+// src/components/HelpSupportPage.tsx
 import React, { useState } from 'react';
-import { 
-  HelpCircle, 
-  MessageCircle, 
-  Mail, 
-  Book, 
-  Video, 
-  FileText, 
+import {
+  HelpCircle,
+  MessageCircle,
+  Mail,
+  Book,
+  Video,
+  FileText,
   Search,
   ChevronDown,
   ChevronRight,
   ExternalLink,
   Send,
-  CheckCircle
+  CheckCircle,
+  Info // Added for demo message icon
 } from 'lucide-react';
-import { useStore } from '../store';
+import { useDemoMode } from '../contexts/DemoModeContext'; // Import the hook
 
 interface FAQItem {
   id: string;
@@ -22,7 +24,7 @@ interface FAQItem {
   category: string;
 }
 
-interface ContactForm {
+interface ContactFormType {
   name: string;
   email: string;
   subject: string;
@@ -30,10 +32,13 @@ interface ContactForm {
   category: string;
 }
 
+// No longer needs HelpSupportPageProps for isReadOnlyDemo
 const HelpSupportPage: React.FC = () => {
+  const { isReadOnlyDemo } = useDemoMode(); // Get isReadOnlyDemo from context
+
   const [searchTerm, setSearchTerm] = useState('');
   const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
-  const [contactForm, setContactForm] = useState<ContactForm>({
+  const [contactForm, setContactForm] = useState<ContactFormType>({
     name: '',
     email: '',
     subject: '',
@@ -43,7 +48,6 @@ const HelpSupportPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Updated FAQ data with latest features
   const faqs: FAQItem[] = [
     {
       id: '1',
@@ -123,47 +127,54 @@ const HelpSupportPage: React.FC = () => {
 
   const [selectedCategory, setSelectedCategory] = useState('all');
 
-  // Filter FAQs based on search and category
   const filteredFAQs = faqs.filter(faq => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       faq.question.toLowerCase().includes(searchTerm.toLowerCase()) ||
       faq.answer.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesCategory = selectedCategory === 'all' || faq.category === selectedCategory;
-    
+
     return matchesSearch && matchesCategory;
   });
 
   const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
-    // Simulate form submission
+
+    if (isReadOnlyDemo) {
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate delay
+      setSubmitSuccess(true);
+      setIsSubmitting(false);
+
+      setTimeout(() => {
+        setContactForm({ name: '', email: '', subject: '', message: '', category: 'general' });
+        setSubmitSuccess(false);
+      }, 3000);
+      console.log("Contact form submitted (Demo Mode):", contactForm);
+      // You could use a global toast here if you have one:
+      // e.g., addToast("This is a demo. Your message was not actually sent.", "info");
+      return;
+    }
+
+    // --- Real submission logic would go here if not in demo mode ---
+    // For now, it remains a mock for non-demo too.
+    // Replace this with an actual API call (e.g., using fetch or axios).
+    console.log("Attempting real submission with:", contactForm);
     await new Promise(resolve => setTimeout(resolve, 2000));
-    
     setSubmitSuccess(true);
     setIsSubmitting(false);
-    
-    // Reset form after success
     setTimeout(() => {
-      setContactForm({
-        name: '',
-        email: '',
-        subject: '',
-        message: '',
-        category: 'general'
-      });
+      setContactForm({ name: '', email: '', subject: '', message: '', category: 'general' });
       setSubmitSuccess(false);
     }, 3000);
+    // --- End of real submission logic placeholder ---
   };
 
   const toggleFAQ = (id: string) => {
     setExpandedFAQ(expandedFAQ === id ? null : id);
   };
 
-  // Enhanced input styling with better border contrast
   const inputClasses = "block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 px-4 transition-all duration-200";
-  
   const textareaClasses = "block w-full rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 p-4 transition-all duration-200";
 
   return (
@@ -310,11 +321,26 @@ const HelpSupportPage: React.FC = () => {
               </div>
 
               <div className="p-6">
+                {isReadOnlyDemo && !submitSuccess && (
+                  <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg text-blue-700 dark:text-blue-300 text-sm flex items-start">
+                    <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
+                    <span>
+                      This contact form is for demonstration purposes. Messages will not be sent.
+                    </span>
+                  </div>
+                )}
                 {submitSuccess ? (
                   <div className="text-center py-8">
                     <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-                    <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Message Sent!</h4>
-                    <p className="text-gray-600 dark:text-gray-400">We'll get back to you within 24 hours.</p>
+                    <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                      {isReadOnlyDemo ? "Demo Message Submitted!" : "Message Sent!"}
+                    </h4>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {isReadOnlyDemo
+                        ? "Thank you for trying out the form."
+                        : "We'll get back to you within 24 hours."
+                      }
+                    </p>
                   </div>
                 ) : (
                   <form onSubmit={handleContactSubmit} className="space-y-4">
@@ -329,6 +355,8 @@ const HelpSupportPage: React.FC = () => {
                         className={inputClasses}
                         value={contactForm.name}
                         onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                        // Optionally disable inputs in demo mode if you don't want them editable
+                        // disabled={isReadOnlyDemo} 
                       />
                     </div>
 
@@ -343,6 +371,7 @@ const HelpSupportPage: React.FC = () => {
                         className={inputClasses}
                         value={contactForm.email}
                         onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                        // disabled={isReadOnlyDemo}
                       />
                     </div>
 
@@ -356,6 +385,7 @@ const HelpSupportPage: React.FC = () => {
                           className="block w-full h-12 rounded-lg border-2 border-gray-400 dark:border-gray-600 shadow-sm focus:border-primary focus:ring-2 focus:ring-primary focus:ring-opacity-50 text-base bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 pl-4 pr-12 transition-all duration-200 appearance-none cursor-pointer"
                           value={contactForm.category}
                           onChange={(e) => setContactForm({ ...contactForm, category: e.target.value })}
+                          // disabled={isReadOnlyDemo}
                         >
                           <option value="general">General Question</option>
                           <option value="technical">Technical Issue</option>
@@ -380,6 +410,7 @@ const HelpSupportPage: React.FC = () => {
                         className={inputClasses}
                         value={contactForm.subject}
                         onChange={(e) => setContactForm({ ...contactForm, subject: e.target.value })}
+                        // disabled={isReadOnlyDemo}
                       />
                     </div>
 
@@ -394,11 +425,15 @@ const HelpSupportPage: React.FC = () => {
                         className={textareaClasses}
                         value={contactForm.message}
                         onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
+                        // disabled={isReadOnlyDemo}
                       />
                     </div>
 
                     <button
                       type="submit"
+                      // The button is disabled if it's currently submitting.
+                      // In demo mode, it will still appear active until clicked,
+                      // then go through the mock submission.
                       disabled={isSubmitting}
                       className="w-full inline-flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                     >
@@ -425,28 +460,28 @@ const HelpSupportPage: React.FC = () => {
                 <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">Quick Links</h3>
                 <div className="space-y-3">
                   <a
-                    href="#"
+                    href="#" // Replace with actual links
                     className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     Getting Started Guide
                   </a>
                   <a
-                    href="#"
+                    href="#" // Replace with actual links
                     className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
                   >
                     <Video className="h-4 w-4 mr-2" />
                     Video Tutorials
                   </a>
                   <a
-                    href="#"
+                    href="#" // Replace with actual links
                     className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
                   >
                     <Book className="h-4 w-4 mr-2" />
-                    API Documentation
+                    API Documentation {/* If applicable */}
                   </a>
                   <a
-                    href="#"
+                    href="#" // Replace with actual links
                     className="flex items-center text-gray-600 dark:text-gray-400 hover:text-primary dark:hover:text-primary transition-colors"
                   >
                     <MessageCircle className="h-4 w-4 mr-2" />
