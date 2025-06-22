@@ -25,6 +25,8 @@ export interface ReviewUserAnswer {
     answer: string;
     timestamp: Date;
     difficulty_rating?: 'easy' | 'medium' | 'hard';
+    ai_response_text?: string | null;
+    is_correct?: boolean | null;
 }
 
 export interface LocationState {

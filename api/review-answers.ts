@@ -264,6 +264,20 @@ const handler: Handler = async (event) => {
 
       const confidenceAdj = calculateConfidenceChange(fb.isCorrect, questionDifficulty, userRatedDifficulty);
 
+      // Update the review_answers table with AI feedback
+      const { error: updateError } = await supabase
+        .from('review_answers')
+        .update({
+          ai_response_text: fb.feedback,
+          is_correct: fb.isCorrect
+        })
+        .eq('original_question_id', fb.questionId)
+        .eq('user_id', user.id);
+
+      if (updateError) {
+        console.error(`Error updating review_answers with AI feedback: ${updateError.message}`);
+      }
+
       for (const conceptName of question.connects) {
         const { data: concept } = await supabase.from('concepts').select('id').eq('name', conceptName).single();
         if (concept) {

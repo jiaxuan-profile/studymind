@@ -175,6 +175,8 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 original_difficulty: q.difficulty,
                 original_question_id: q.id,
                 // difficulty_rating is not set here, will be set on user interaction
+                ai_response_text: null, // Initialize AI feedback fields
+                is_correct: null
             }));
 
             const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
@@ -507,6 +509,22 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 const feedbackItem = data.feedbacks[0];
                 setAiReviewFeedback(feedbackItem.feedback);
                 setAiReviewIsCorrect(feedbackItem.isCorrect);
+                
+                // Update local state with AI feedback
+                pageSetUserAnswers(prev => {
+                    const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
+                    if (existingIndex > -1) {
+                        const updatedAnswers = [...prev];
+                        updatedAnswers[existingIndex] = {
+                            ...updatedAnswers[existingIndex],
+                            ai_response_text: feedbackItem.feedback,
+                            is_correct: feedbackItem.isCorrect
+                        };
+                        return updatedAnswers;
+                    }
+                    return prev;
+                });
+                
                 addToast('AI feedback received!', 'success');
             } else {
                 throw new Error('No feedback received from AI');
@@ -522,7 +540,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
     }, [
         currentQuestion, userAnswer, isReadOnlyDemo, isAnswerSaved, // isAnswerSaved and userAnswer are key for this logic
-        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing,
+        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing, pageSetUserAnswers, currentQuestionIndex
     ]);
 
     return {

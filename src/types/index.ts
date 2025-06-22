@@ -155,6 +155,8 @@ export interface ReviewAnswer {
   created_at: string;
   updated_at: string;
   original_question_id?: string | null;
+  ai_response_text?: string | null;
+  is_correct?: boolean | null;
 }
 
 // Data model for a review session.
