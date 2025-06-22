@@ -73,7 +73,6 @@ const ReviewPage: React.FC = () => {
     selectedQuestionType,
     selectedQuestionCount,
     generateNewQuestions,
-    customDifficulty,
     searchTerm,
     activeNoteSelectionTab,
     debouncedSearchTerm,
@@ -82,7 +81,6 @@ const ReviewPage: React.FC = () => {
     setSelectedQuestionType,
     setSelectedQuestionCount,
     setGenerateNewQuestions,
-    setCustomDifficulty,
     setSearchTerm,
     setActiveNoteSelectionTab,
     availableNotes,
@@ -324,9 +322,8 @@ const ReviewPage: React.FC = () => {
 
       for (const noteId of selectedNotes) {
         try {
-          const difficulty = customDifficulty ? 'custom' : selectedDifficulty;
           await generateQuestionsForNote(noteId, {
-            difficulty: difficulty as any,
+            difficulty: selectedDifficulty as any,
             questionType: selectedQuestionType
           });
           addToast(`Generated questions for note ${notesWithQuestionsData.find(n => n.id === noteId)?.title || noteId}`, 'success');
@@ -427,8 +424,6 @@ const ReviewPage: React.FC = () => {
           selectedNotes={selectedNotes}
           generateNewQuestions={generateNewQuestions}
           setGenerateNewQuestions={setGenerateNewQuestions}
-          customDifficulty={customDifficulty}
-          setCustomDifficulty={setCustomDifficulty}
           selectedDifficulty={selectedDifficulty}
           setSelectedDifficulty={setSelectedDifficulty}
           selectedQuestionType={selectedQuestionType}

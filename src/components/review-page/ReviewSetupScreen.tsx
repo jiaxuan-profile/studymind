@@ -28,8 +28,6 @@ interface ReviewSetupScreenProps {
 
   generateNewQuestions: boolean;
   setGenerateNewQuestions: (value: boolean) => void;
-  customDifficulty: boolean;
-  setCustomDifficulty: (value: boolean) => void;
   selectedDifficulty: 'all' | 'easy' | 'medium' | 'hard';
   setSelectedDifficulty: (difficulty: 'all' | 'easy' | 'medium' | 'hard') => void;
 
@@ -63,8 +61,6 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
     selectedNotes,
     generateNewQuestions,
     setGenerateNewQuestions,
-    customDifficulty,
-    setCustomDifficulty,
     selectedDifficulty,
     setSelectedDifficulty,
     selectedQuestionType,
@@ -111,8 +107,6 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
           <SelectDifficultyPanel
             generateNewQuestions={generateNewQuestions}
             setGenerateNewQuestions={setGenerateNewQuestions}
-            customDifficulty={customDifficulty}
-            setCustomDifficulty={setCustomDifficulty}
             selectedDifficulty={selectedDifficulty}
             setSelectedDifficulty={setSelectedDifficulty}
             getDifficultyIcon={getDifficultyIcon}

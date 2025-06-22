@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useStore } from '../store';
 import { useDemoMode } from '../contexts/DemoModeContext';
-import { ArrowLeft, Sun, Moon, UserCheck, User } from 'lucide-react'; 
+import { ArrowLeft, Sun, Moon, UserCheck, User } from 'lucide-react';
 import BoltBadge from '../components/BoltBadge';
 
 const LoginPage: React.FC = () => {
@@ -24,7 +24,6 @@ const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (user) {
-      console.log("LoginPage: User detected, navigating to /");
       navigate('/');
     }
   }, [user, navigate]);
@@ -53,7 +52,7 @@ const LoginPage: React.FC = () => {
   };
 
   const handleDemoLogin = (userType: 'power' | 'standard' | 'free' | 'readonly') => {
-    setActiveDemoUser(userType); 
+    setActiveDemoUser(userType);
     if (userType === 'power' || userType === 'readonly') {
       setEmail('demo@studymindai.me');
       setPassword('password123');
@@ -62,7 +61,7 @@ const LoginPage: React.FC = () => {
 
   const renderForm = () => {
     const inputClasses = "appearance-none relative block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 placeholder-gray-500 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 focus:outline-none focus:ring-primary focus:border-primary focus:z-10 sm:text-sm";
-    
+
     if (isForgotPassword) {
       return (
         <div>
@@ -126,19 +125,19 @@ const LoginPage: React.FC = () => {
         {/* Branding header is correct */}
         <div>
           <div className="flex flex-col items-center">
-            <BoltBadge className="w-24 h-24" /> 
+            <BoltBadge className="w-24 h-24" />
             <h1 className="mt-4 text-4xl font-bold tracking-tight text-gray-800 dark:text-gray-200">
               StudyMind
             </h1>
           </div>
         </div>
-        
+
         {/* Demo Mode Information Box */}
         {(isDemoMode || isReadOnlyDemo) && (
           <div className="bg-primary/5 dark:bg-primary/10 border-l-4 border-primary dark:border-primary-light p-4 rounded-r-lg">
             <h3 className="font-bold text-gray-800 dark:text-gray-200">Demo Environment</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              {isReadOnlyDemo 
+              {isReadOnlyDemo
                 ? "This is a read-only demo. You can explore the app but changes won't be saved."
                 : "Sign up is disabled. Please use the account below to explore the app."}
             </p>
@@ -188,11 +187,11 @@ const LoginPage: React.FC = () => {
                   <div className="h-5 w-5 border-t-2 border-white rounded-full animate-spin"></div>
                 </span>
               ) : null}
-              {isForgotPassword 
+              {isForgotPassword
                 ? 'Send reset instructions'
-                : isSignUp 
-                ? 'Sign up' 
-                : 'Sign in'}
+                : isSignUp
+                  ? 'Sign up'
+                  : 'Sign in'}
             </button>
           </div>
 

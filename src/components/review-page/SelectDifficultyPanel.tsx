@@ -4,8 +4,6 @@ import React from 'react';
 interface SelectDifficultyPanelProps {
   generateNewQuestions: boolean;
   setGenerateNewQuestions: (value: boolean) => void;
-  customDifficulty: boolean;
-  setCustomDifficulty: (value: boolean) => void;
   selectedDifficulty: 'all' | 'easy' | 'medium' | 'hard';
   setSelectedDifficulty: (difficulty: 'all' | 'easy' | 'medium' | 'hard') => void;
   getDifficultyIcon: (difficulty: string) => React.ReactNode;
@@ -14,8 +12,6 @@ interface SelectDifficultyPanelProps {
 const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
   generateNewQuestions,
   setGenerateNewQuestions,
-  customDifficulty,
-  setCustomDifficulty,
   selectedDifficulty,
   setSelectedDifficulty,
   getDifficultyIcon,
@@ -43,20 +39,6 @@ const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
                 Generate 5 new questions for this session
               </span>
             </label>
-            
-            {generateNewQuestions && (
-              <label className="flex items-center space-x-2 cursor-pointer ml-6">
-                <input
-                  type="checkbox"
-                  checked={customDifficulty}
-                  onChange={(e) => setCustomDifficulty(e.target.checked)}
-                  className="rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <span className="text-sm text-yellow-700 dark:text-yellow-300">
-                  Use custom difficulty based on concept mastery
-                </span>
-              </label>
-            )}
           </div>
         </div>
 
@@ -64,11 +46,10 @@ const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
           <button
             key={difficulty}
             onClick={() => setSelectedDifficulty(difficulty)}
-            className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
-              selectedDifficulty === difficulty
+            className={`w-full p-3 rounded-lg border-2 text-left transition-all ${selectedDifficulty === difficulty
                 ? 'border-primary bg-primary/5'
                 : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center">
@@ -77,11 +58,10 @@ const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
                   {difficulty === 'all' ? 'All Difficulties' : difficulty}
                 </span>
               </div>
-              <div className={`w-4 h-4 rounded-full border-2 ${
-                selectedDifficulty === difficulty
+              <div className={`w-4 h-4 rounded-full border-2 ${selectedDifficulty === difficulty
                   ? 'border-primary bg-primary'
                   : 'border-gray-300 dark:border-gray-600'
-              }`}>
+                }`}>
                 {selectedDifficulty === difficulty && (
                   <div className="w-full h-full rounded-full bg-primary"></div>
                 )}

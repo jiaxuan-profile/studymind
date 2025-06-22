@@ -16,7 +16,6 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<'5' | '10' | 'all'>('all');
   
   const [generateNewQuestions, setGenerateNewQuestions] = useState(false);
-  const [customDifficulty, setCustomDifficulty] = useState(false); 
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeNoteSelectionTab, setActiveNoteSelectionTab] = useState<'available' | 'selected'>('available');
@@ -60,7 +59,6 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     setSelectedQuestionType('short');
     setSelectedQuestionCount('all');
     setGenerateNewQuestions(false);
-    setCustomDifficulty(false);
     setSearchTerm('');
     setActiveNoteSelectionTab('available');
   };
@@ -72,7 +70,6 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     selectedQuestionType,
     selectedQuestionCount,
     generateNewQuestions,
-    customDifficulty,
     searchTerm,
     activeNoteSelectionTab,
     debouncedSearchTerm,
@@ -82,7 +79,6 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     setSelectedQuestionType,
     setSelectedQuestionCount,
     setGenerateNewQuestions,
-    setCustomDifficulty,
     setSearchTerm,
     setActiveNoteSelectionTab,
     // Derived/Calculated values
