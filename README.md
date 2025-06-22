@@ -91,32 +91,43 @@ StudyMind supports both formative and summative assessment strategies:
 
 ### 🎯 Concept Mastery System
 - **3-Tier Mastery Classification**:
-  - 🟢 Mastered (≥70%): Used as foundation for new questions
-  - 🟡 Developing (30-70%): Targeted with focused practice
-  - 🔴 Struggling (<30%): Flagged for remedial attention
+  - 🟢 Mastered (≥70%): Used as foundation for new questions.
+  - 🟡 Developing (30-70%): Targeted with focused practice.
+  - 🔴 Struggling (<30%): Flagged for remedial attention.
 - **Adaptive Question Weights**:
-  - Higher frequency of developing concept questions
-  - Gradual reintroduction of struggling concepts
+  - Higher frequency of developing concept questions.
+  - Gradual reintroduction of struggling concepts.
 - **Visual Mastery Tracking**:
-  - Concept nodes sized and colored by mastery level
-  - Border thickness indicates confidence level
-  - Hover tooltips show exact mastery percentages
-  - Mastery tiers clearly indicated with color coding
+  - Concept nodes sized and colored by mastery level.
+  - Border thickness indicates confidence level.
+  - Hover tooltips show exact mastery percentages.
+  - Mastery tiers clearly indicated with color coding.
 - **Performance-Based Progression**:
-  - Mastery increases based on question difficulty and correctness
-  - Easy questions: +0.1 mastery for correct answers
-  - Medium questions: +0.2 mastery for correct answers
-  - Hard questions: +0.3 mastery for correct answers
-  - Penalties for incorrect answers scaled by difficulty
+  - Mastery level (0.0 to 1.0) for each concept is updated after each relevant question in a review session.
+  - **Correct Answers**:
+    - Easy questions: +0.1 mastery
+    - Medium questions: +0.2 mastery
+    - Hard questions: +0.3 mastery
+  - **Incorrect Answers (New Structure)**:
+    - Easy questions: -0.25 mastery (larger penalty for missing easier concepts)
+    - Medium questions: -0.2 mastery (moderate penalty)
+    - Hard questions: -0.15 mastery (smaller penalty for challenging concepts)
+  - **User Perception Adjustment**:
+    - If a user rates a question's difficulty differently than its actual difficulty, the mastery change is adjusted:
+      - **Correct & Easier than Expected**: Mastery gain is reduced (e.g., by 15-30%).
+      - **Correct & Harder than Expected**: Mastery gain is increased (e.g., by 15-30%).
+      - **Incorrect & Harder than Expected**: Mastery loss is reduced (e.g., by 10-40%).
+      - **Incorrect & Easier than Expected**: Mastery loss might be slightly increased (optional).
+    - This adjustment only applies if the user provides a difficulty rating for the question.
 - **Confidence Scoring**:
-  - Tracks how well you can assess your own knowledge
-  - Increases when self-assessment matches actual performance
-  - Decreases when there's a mismatch between perception and reality
+  - Confidence score (0.0 to 1.0) for each concept tracks how well your self-assessment aligns with actual performance.
+  - Increases when your perceived difficulty of a question aligns with your performance (e.g., correct and found it easy/medium, or incorrect but knew it was hard).
+  - Decreases when there's a mismatch (e.g., correct but found it very hard, or incorrect but found it easy).
 - **Mastery Persistence**:
-  - Concepts remain in your knowledge graph even if notes are deleted
-  - Long-term tracking of your growing expertise
-  - **Coming Soon**: Mastery history and progression tracking
-
+  - Concepts and their mastery/confidence scores remain in your knowledge graph even if associated notes are deleted.
+  - Long-term tracking of your growing expertise.
+  - **Coming Soon**: Mastery history and progression tracking.
+  
 ### 🌙 Theme Support
 - **Light/Dark Mode**: Toggle between light and dark themes
 - **Persistent Settings**: Theme preference saved across sessions

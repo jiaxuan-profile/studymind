@@ -407,6 +407,8 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             } else {
                 throw new Error('No feedback received from AI');
             }
+            console.log('ai reviwer' , data);
+            
         } catch (error) {
             console.error('Error getting AI review:', error);
             addToast(`Failed to get AI feedback: ${error instanceof Error ? error.message : 'Unknown error'}.`, 'error');
