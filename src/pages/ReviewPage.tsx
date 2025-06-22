@@ -279,12 +279,21 @@ const ReviewPage: React.FC = () => {
       if (existingAnswer) {
         setUserAnswer(existingAnswer.answer);
         setIsAnswerSaved(true);
+        
+        // Load AI feedback if it exists for this question
+        if (existingAnswer.ai_response_text) {
+          setAiReviewFeedback(existingAnswer.ai_response_text);
+          setAiReviewIsCorrect(existingAnswer.is_correct !== undefined ? existingAnswer.is_correct : null);
+        } else {
+          setAiReviewFeedback(null);
+          setAiReviewIsCorrect(null);
+        }
       } else {
         setUserAnswer('');
         setIsAnswerSaved(false);
+        setAiReviewFeedback(null);
+        setAiReviewIsCorrect(null);
       }
-      setAiReviewFeedback(null);
-      setAiReviewIsCorrect(null);
     }
   }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
 
