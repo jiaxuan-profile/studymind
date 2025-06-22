@@ -25,7 +25,7 @@ export type QuestionType = 'mcq' | 'short' | 'open';
 
 const getApiBaseUrl = () => {
   const isDev = process.env.NODE_ENV === 'development';
-  return isDev ? '/api' : 'https://studymindai.me/.netlify/functions';
+  return isDev ? '/api' : 'https://study.studymindai.me/.netlify/functions';
 };
 
 // Helper function to get authenticated user ID
