@@ -72,10 +72,10 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
   
   return (
     <>
-      <header className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-800 shadow">
+      <header className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white dark:bg-gray-900 shadow-sm dark:shadow-gray-800/50 border-b border-gray-200 dark:border-gray-700">
         <button
           type="button"
-          className="px-4 border-r border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary md:hidden"
+          className="px-4 border-r border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 dark:focus:ring-blue-400 md:hidden transition-colors"
           onClick={toggleSidebar}
         >
           <span className="sr-only">Open sidebar</span>
@@ -85,13 +85,13 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
         <div className="flex-1 px-4 flex justify-between">
           <div className="flex-1 flex">
             <div className="w-full flex md:ml-0 relative">
-              <form onSubmit={handleSearchSubmit} className="relative w-full text-gray-400 focus-within:text-gray-600">
+              <form onSubmit={handleSearchSubmit} className="relative w-full text-gray-400 dark:text-gray-500 focus-within:text-gray-600 dark:focus-within:text-gray-300">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3">
                   <Search className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <input
                   id="search-field"
-                  className="block w-full h-full pl-10 pr-3 py-2 border-transparent text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:placeholder-gray-400 focus:ring-0 focus:border-transparent sm:text-sm bg-transparent"
+                  className="block w-full h-full pl-10 pr-3 py-2 border-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:placeholder-gray-500 dark:focus:placeholder-gray-400 focus:ring-0 focus:border-transparent sm:text-sm bg-transparent"
                   placeholder="Search notes, concepts, and more..."
                   type="search"
                   value={searchTerm}
@@ -102,7 +102,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
                 
                 {/* Search Results Dropdown */}
                 {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg dark:shadow-2xl z-50 max-h-80 overflow-y-auto">
                     <div className="p-2">
                       <div className="text-xs font-medium text-gray-500 dark:text-gray-400 px-3 py-2 border-b border-gray-100 dark:border-gray-700">
                         Search Results ({searchResults.length})
@@ -121,7 +121,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
                             {note.tags.slice(0, 3).map((tag, i) => (
                               <span
                                 key={i}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200"
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                               >
                                 {tag}
                               </span>
@@ -136,7 +136,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
                             setShowSearchResults(false);
                             setSearchTerm('');
                           }}
-                          className="w-full text-left p-3 text-primary hover:bg-primary/5 rounded-md transition-colors border-t border-gray-100 dark:border-gray-700"
+                          className="w-full text-left p-3 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-md transition-colors border-t border-gray-100 dark:border-gray-700"
                         >
                           <div className="flex items-center">
                             <Search className="h-4 w-4 mr-2" />
@@ -150,11 +150,11 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
                 
                 {/* No Results Message */}
                 {showSearchResults && searchTerm.length > 2 && searchResults.length === 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg dark:shadow-2xl z-50">
                     <div className="p-4 text-center text-gray-500 dark:text-gray-400">
-                      <Search className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                      <Search className="h-8 w-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" />
                       <div className="text-sm">No results found for "{searchTerm}"</div>
-                      <div className="text-xs text-gray-400 mt-1">Try different keywords or check spelling</div>
+                      <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try different keywords or check spelling</div>
                     </div>
                   </div>
                 )}
@@ -162,28 +162,28 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
             </div>
           </div>
           
-          <div className="ml-4 flex items-center md:ml-6 space-x-4">
+          <div className="ml-4 flex items-center md:ml-6 space-x-2">
             <button 
-              className="p-1 rounded-full text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              className="p-2 rounded-md text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900 transition-colors"
               onClick={toggleTheme}
-              title="Toggle theme"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             >
               {theme === 'dark' ? (
-                <Sun className="h-6 w-6" aria-hidden="true" />
+                <Sun className="h-5 w-5" aria-hidden="true" />
               ) : (
-                <Moon className="h-6 w-6" aria-hidden="true" />
+                <Moon className="h-5 w-5" aria-hidden="true" />
               )}
             </button>
             
             <button 
-              className="relative p-1 rounded-full text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              className="relative p-2 rounded-md text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900 transition-colors"
               onClick={() => setShowNotificationCenter(true)}
               title="View notifications"
             >
               <span className="sr-only">View notifications</span>
-              <Bell className="h-6 w-6" aria-hidden="true" />
+              <Bell className="h-5 w-5" aria-hidden="true" />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium">
+                <span className="absolute -top-0.5 -right-0.5 h-5 w-5 bg-red-500 dark:bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-medium shadow-sm">
                   {unreadCount > 99 ? '99+' : unreadCount}
                 </span>
               )}
@@ -191,10 +191,10 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar, onLogout }) => {
             
             <button 
               onClick={handleLogoutClick}
-              className="p-1 rounded-full text-gray-400 dark:text-gray-300 hover:text-gray-500 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
+              className="p-2 rounded-md text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-900 transition-colors"
               title="Sign out"
             >
-              <LogOut className="h-6 w-6" />
+              <LogOut className="h-5 w-5" />
             </button>
           </div>
         </div>
