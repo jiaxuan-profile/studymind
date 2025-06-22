@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle } from 'lucide-react';
+import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle, History } from 'lucide-react';
 import { useStore } from '../store';
 
 interface SidebarProps {
@@ -10,10 +10,10 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
   const { notes } = useStore();
-  
+
   const recentNotes = [...notes]
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    .slice(0, 2);
+    .slice(0, 5);
 
   return (
     <div className={`w-64 h-full bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col ${mobile ? 'absolute inset-y-0 left-0' : ''}`}>
@@ -29,21 +29,21 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           </button>
         </div>
       )}
-      
+
       {/* Logo */}
       <div className="flex items-center h-16 px-4">
         <div className="flex items-center">
           <Book className="h-8 w-8 text-primary" />
-          <span className="ml-2 text-xl font-bold text-gray-900 dark:text-gray-100">StudyMind</span>          
+          <span className="ml-2 text-xl font-bold text-gray-900 dark:text-gray-100">StudyMind</span>
         </div>
       </div>
-      
+
       {/* Navigation */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
-        <NavLink 
-          to="/" 
-          className={({ isActive }) => 
-            isActive 
+        <NavLink
+          to="/"
+          className={({ isActive }) =>
+            isActive
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
               : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
@@ -52,11 +52,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           <Home className="mr-3 h-5 w-5" />
           Dashboard
         </NavLink>
-        
-        <NavLink 
-          to="/notes" 
-          className={({ isActive }) => 
-            isActive 
+
+        <NavLink
+          to="/notes"
+          className={({ isActive }) =>
+            isActive
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
               : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
@@ -64,11 +64,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           <NotebookText className="mr-3 h-5 w-5" />
           Notes
         </NavLink>
-        
-        <NavLink 
-          to="/concepts" 
-          className={({ isActive }) => 
-            isActive 
+
+        <NavLink
+          to="/concepts"
+          className={({ isActive }) =>
+            isActive
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
               : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
@@ -76,11 +76,11 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           <BrainCircuit className="mr-3 h-5 w-5" />
           Concept Graph
         </NavLink>
-        
-        <NavLink 
-          to="/review" 
-          className={({ isActive }) => 
-            isActive 
+
+        <NavLink
+          to="/review"
+          className={({ isActive }) =>
+            isActive
               ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
               : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
           }
@@ -88,7 +88,19 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           <GraduationCap className="mr-3 h-5 w-5" />
           Review
         </NavLink>
-        
+
+        <NavLink
+          to="/history"
+          className={({ isActive }) =>
+            isActive
+              ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
+              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
+          }
+        >
+          <History className="mr-3 h-5 w-5" />
+          Review History
+        </NavLink>
+
         {recentNotes.length > 0 && (
           <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
             <h3 className="px-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -100,10 +112,9 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
                   key={note.id}
                   to={`/notes/${note.id}`}
                   className={({ isActive }) =>
-                    `flex items-center px-3 py-2 text-sm font-medium rounded-md ${
-                      isActive
-                        ? 'text-primary bg-primary/5'
-                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
+                    `flex items-center px-3 py-2 text-sm font-medium rounded-md ${isActive
+                      ? 'text-primary bg-primary/5'
+                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
                     }`
                   }
                 >
@@ -114,12 +125,12 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
             </div>
           </div>
         )}
-        
+
         <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
-          <NavLink 
+          <NavLink
             to="/help"
-            className={({ isActive }) => 
-              isActive 
+            className={({ isActive }) =>
+              isActive
                 ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
                 : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
             }

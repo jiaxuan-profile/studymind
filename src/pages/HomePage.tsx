@@ -10,7 +10,7 @@ const HomePage: React.FC = () => {
   const { notes, concepts, isLoading, error } = useStore();
   const navigate = useNavigate();
   const { isReadOnlyDemo } = useDemoMode();
-  
+
   useEffect(() => {
     useStore.getState().loadConcepts();
   }, []);
@@ -30,8 +30,8 @@ const HomePage: React.FC = () => {
     return (
       <div className="text-center py-12">
         <div className="text-red-600 mb-4">Error loading data: {error}</div>
-        <button 
-          onClick={() => window.location.reload()} 
+        <button
+          onClick={() => window.location.reload()}
           className="text-primary hover:text-primary-dark"
         >
           Try again
@@ -39,11 +39,11 @@ const HomePage: React.FC = () => {
       </div>
     );
   }
-  
-  // Get recent notes (last 3)
+
+  // Get recent notes (last 5)
   const recentNotes = [...notes]
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    .slice(0, 3);
+    .slice(0, 5);
 
   const handleCreateNote = async () => {
     try {
@@ -66,11 +66,11 @@ const HomePage: React.FC = () => {
       alert(`Failed to create note: ${(error as Error).message}`);
     }
   };
-  
+
   return (
     <div className="fade-in">
       <div className="mb-6 flex items-center gap-4">
-        <BoltBadge className="w-20 h-20" /> 
+        <BoltBadge className="w-20 h-20" />
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Welcome to StudyMind</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-300">
@@ -78,9 +78,9 @@ const HomePage: React.FC = () => {
           </p>
         </div>
       </div>
-      
+
       {isReadOnlyDemo && <DemoModeNotice className="mb-6" />}
-      
+
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
         <button
@@ -93,7 +93,7 @@ const HomePage: React.FC = () => {
           </div>
           <span className="text-gray-800 dark:text-gray-200 font-medium">Create Note</span>
         </button>
-        
+
         <Link
           to="/notes"
           className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
@@ -103,7 +103,7 @@ const HomePage: React.FC = () => {
           </div>
           <span className="text-gray-800 dark:text-gray-200 font-medium">Browse Notes</span>
         </Link>
-        
+
         <Link
           to="/concepts"
           className="flex flex-col items-center p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
@@ -114,7 +114,7 @@ const HomePage: React.FC = () => {
           <span className="text-gray-800 dark:text-gray-200 font-medium">Explore Concepts</span>
         </Link>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-1 gap-6">
         {/* Recent Notes */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
@@ -124,7 +124,7 @@ const HomePage: React.FC = () => {
               View All
             </Link>
           </div>
-          
+
           {recentNotes.length > 0 ? (
             <div className="space-y-4">
               {recentNotes.map((note) => (
@@ -164,9 +164,9 @@ const HomePage: React.FC = () => {
               </Link>
             </div>
           )}
-        </div>        
+        </div>
       </div>
-      
+
       {/* Concepts and Statistics */}
       <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-center mb-4">
@@ -175,19 +175,19 @@ const HomePage: React.FC = () => {
             View Concept Graph
           </Link>
         </div>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 text-center">
             <p className="text-2xl font-bold text-primary">{notes.length}</p>
             <p className="text-gray-600 dark:text-gray-300">Notes</p>
           </div>
-          
+
           <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-100 dark:border-gray-600 text-center">
             <p className="text-2xl font-bold text-secondary">{concepts.length}</p>
             <p className="text-gray-600 dark:text-gray-300">Concepts</p>
           </div>
         </div>
-        
+
         <div className="mt-4">
           <p className="text-gray-600 dark:text-gray-300 text-sm">
             StudyMind automatically generates review questions from your notes and schedules them using spaced repetition for optimal learning.
