@@ -6,14 +6,16 @@
 [functions]
   node_bundler = "esbuild"
 
-[functions."*"]
-  timeout = 60 
+[[functions]]
+  name = "analyze-concepts"
+  timeout = 120
 
-[functions.analyze-gaps]
+[[functions]]
+  name = "analyze-gaps"
   timeout = 90
 
-[functions.analyze-concepts]
-  timeout = 120
+[functions."*"]
+  timeout = 60
 
 [[redirects]]
   from = "/api/*"
