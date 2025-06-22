@@ -9,10 +9,10 @@
 [functions."*"]
   timeout = 60 
 
-[functions."api/analyze-gaps"]
+[functions.analyze-gaps]
   timeout = 90
 
-[functions."api/analyze-concepts"]
+[functions.analyze-concepts]
   timeout = 120
 
 [[redirects]]

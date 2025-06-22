@@ -171,11 +171,8 @@ const handler: Handler = async (event) => {
       .single();
     if (noteError || !noteContext) throw new Error(`Could not fetch note context: ${noteError?.message || 'Note not found'}`);
 
-    console.log("Submitted Answers (from client):", JSON.stringify(submittedAnswers, null, 2));
-    
     // Get the review answer IDs from the submitted answers
     const reviewAnswerIds = submittedAnswers.map((a: SubmittedAnswer) => a.reviewAnswerId);
-    console.log("Review Answer IDs for DB query:", JSON.stringify(reviewAnswerIds, null, 2));
 
     // Fetch the full review_answers records using the review answer IDs
     const { data: reviewAnswersData, error: reviewAnswersError } = await supabase
@@ -183,7 +180,6 @@ const handler: Handler = async (event) => {
       .select('id, question_text, original_question_id, difficulty_rating, connects, hint, mastery_context, original_difficulty')
       .in('id', reviewAnswerIds);
       
-    console.log("Review Answers Data (from DB):", JSON.stringify(reviewAnswersData, null, 2));
     if (reviewAnswersError) throw new Error(`Could not fetch review answers: ${reviewAnswersError.message}`);
     if (!reviewAnswersData || reviewAnswersData.length === 0) {
       console.error("Critical: No review answers found in DB for IDs:", JSON.stringify(reviewAnswerIds));
@@ -264,9 +260,7 @@ const handler: Handler = async (event) => {
 
     const result = await model.generateContent(prompt);
     const rawText = extractJSONFromMarkdown(result.response.text());
-    console.log("Raw AI Response Text for Feedback:", rawText);
     const aiFeedbacks: Feedback[] = JSON.parse(rawText);
-    console.log("Parsed AI Feedbacks:", JSON.stringify(aiFeedbacks, null, 2));
 
     const { data: userRatedAnswersData } = await supabase
       .from('review_answers')
