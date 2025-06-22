@@ -415,6 +415,7 @@ const ReviewPage: React.FC = () => {
           isGeneratingQuestions={isGeneratingQuestions || loadingReviewProcess}
           selectedQuestionCount={selectedQuestionCount}
           setSelectedQuestionCount={setSelectedQuestionCount}
+          isReadOnlyDemo={isReadOnlyDemo}
         />
 
         {/* Resume Session Dialog */}

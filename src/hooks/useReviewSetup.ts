@@ -2,10 +2,9 @@
 import { useState, useMemo } from 'react';
 import { NoteWithQuestions } from '../types/reviewTypes';
 import { QuestionType } from '../utils/reviewUtils';
-import { useDebounce } from './useDebounce'; // Assuming useDebounce is in the same hooks folder
-
+import { useDebounce } from './useDebounce'; 
 interface UseReviewSetupProps {
-  allNotesWithQuestions: NoteWithQuestions[]; // The full list from ReviewPage's state
+  allNotesWithQuestions: NoteWithQuestions[];
 }
 
 export const useReviewSetup = (props: UseReviewSetupProps) => {
@@ -17,13 +16,12 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<'5' | '10' | 'all'>('all');
   
   const [generateNewQuestions, setGenerateNewQuestions] = useState(false);
-  const [customDifficulty, setCustomDifficulty] = useState(false); // For "Pro" generation options
+  const [customDifficulty, setCustomDifficulty] = useState(false); 
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeNoteSelectionTab, setActiveNoteSelectionTab] = useState<'available' | 'selected'>('available');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Memoized calculation for available notes
   const availableNotes = useMemo(() => {
     return allNotesWithQuestions.filter(note => {
       const matchesSearch = debouncedSearchTerm === '' ||
@@ -34,21 +32,12 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     });
   }, [allNotesWithQuestions, debouncedSearchTerm, selectedNotes]);
 
-  // Memoized calculation for currently selected notes (for display in "selected" tab)
   const currentSelectedNotesDisplay = useMemo(() => {
     return allNotesWithQuestions.filter(note => selectedNotes.includes(note.id));
   }, [allNotesWithQuestions, selectedNotes]);
 
-  // Memoized calculation for total questions based on current selections
-  // This is for display on the setup screen. The actual filtering for starting a session
-  // happens in useReviewSessionManagement.
   const displayTotalQuestions = useMemo(() => {
     if (generateNewQuestions) {
-      // If generating new questions, this count might be indicative or "N/A"
-      // as new questions aren't in `allNotesWithQuestions` yet.
-      // For simplicity, let's keep the original logic, acknowledging it might be less accurate
-      // when `generateNewQuestions` is true until after generation.
-      // Or, you could return a string like "New + X existing".
     }
     return selectedNotes.reduce((total, noteId) => {
       const note = allNotesWithQuestions.find(n => n.id === noteId);

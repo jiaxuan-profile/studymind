@@ -1,5 +1,5 @@
 // src/components/review-page/ReviewSetupScreen.tsx
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { History } from 'lucide-react';
 
@@ -44,6 +44,7 @@ interface ReviewSetupScreenProps {
   isGeneratingQuestions?: boolean;
   selectedQuestionCount: '5' | '10' | 'all';
   setSelectedQuestionCount: (count: '5' | '10' | 'all') => void;
+  isReadOnlyDemo: boolean;
 }
 
 const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
@@ -76,9 +77,8 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
     isGeneratingQuestions,
     selectedQuestionCount,
     setSelectedQuestionCount,
+    isReadOnlyDemo,
   } = props;
-
-  const [showQuestionCountTooltip, setShowQuestionCountTooltip] = useState(false);
 
   return (
     <div className="fade-in">
@@ -136,8 +136,7 @@ const ReviewSetupScreen: React.FC<ReviewSetupScreenProps> = (props) => {
             generateNewQuestions={generateNewQuestions}
             selectedQuestionCount={selectedQuestionCount}
             setSelectedQuestionCount={setSelectedQuestionCount}
-            showQuestionCountTooltip={showQuestionCountTooltip}
-            setShowQuestionCountTooltip={setShowQuestionCountTooltip}
+            isReadOnlyDemo={isReadOnlyDemo}
           />
         </div>
       </div>

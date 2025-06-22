@@ -16,6 +16,7 @@ interface SessionPreviewPanelProps {
   generateNewQuestions?: boolean;
   selectedQuestionCount: QuestionCount;
   setSelectedQuestionCount: (count: QuestionCount) => void;
+  isReadOnlyDemo: boolean;
 }
 
 const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
@@ -30,10 +31,11 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
   generateNewQuestions = false,
   selectedQuestionCount,
   setSelectedQuestionCount,
+  isReadOnlyDemo,
 }) => {
   // Calculate the actual number of questions that will be used
-  const finalQuestionCount = selectedQuestionCount === 'all' 
-    ? totalQuestions 
+  const finalQuestionCount = selectedQuestionCount === 'all'
+    ? totalQuestions
     : Math.min(parseInt(selectedQuestionCount), totalQuestions);
 
   return (
@@ -53,11 +55,11 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
                 <div className="text-sm">
                   <p className="font-medium">Generating new questions</p>
                   <p className="mt-1 text-blue-700 dark:text-blue-400 text-xs">
-                    {selectedQuestionCount === '5' 
+                    {selectedQuestionCount === '5'
                       ? "5 new questions will be generated based on your selected notes."
                       : selectedQuestionCount === '10'
-                      ? "10 questions will be generated, mixing new and existing ones."
-                      : "All available questions will be used, plus new generated ones."}
+                        ? "10 questions will be generated, mixing new and existing ones."
+                        : "All available questions will be used, plus new generated ones."}
                   </p>
                 </div>
               </div>
@@ -65,8 +67,8 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
               <div className="text-center">
                 <div className="text-2xl font-bold text-primary">{finalQuestionCount}</div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {selectedQuestionCount === 'all' 
-                    ? 'Total Questions' 
+                  {selectedQuestionCount === 'all'
+                    ? 'Total Questions'
                     : `Questions (${finalQuestionCount} of ${totalQuestions} available)`}
                 </div>
               </div>
@@ -81,26 +83,25 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
                     <button
                       key={count}
                       onClick={() => setSelectedQuestionCount(count)}
-                      className={`py-2 px-3 rounded-lg border-2 text-center transition-colors ${
-                        selectedQuestionCount === count
+                      className={`py-2 px-3 rounded-lg border-2 text-center transition-colors ${selectedQuestionCount === count
                           ? 'border-primary bg-primary/5 text-primary'
                           : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 text-gray-700 dark:text-gray-300'
-                      }`}
+                        }`}
                     >
                       {count === 'all' ? 'All' : `${count}`}
                     </button>
                   ))}
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                  {selectedQuestionCount === '5' 
+                  {selectedQuestionCount === '5'
                     ? "Generate 5 new questions based on your selected notes"
                     : selectedQuestionCount === '10'
-                    ? "Generate up to 10 questions, mixing new and existing ones"
-                    : "Use all available questions plus generate new ones"}
+                      ? "Generate up to 10 questions, mixing new and existing ones"
+                      : "Use all available questions plus generate new ones"}
                 </p>
               </div>
             )}
-            
+
             <div className="text-center">
               <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${getQuestionTypeColor(selectedQuestionType)}`}>
                 {getQuestionTypeIcon(selectedQuestionType)}
@@ -135,12 +136,12 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
               )}
             </button>
 
-            {startReviewDisabled && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center flex items-center">
-                  <Lock className="h-3 w-3 mr-1" />
-                  This feature is disabled in demo mode.
-                </p>
-              )}
+            {isReadOnlyDemo && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center flex items-center">
+                <Lock className="h-3 w-3 mr-1" />
+                This feature is disabled in demo mode.
+              </p>
+            )}
 
             {/* Only show "No questions available" message when not generating new questions */}
             {totalQuestions === 0 && selectedNotesCount > 0 && !generateNewQuestions && (
