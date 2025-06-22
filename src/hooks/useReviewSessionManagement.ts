@@ -67,13 +67,9 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
     } = props;
 
 
-    const handleStartReviewProcess = useCallback(async (
-        // Pass generateQuestionsFunc if it needs to be called from here and involves more state (like isGenerating)
-        // For now, assuming generateQuestions (the AI service call part) is handled outside or before this.
-        // This handler will focus on filtering/setting up questions from `notesWithQuestions`.
-    ) => {
+    const handleStartReviewProcess = useCallback(async () => {
         try {
-            setLoading(true);
+            props.setLoading(true);
             if (!user || !user.id) {
                 addToast('User not authenticated. Please log in.', 'error');
                 setLoading(false);
@@ -99,7 +95,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
             if (shuffledQuestions.length === 0) {
                 addToast("No questions found for the selected criteria.", "warning");
-                setLoading(false);
+                props.setLoading(false);
                 return;
             }
 
@@ -111,7 +107,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
             if (finalQuestions.length === 0) { // Double check after slicing
                 addToast("Not enough questions after filtering by count.", "warning");
-                setLoading(false);
+                props.setLoading(false);
                 return;
             }
 
@@ -165,7 +161,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 setCurrentStep('review');
                 setAiReviewFeedback(null);
                 addToast('Demo review session started!', 'info');
-                setLoading(false);
+                props.setLoading(false);
                 return;
             }
 
@@ -216,7 +212,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             console.error('Error starting review:', error);
             addToast(`Failed to start review session: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`, 'error');
         } finally {
-            setLoading(false);
+            props.setLoading(false);
         }
     }, [
         user, notes, subjects, selectedNotes, notesWithQuestions, selectedDifficulty, selectedQuestionCount, generateNewQuestions,

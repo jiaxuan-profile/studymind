@@ -62,6 +62,7 @@ const ReviewPage: React.FC = () => {
 
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [loadingReviewProcess, setLoadingReviewProcess] = useState(false);
+  const [isInitiatingReview, setIsInitiatingReview] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -286,6 +287,27 @@ const ReviewPage: React.FC = () => {
     }
   }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
 
+  useEffect(() => {
+    // Only proceed if isInitiatingReview is true and we are not already loading the review process
+    if (isInitiatingReview && !loadingReviewProcess) {
+      const actuallyStartReview = async () => {
+        setLoadingReviewProcess(true);
+        await handleStartReviewProcess(); // This uses notesWithQuestionsData passed to useReviewSessionManagement
+        setLoadingReviewProcess(false);
+        setIsInitiatingReview(false); // Reset the trigger
+      };
+
+      actuallyStartReview();
+    }
+  }, [
+    isInitiatingReview,
+    notesWithQuestionsData, // Reacts to fresh data after generateQuestions -> loadNotesWithQuestions
+    handleStartReviewProcess, // Stable callback from useReviewSessionManagement
+    loadingReviewProcess, // Prevent re-entry if already processing
+    setLoadingReviewProcess, // To set loading state
+    setIsInitiatingReview // To reset trigger
+  ]);
+
   const generateQuestions = async () => {
     if (!generateNewQuestions || selectedNotes.length === 0) return;
     if (isReadOnlyDemo) {
@@ -329,11 +351,15 @@ const ReviewPage: React.FC = () => {
 
   const handleInitiateReview = async () => {
     if (generateNewQuestions) {
-      setLoading(true);
+      if (isReadOnlyDemo) {
+        addToast('Question generation is not available in demo mode.', 'warning');
+        return;
+      }
+      setIsGeneratingQuestions(true);
       await generateQuestions();
-      setLoadingReviewProcess(false);
+      setIsGeneratingQuestions(false);
     }
-    await handleStartReviewProcess();
+    setIsInitiatingReview(true);
   };
 
   const handleUserAnswerChange = (newAnswer: string) => {
