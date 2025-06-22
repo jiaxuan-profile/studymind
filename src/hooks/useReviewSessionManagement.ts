@@ -37,6 +37,7 @@ interface UseReviewSessionManagementProps {
     setIsReviewComplete: React.Dispatch<React.SetStateAction<boolean>>;
     setCurrentStep: React.Dispatch<React.SetStateAction<'select' | 'review'>>;
     setAiReviewFeedback: React.Dispatch<React.SetStateAction<string | null>>;
+    setAiReviewIsCorrect: React.Dispatch<React.SetStateAction<boolean | null>>;
     setIsSavingAnswer: React.Dispatch<React.SetStateAction<boolean>>;
     setIsAiReviewing: React.Dispatch<React.SetStateAction<boolean>>;
     setIsAnswerSaved: React.Dispatch<React.SetStateAction<boolean>>;
@@ -60,7 +61,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         setLoading, addToast, setCurrentSessionId, setSessionName, setSessionStartTime,
         setCurrentQuestions, setCurrentQuestionIndex, setReviewedCount, setSessionStats,
         setUserAnswers: pageSetUserAnswers,
-        setIsReviewComplete, setCurrentStep, setAiReviewFeedback, setIsSavingAnswer, setIsAiReviewing,
+        setIsReviewComplete, setCurrentStep, setAiReviewFeedback, setAiReviewIsCorrect, setIsSavingAnswer, setIsAiReviewing,
         currentSessionId, currentQuestionIndex, currentQuestion, userAnswer, userAnswers,
         sessionDuration, isAnswerSaved, reviewedCount: pageReviewedCount, sessionStats: pageSessionStats,
         setIsAnswerSaved: pageSetIsAnswerSaved,
@@ -367,15 +368,17 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
         if (isReadOnlyDemo) {
             setAiReviewFeedback("AI feedback is not available in demo mode.");
+            setAiReviewIsCorrect(null);
             addToast("AI Review (Demo Mode)", "info");
             return;
         }
 
         setIsAiReviewing(true);
         setAiReviewFeedback(null);
+        setAiReviewIsCorrect(null);
 
         try {
-            const { data: { session: authSession } } = await supabase.auth.getSession(); // Renamed to authSession
+            const { data: { session: authSession } } = await supabase.auth.getSession();
             if (!authSession) throw new Error("User not authenticated for AI review.");
 
             const payload = {
@@ -401,14 +404,14 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             }
             const data = await response.json();
             if (data.feedbacks && data.feedbacks.length > 0) {
-                const feedback = data.feedbacks[0];
-                setAiReviewFeedback(feedback.feedback);
+                const feedbackItem = data.feedbacks[0];
+                setAiReviewFeedback(feedbackItem.feedback);
+                setAiReviewIsCorrect(feedbackItem.isCorrect);
                 addToast('AI feedback received!', 'success');
             } else {
                 throw new Error('No feedback received from AI');
             }
-            console.log('ai reviwer' , data);
-            
+
         } catch (error) {
             console.error('Error getting AI review:', error);
             addToast(`Failed to get AI feedback: ${error instanceof Error ? error.message : 'Unknown error'}.`, 'error');
@@ -417,8 +420,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
     }, [
         currentQuestion, userAnswer, isReadOnlyDemo,
-        addToast, setAiReviewFeedback, setIsAiReviewing,
-        // supabase client, fetch are stable
+        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing,
     ]);
 
     return {

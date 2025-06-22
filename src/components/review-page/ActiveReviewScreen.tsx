@@ -46,6 +46,7 @@ interface ActiveReviewScreenProps {
   isSaving: boolean;
   onSaveAnswer: () => Promise<void>;
   aiReviewFeedback?: string | null;
+  aiReviewIsCorrect: boolean | null;
   isAiReviewing?: boolean;
   onAiReviewAnswer?: () => void;
 
@@ -84,6 +85,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
     isSaving,
     onSaveAnswer,
     aiReviewFeedback,
+    aiReviewIsCorrect,
     isAiReviewing,
     onAiReviewAnswer,
     onNavigatePrevious,
@@ -145,6 +147,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 isSaving={isSaving}
                 onSaveAnswer={onSaveAnswer}
                 aiReviewFeedback={aiReviewFeedback}
+                aiReviewIsCorrect={aiReviewIsCorrect}
                 isAiReviewing={isAiReviewing}
                 onAiReviewAnswer={onAiReviewAnswer}
               />

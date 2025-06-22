@@ -58,6 +58,7 @@ const ReviewPage: React.FC = () => {
   const [sessionDuration, setSessionDuration] = useState(0);
 
   const [aiReviewFeedback, setAiReviewFeedback] = useState<string | null>(null);
+  const [aiReviewIsCorrect, setAiReviewIsCorrect] = useState<boolean | null>(null);
   const [isAiReviewing, setIsAiReviewing] = useState(false);
 
   const [isLoadingSession, setIsLoadingSession] = useState(false);
@@ -169,6 +170,7 @@ const ReviewPage: React.FC = () => {
     setIsReviewComplete,
     setCurrentStep,
     setAiReviewFeedback,
+    setAiReviewIsCorrect,
     setIsSavingAnswer,
     setIsAiReviewing,
     setIsAnswerSaved,
@@ -282,6 +284,7 @@ const ReviewPage: React.FC = () => {
         setIsAnswerSaved(false);
       }
       setAiReviewFeedback(null);
+      setAiReviewIsCorrect(null);
     }
   }, [currentQuestionIndex, currentQuestions, userAnswers, currentStep]);
 
@@ -384,6 +387,7 @@ const ReviewPage: React.FC = () => {
     setIsAnswerSaved(false);
     setCurrentSessionId(null);
     setAiReviewFeedback(null);
+    setAiReviewIsCorrect(null);
     setIsAiReviewing(false);
     setIsGeneratingQuestions(false);
     setIsSavingAnswer(false);
@@ -501,6 +505,7 @@ const ReviewPage: React.FC = () => {
           isSaving={isSavingAnswer}
           onSaveAnswer={saveAnswerHandler}
           aiReviewFeedback={aiReviewFeedback}
+          aiReviewIsCorrect={aiReviewIsCorrect}
           isAiReviewing={isAiReviewing}
           onAiReviewAnswer={handleAiReviewAnswerHandler}
           // ReviewControls props
