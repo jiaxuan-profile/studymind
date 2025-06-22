@@ -1,7 +1,7 @@
 // src/hooks/useReviewSessionManagement.ts
 import { useCallback } from 'react';
 import { supabase } from '../services/supabase';
-import { User, ReviewAnswer, Subject } from '../types';
+import { User, Subject } from '../types'; // Assuming ReviewAnswer is not directly used here anymore
 import { CurrentQuestionType, ReviewUserAnswer, NoteWithQuestions as ReviewNoteWithQuestionsType } from '../types/reviewTypes';
 
 interface UseReviewSessionManagementProps {
@@ -46,10 +46,10 @@ interface UseReviewSessionManagementProps {
     currentSessionId: string | null;
     currentQuestionIndex: number;
     currentQuestion: CurrentQuestionType | undefined;
-    userAnswer: string;
-    userAnswers: ReviewUserAnswer[];
+    userAnswer: string; // Current text in the answer input field
+    userAnswers: ReviewUserAnswer[]; // Array of answers (text + rating)
     sessionDuration: number;
-    isAnswerSaved: boolean;
+    isAnswerSaved: boolean; // Indicates if the current userAnswer text has been persisted
     reviewedCount: number;
     sessionStats: { easy: number; medium: number; hard: number };
 }
@@ -63,7 +63,8 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         setUserAnswers: pageSetUserAnswers,
         setIsReviewComplete, setCurrentStep, setAiReviewFeedback, setAiReviewIsCorrect, setIsSavingAnswer, setIsAiReviewing,
         currentSessionId, currentQuestionIndex, currentQuestion, userAnswer, userAnswers,
-        sessionDuration, isAnswerSaved, reviewedCount: pageReviewedCount, sessionStats: pageSessionStats,
+        sessionDuration, isAnswerSaved, // isAnswerSaved is still a prop from ReviewPage
+        reviewedCount: pageReviewedCount, sessionStats: pageSessionStats,
         setIsAnswerSaved: pageSetIsAnswerSaved,
     } = props;
 
@@ -77,7 +78,6 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 return;
             }
 
-            // Question filtering logic (moved from ReviewPage)
             const questionsToReview: CurrentQuestionType[] = selectedNotes.flatMap(noteId => {
                 const note = notesWithQuestions.find(n => n.id === noteId);
                 if (!note) return [];
@@ -106,7 +106,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 finalQuestions = shuffledQuestions.slice(0, Math.min(count, shuffledQuestions.length));
             }
 
-            if (finalQuestions.length === 0) { // Double check after slicing
+            if (finalQuestions.length === 0) {
                 addToast("Not enough questions after filtering by count.", "warning");
                 props.setLoading(false);
                 return;
@@ -146,7 +146,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             const minutes = String(now.getMinutes()).padStart(2, '0');
             const newSessionName = `${yearCode ? yearCode + '-' : ''}${subjectNameString.replace(/\s+/g, '-')} ${day}-${month}-${year} ${hours}:${minutes} ${ampm}`;
 
-            setSessionGeneratedName(newSessionName); // Store for potential resume dialog display
+            setSessionGeneratedName(newSessionName);
 
             const { data: sessionData, error: sessionError } = await supabase.from('review_sessions').insert({
                 user_id: user.id,
@@ -167,13 +167,14 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 user_id: user.id,
                 note_id: q.noteId,
                 question_text: q.question,
-                answer_text: '',
+                answer_text: '', // Initially empty
                 note_title: q.noteTitle,
                 hint: q.hint,
                 connects: q.connects,
                 mastery_context: q.mastery_context,
                 original_difficulty: q.difficulty,
                 original_question_id: q.id,
+                // difficulty_rating is not set here, will be set on user interaction
             }));
 
             const { error: answersInsertError } = await supabase.from('review_answers').insert(placeholderAnswers);
@@ -186,13 +187,13 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             setCurrentQuestionIndex(0);
             setReviewedCount(0);
             setSessionStats({ easy: 0, medium: 0, hard: 0 });
-            pageSetUserAnswers([]);
+            pageSetUserAnswers([]); // Reset local user answers state
             setIsReviewComplete(false);
             setCurrentStep('review');
             setAiReviewFeedback(null);
 
         } catch (error) {
-            setSessionStartTime(null); // Reset start time on error
+            setSessionStartTime(null);
             console.error('Error starting review:', error);
             addToast(`Failed to start review session: ${error instanceof Error ? error.message : 'Unknown error'}. Please try again.`, 'error');
         } finally {
@@ -200,42 +201,58 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
     }, [
         user, notes, subjects, selectedNotes, notesWithQuestions, selectedDifficulty, selectedQuestionCount, generateNewQuestions,
-        isReadOnlyDemo, setSessionGeneratedName,
-        setLoading, addToast, setCurrentSessionId, setSessionName, setSessionStartTime,
+        setSessionGeneratedName, // Removed isReadOnlyDemo as it's not used in this handler's logic path
+        props.setLoading, addToast, setCurrentSessionId, setSessionName, setSessionStartTime, // Use props.setLoading to avoid lint warning
         setCurrentQuestions, setCurrentQuestionIndex, setReviewedCount, setSessionStats,
         pageSetUserAnswers, setIsReviewComplete, setCurrentStep, setAiReviewFeedback,
-        // supabase client is stable
     ]);
 
     const saveAnswerHandler = useCallback(async () => {
         if (!userAnswer.trim() || !currentSessionId) {
-            if (isReadOnlyDemo && userAnswer.trim()) {
-                const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
-                if (answerExists) {
-                    pageSetUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim(), timestamp: new Date() } : a));
-                } else {
-                    pageSetUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
-                }
+            // Allow saving an empty answer in demo if user explicitly clicks save and the input is empty
+            // Or if they typed something and then cleared it.
+            if (isReadOnlyDemo && currentSessionId) { // Check currentSessionId for demo too to ensure we are in a session context
+                pageSetUserAnswers(prev => {
+                    const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
+                    const newAnswerData = {
+                        questionIndex: currentQuestionIndex,
+                        answer: userAnswer.trim(), // Save the trimmed answer (could be empty)
+                        timestamp: new Date(),
+                    };
+                    if (existingIndex > -1) {
+                        return prev.map((ans, idx) => idx === existingIndex ? { ...ans, ...newAnswerData } : ans);
+                    }
+                    // If no existing entry, but we are saving (even empty), create one
+                    return [...prev, newAnswerData];
+                });
                 pageSetIsAnswerSaved(true);
                 addToast('Answer saved (Demo Mode)', 'info');
             }
-            return Promise.resolve();
+            return Promise.resolve(); // Don't proceed if no answer text and not demo, or no session
         }
 
+
         if (isReadOnlyDemo) {
-            const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
-            if (answerExists) {
-                pageSetUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim(), timestamp: new Date() } : a));
-            } else {
-                pageSetUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
-            }
-            pageSetIsAnswerSaved(true);
-            addToast('Answer saved (Demo Mode)', 'info');
-            return Promise.resolve();
+            pageSetUserAnswers(prev => {
+               const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
+               const newAnswerData = {
+                   answer: userAnswer.trim(),
+                   timestamp: new Date(),
+               };
+               if (existingIndex > -1) {
+                   return prev.map((ans, idx) => idx === existingIndex ? { ...ans, ...newAnswerData } : ans);
+               }
+               return [...prev, { questionIndex: currentQuestionIndex, ...newAnswerData }];
+           });
+           pageSetIsAnswerSaved(true);
+           addToast('Answer saved (Demo Mode)', 'info');
+           return Promise.resolve();
         }
 
         setIsSavingAnswer(true);
         try {
+            // In live mode, update the answer_text in the database.
+            // The row for (session_id, question_index) should already exist.
             const { error } = await supabase
                 .from('review_answers')
                 .update({ answer_text: userAnswer.trim() })
@@ -244,13 +261,34 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
             if (error) throw error;
 
-            const answerExists = userAnswers.some(a => a.questionIndex === currentQuestionIndex);
-            if (answerExists) {
-                pageSetUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, answer: userAnswer.trim(), timestamp: new Date() } : a));
-            } else {
-                pageSetUserAnswers(prev => [...prev, { questionIndex: currentQuestionIndex, answer: userAnswer.trim(), timestamp: new Date() }]);
-            }
-            pageSetIsAnswerSaved(true);
+            // Update local state: merge new answer and timestamp, preserve existing difficulty_rating
+            pageSetUserAnswers(prev => {
+                const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
+                const newAnswerData = {
+                    answer: userAnswer.trim(),
+                    timestamp: new Date(),
+                };
+                if (existingIndex > -1) {
+                    // Entry exists, update its answer and timestamp, preserve other fields
+                    return prev.map((ans, idx) =>
+                        idx === existingIndex
+                            ? { ...ans, ...newAnswerData } // Spread existing answer first, then new data
+                            : ans
+                    );
+                } else {
+                    // This case should ideally not happen if placeholders are always created.
+                    // But if it does, create a new entry.
+                    return [
+                        ...prev,
+                        {
+                            questionIndex: currentQuestionIndex,
+                            ...newAnswerData,
+                            // difficulty_rating would be undefined here if not previously set
+                        },
+                    ];
+                }
+            });
+            pageSetIsAnswerSaved(true); // Mark that this specific text answer is now saved
         } catch (error) {
             console.error('Error saving answer:', error);
             addToast('Failed to save answer.', 'error');
@@ -259,71 +297,139 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
         return Promise.resolve();
     }, [
-        userAnswer, currentSessionId, isReadOnlyDemo, userAnswers, currentQuestionIndex, // Props values
-        pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer, // Prop setters
+        userAnswer, currentSessionId, isReadOnlyDemo, currentQuestionIndex, // userAnswers is not strictly needed here as we find and update/create
+        pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer,
     ]);
 
     const handleDifficultyResponseHandler = useCallback(async (difficulty: 'easy' | 'medium' | 'hard') => {
-        if (!isAnswerSaved) {
-            addToast("Please save your answer before rating.", 'warning');
-            return;
-        }
-        if (!currentSessionId) {
-            addToast("Session ID not found. Please try again.", 'error');
+        if (!currentSessionId && !isReadOnlyDemo) {
+            addToast("Session ID not found. Cannot save rating. Please try restarting the session.", 'error');
             return;
         }
 
+        const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
+
         if (isReadOnlyDemo) {
-            // Simulate rating for demo
-            const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
-            pageSetUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, difficulty_rating: difficulty } : a));
+            pageSetUserAnswers(prevAnswers => {
+                const existingAnswerIndex = prevAnswers.findIndex(a => a.questionIndex === currentQuestionIndex);
+                if (existingAnswerIndex > -1) {
+                    // Entry exists, update its difficulty_rating
+                    const updatedAnswers = [...prevAnswers];
+                    updatedAnswers[existingAnswerIndex] = {
+                        ...updatedAnswers[existingAnswerIndex], // Preserve existing answer, timestamp
+                        difficulty_rating: difficulty,
+                    };
+                    return updatedAnswers;
+                } else {
+                    // Entry doesn't exist, create it with the rating and current userAnswer
+                    return [
+                        ...prevAnswers,
+                        {
+                            questionIndex: currentQuestionIndex,
+                            answer: userAnswer, // Capture current input field value
+                            // timestamp will be set if/when saveAnswerHandler is called
+                            difficulty_rating: difficulty,
+                        },
+                    ];
+                }
+            });
+
             if (difficulty !== previouslyRated) {
-                setSessionStats(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1, ...(previouslyRated && { [previouslyRated]: prev[previouslyRated] - 1 }) }));
-                if (!previouslyRated) setReviewedCount(prev => prev + 1);
+                setSessionStats(prev => {
+                    const newStats = { ...prev };
+                    newStats[difficulty] = (newStats[difficulty] || 0) + 1;
+                    if (previouslyRated) {
+                        newStats[previouslyRated] = Math.max(0, (newStats[previouslyRated] || 0) - 1);
+                    }
+                    return newStats;
+                });
+                if (!previouslyRated) {
+                    setReviewedCount(prev => prev + 1);
+                }
             }
             addToast(`Rated as ${difficulty} (Demo Mode)`, 'info');
             return;
         }
 
+        // Live mode
         try {
-            const { error } = await supabase.from('review_answers').update({ difficulty_rating: difficulty }).eq('session_id', currentSessionId).eq('question_index', currentQuestionIndex);
+            // Update the difficulty rating in the database
+            const { error } = await supabase.from('review_answers')
+                .update({ difficulty_rating: difficulty })
+                .eq('session_id', currentSessionId)
+                .eq('question_index', currentQuestionIndex);
+
             if (error) throw error;
 
-            const previouslyRated = userAnswers.find(a => a.questionIndex === currentQuestionIndex)?.difficulty_rating;
-            pageSetUserAnswers(prev => prev.map(a => a.questionIndex === currentQuestionIndex ? { ...a, difficulty_rating: difficulty } : a));
+            pageSetUserAnswers(prevAnswers => {
+                const existingAnswerIndex = prevAnswers.findIndex(a => a.questionIndex === currentQuestionIndex);
+                if (existingAnswerIndex > -1) {
+                    const updatedAnswers = [...prevAnswers];
+                    updatedAnswers[existingAnswerIndex] = {
+                        ...updatedAnswers[existingAnswerIndex],
+                        difficulty_rating: difficulty,
+                    };
+                    return updatedAnswers;
+                } else {
+                    return [
+                        ...prevAnswers,
+                        {
+                            questionIndex: currentQuestionIndex,
+                            answer: userAnswer, // Capture current input field value if creating new
+                            difficulty_rating: difficulty,
+                            // timestamp will be set by saveAnswerHandler if it runs
+                        },
+                    ];
+                }
+            });
 
             if (difficulty !== previouslyRated) {
-                setSessionStats(prev => ({ ...prev, [difficulty]: prev[difficulty] + 1, ...(previouslyRated && { [previouslyRated]: prev[previouslyRated] - 1 }) }));
-                if (!previouslyRated) setReviewedCount(prev => prev + 1);
+                setSessionStats(prev => {
+                    const newStats = { ...prev };
+                    newStats[difficulty] = (newStats[difficulty] || 0) + 1;
+                    if (previouslyRated) {
+                        newStats[previouslyRated] = Math.max(0, (newStats[previouslyRated] || 0) - 1);
+                    }
+                    return newStats;
+                });
+                if (!previouslyRated) {
+                    setReviewedCount(prev => prev + 1);
+                }
             }
         } catch (error) {
             console.error('Error saving difficulty rating:', error);
             addToast('Failed to save difficulty rating.', 'error');
         }
     }, [
-        isAnswerSaved, currentSessionId, isReadOnlyDemo, userAnswers, currentQuestionIndex,
+        currentSessionId, isReadOnlyDemo, userAnswers, currentQuestionIndex, userAnswer, // userAnswer needed for new entry
         addToast, pageSetUserAnswers, setSessionStats, setReviewedCount,
-        // supabase client is stable
     ]);
 
     const finishReviewSessionHandler = useCallback(async () => {
         if (!currentSessionId) return Promise.resolve();
 
+        // Check if there's an unsaved text answer in the input field compared to the latest in userAnswers state
         const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
-        const isUnsaved = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
-
-        if (isUnsaved) {
-            await saveAnswerHandler();
+        const isUnsavedText = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
+        
+        // Also check if isAnswerSaved is false, indicating the last explicit save attempt might not have matched the current input
+        if (isUnsavedText || !isAnswerSaved && userAnswer.trim()) {
+            await saveAnswerHandler(); // Ensure the latest text answer is saved
         }
+
+        // After potential save, re-fetch userAnswers to get the most up-to-date count for the session summary
+        // This is a simplification; ideally, saveAnswerHandler would return the updated state or this logic
+        // would rely on the `userAnswers` state which should be up-to-date after saveAnswerHandler.
+        // For now, we'll use the `pageReviewedCount` and `pageSessionStats` which are updated by handleDifficultyResponseHandler.
 
         try {
             const { error } = await supabase.from('review_sessions').update({
                 session_status: 'completed',
                 completed_at: new Date().toISOString(),
                 duration_seconds: sessionDuration,
-                questions_answered: userAnswers.filter(a => a.answer && a.answer.trim() !== '').length,
-                questions_rated: pageReviewedCount, // Use the count from page state
-                easy_ratings: pageSessionStats.easy, // Use stats from page state
+                questions_answered: userAnswers.filter(a => a.answer && a.answer.trim() !== '').length, // Count answers with non-empty text
+                questions_rated: pageReviewedCount,
+                easy_ratings: pageSessionStats.easy,
                 medium_ratings: pageSessionStats.medium,
                 hard_ratings: pageSessionStats.hard,
             }).eq('id', currentSessionId);
@@ -333,22 +439,32 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             console.error('Error completing review session:', error);
             addToast('Failed to mark session as complete.', 'error');
         } finally {
-            setSessionStartTime(null); // Stop timer
+            setSessionStartTime(null);
             setIsReviewComplete(true);
         }
         return Promise.resolve();
     }, [
-        currentSessionId, isReadOnlyDemo, userAnswers, currentQuestionIndex, userAnswer, saveAnswerHandler, // Add saveAnswerHandler
-        sessionDuration, pageReviewedCount, pageSessionStats, // Use page-level stats for update
+        currentSessionId, userAnswer, userAnswers, currentQuestionIndex, isAnswerSaved, // Dependencies for checking unsaved text
+        saveAnswerHandler, sessionDuration, pageReviewedCount, pageSessionStats,
         addToast, setIsReviewComplete, setSessionStartTime,
-        // supabase client is stable
     ]);
 
     const handleAiReviewAnswerHandler = useCallback(async () => {
-        if (!currentQuestion || !userAnswer.trim()) {
-            addToast('Please save your answer first before requesting AI feedback.', 'warning');
+        // Ensure an answer is saved before AI review, as AI needs the text
+        if (!isAnswerSaved && userAnswer.trim()) {
+             addToast('Please save your current answer before requesting AI feedback.', 'warning');
+             return;
+        }
+        if (!userAnswer.trim()) { // Check after the isAnswerSaved check
+            addToast('Please enter and save an answer before requesting AI feedback.', 'warning');
             return;
         }
+        if (!currentQuestion) {
+            addToast('No current question to review.', 'error');
+            return;
+        }
+
+
         if (isReadOnlyDemo) {
             setAiReviewFeedback("AI feedback is not available in demo mode.");
             setAiReviewIsCorrect(null);
@@ -367,6 +483,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             const payload = {
                 answers: [{
                     questionId: currentQuestion.id,
+                    // Use the `userAnswer` from the state, which should be the saved one due to the check above
                     answerText: userAnswer.trim()
                 }],
                 noteId: currentQuestion.noteId
@@ -383,7 +500,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to get AI feedback');
+                throw new Error(errorData.error || `Failed to get AI feedback (${response.status})`);
             }
             const data = await response.json();
             if (data.feedbacks && data.feedbacks.length > 0) {
@@ -397,12 +514,14 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
         } catch (error) {
             console.error('Error getting AI review:', error);
-            addToast(`Failed to get AI feedback: ${error instanceof Error ? error.message : 'Unknown error'}.`, 'error');
+            setAiReviewFeedback(`Error: ${error instanceof Error ? error.message : 'Unknown error during AI review.'}`);
+            setAiReviewIsCorrect(null);
+            addToast(`Failed to get AI feedback.`, 'error');
         } finally {
             setIsAiReviewing(false);
         }
     }, [
-        currentQuestion, userAnswer, isReadOnlyDemo,
+        currentQuestion, userAnswer, isReadOnlyDemo, isAnswerSaved, // isAnswerSaved and userAnswer are key for this logic
         addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing,
     ]);
 

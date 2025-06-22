@@ -48,7 +48,10 @@ interface ActiveReviewScreenProps {
   aiReviewFeedback?: string | null;
   aiReviewIsCorrect: boolean | null;
   isAiReviewing?: boolean;
-  onAiReviewAnswer?: () => void;
+  // MODIFIED: Changed from onAiReviewAnswer?: () => void;
+  // to onAiReviewAnswer: () => Promise<void>; to match AnswerInputArea's expectation.
+  // This makes it a required prop for ActiveReviewScreen.
+  onAiReviewAnswer: () => Promise<void>;
   aiFeedbackCompleted: boolean;
 
   // Props for ReviewControls
@@ -58,7 +61,7 @@ interface ActiveReviewScreenProps {
   isFirstQuestion: boolean;
   isLastQuestion: boolean;
 
-  // Prop for DifficultyRating (and its conditional rendering)
+  // Prop for DifficultyRating
   onRateDifficulty: (difficulty: 'easy' | 'medium' | 'hard') => void;
   userAnswers: UserAnswer[];
 
@@ -88,7 +91,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
     aiReviewFeedback,
     aiReviewIsCorrect,
     isAiReviewing,
-    onAiReviewAnswer,
+    onAiReviewAnswer, // This prop is now () => Promise<void>
     aiFeedbackCompleted,
     onNavigatePrevious,
     onNavigateNext,
@@ -151,7 +154,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 aiReviewFeedback={aiReviewFeedback}
                 aiReviewIsCorrect={aiReviewIsCorrect}
                 isAiReviewing={isAiReviewing}
-                onAiReviewAnswer={onAiReviewAnswer}
+                onAiReviewAnswer={onAiReviewAnswer} // Now correctly typed as () => Promise<void>
                 isReadOnly={aiFeedbackCompleted}
               />
 
@@ -163,11 +166,11 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 isLastQuestion={isLastQuestion}
               />
 
+              {/* MODIFIED: Passing selectedRating instead of currentQuestionIndex and userAnswers */}
               <DifficultyRating
                 onRateDifficulty={onRateDifficulty}
-                currentQuestionIndex={currentQuestionIndex}
-                userAnswers={userAnswers}
-                isReadOnly={aiFeedbackCompleted} 
+                selectedRating={selectedRating}
+                isReadOnly={aiFeedbackCompleted}
               />
             </div>
           </div>
