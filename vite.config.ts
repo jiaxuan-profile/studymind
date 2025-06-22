@@ -19,36 +19,46 @@ export default defineConfig({
   },
   define: {
     global: 'globalThis',
-  },  
+  },
   optimizeDeps: {
     exclude: ['lucide-react']
   },
   server: {
     proxy: {
-      '/api/generate-embedding': {
-        target: 'https://studymindai.me/.netlify/functions',
-        changeOrigin: true,
-        rewrite: (path) => path.replace('/api/generate-embedding', '/generate-embedding'),
-      },
       '/api/analyze-concepts': {
-        target: 'https://studymindai.me/.netlify/functions',
+        target: 'https://study.studymindai.me/.netlify/functions',
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/analyze-concepts', '/analyze-concepts'),
       },
-      '/api/summarize': {
-        target: 'https://studymindai.me/.netlify/functions',
+      '/api/analyze-gaps': {
+        target: 'https://study.studymindai.me/.netlify/functions',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/api/summarize', '/summarize'),
+        rewrite: (path) => path.replace('/api/analyze-gaps', '/analyze-gaps'),
+      },
+      '/api/find-related-notes': {
+        target: 'https://study.studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/find-related-notes', '/find-related-notes'),
+      },
+      '/api/generate-embedding': {
+        target: 'https://study.studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/generate-embedding', '/generate-embedding'),
       },
       '/api/generate-questions': {
-        target: 'https://studymindai.me/.netlify/functions',
+        target: 'https://study.studymindai.me/.netlify/functions',
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/generate-questions', '/generate-questions'),
       },
-      '/api/analyze-gaps': {
-        target: 'https://studymindai.me/.netlify/functions',
+      '/api/review-anwsers': {
+        target: 'https://study.studymindai.me/.netlify/functions',
         changeOrigin: true,
-        rewrite: (path) => path.replace('/api/analyze-gaps', '/analyze-gaps'),
+        rewrite: (path) => path.replace('/api/review-anwsers', '/review-anwsers'),
+      },
+      '/api/summarize': {
+        target: 'https://study.studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/summarize', '/summarize'),
       },
     },
   },
