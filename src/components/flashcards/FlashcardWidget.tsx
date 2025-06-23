@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { 
   RotateCcw, 
-  Check, 
-  X, 
   ThumbsUp, 
   ThumbsDown, 
   HelpCircle, 
   Brain, 
   ArrowRight,
-  Lightbulb
+  Check
 } from 'lucide-react';
 import { Flashcard } from '../../types';
 import { getDueFlashcards, recordFlashcardResponse } from '../../services/flashcardService';
@@ -28,7 +25,7 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
   const [responseStartTime, setResponseStartTime] = useState<number | null>(null);
   const { isReadOnlyDemo } = useDemoMode();
   const { addToast } = useToast();
-  const navigate = useNavigate();
+  const [isDeckComplete, setIsDeckComplete] = useState(false);
 
   useEffect(() => {
     loadFlashcards();
@@ -36,6 +33,7 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
 
   const loadFlashcards = async () => {
     setIsLoading(true);
+    setIsDeckComplete(false);
     try {
       if (isReadOnlyDemo) {
         // Mock data for demo mode
@@ -91,6 +89,7 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     } catch (error) {
       console.error('Error loading flashcards:', error);
       addToast('Failed to load flashcards', 'error');
+      setFlashcards([]);
     } finally {
       setIsLoading(false);
     }
@@ -134,17 +133,18 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     setIsFlipped(false);
     if (currentIndex < flashcards.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      setIsDeckComplete(false); 
     } else {
       // Reached the end of the deck
       addToast('You\'ve reviewed all available flashcards!', 'success');
-      // Optionally reload or reset
-      setCurrentIndex(0);
+      setIsDeckComplete(true); 
     }
   };
 
   const resetDeck = () => {
     setCurrentIndex(0);
     setIsFlipped(false);
+    setIsDeckComplete(false);
   };
 
   if (isLoading) {
@@ -158,24 +158,41 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     );
   }
 
-  if (flashcards.length === 0) {
+  if (isDeckComplete && flashcards.length > 0) { // flashcards.length > 0 ensures we don't show this if cards were initially empty
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="text-center py-8">
-          <Brain className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Flashcards Available</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            You don't have any flashcards due for review.
-          </p>
+        {/* "All Reviewed!" message and buttons */}
+      </div>
+    );
+  }
+
+ if (flashcards.length === 0) { 
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="text-center py-8">
+        <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Flashcards Available</h3>
+        <p className="text-gray-600 dark:text-gray-400 mb-4">
+          No flashcards are currently due for review.
+        </p>
+        <div className="flex flex-col sm:flex-row justify-center gap-3">
+          <button
+            onClick={resetDeck} // Or loadFlashcards if you want to refresh
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+          >
+            <RotateCcw className="h-4 w-4 mr-2" />
+            Review Again
+          </button>
           <button
             onClick={onViewAllClick}
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
           >
-            <Lightbulb className="h-4 w-4 mr-2" />
-            Generate Flashcards
+            Study All Due Cards
+            <ArrowRight className="h-4 w-4 ml-2" />
           </button>
         </div>
       </div>
+    </div>
     );
   }
 
@@ -209,7 +226,7 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
 
       {/* Flashcard */}
       <div 
-        className={`relative w-full h-64 cursor-pointer transition-transform duration-700 transform-gpu ${
+        className={`relative w-full h-64 cursor-pointer transition-transform duration-700 transform-gpu [transform-style:preserve-3d] ${ 
           isFlipped ? 'rotate-y-180' : ''
         }`}
         onClick={handleFlip}

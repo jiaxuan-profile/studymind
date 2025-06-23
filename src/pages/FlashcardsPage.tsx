@@ -454,7 +454,7 @@ const FlashcardsPage: React.FC = () => {
 
               {/* Current Flashcard */}
               <div 
-                className={`relative w-full h-96 cursor-pointer transition-transform duration-700 transform-gpu ${
+                className={`relative w-full h-96 cursor-pointer transition-transform duration-700 transform-gpu [transform-style:preserve-3d] ${
                   isFlipped ? 'rotate-y-180' : ''
                 }`}
                 onClick={handleFlip}
