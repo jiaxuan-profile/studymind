@@ -1,5 +1,5 @@
-// src/components/review-page/SelectQuestionTypePanel.tsx
 import React from 'react';
+import { useDemoMode } from '../../contexts/DemoModeContext';
 
 type QuestionType = 'short' | 'mcq' | 'open';
 
@@ -14,6 +14,8 @@ const SelectQuestionTypePanel: React.FC<SelectQuestionTypePanelProps> = ({
   setSelectedQuestionType,
   getQuestionTypeIcon,
 }) => {
+  const { isReadOnlyDemo } = useDemoMode();
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="bg-gradient-to-r from-secondary/10 to-primary/10 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -28,13 +30,15 @@ const SelectQuestionTypePanel: React.FC<SelectQuestionTypePanelProps> = ({
           <button
             key={type}
             onClick={() => setSelectedQuestionType(type)}
-            disabled={type !== 'short'} // Logic for disabling non-short types remains
+            disabled={type === 'open' || (isReadOnlyDemo && type !== 'short')} // Only 'open' is disabled now
             className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
               selectedQuestionType === type
                 ? 'border-primary bg-primary/5'
-                : type === 'short'
-                ? 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                : 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'
+                : type === 'open'
+                ? 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'
+                : isReadOnlyDemo && type !== 'short'
+                ? 'border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'
+                : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50'
             }`}
           >
             <div className="flex items-center justify-between">
@@ -45,9 +49,14 @@ const SelectQuestionTypePanel: React.FC<SelectQuestionTypePanelProps> = ({
                   {type === 'mcq' && 'Multiple Choice'}
                   {type === 'open' && 'Open Ended'}
                 </span>
-                {type !== 'short' && (
+                {type === 'open' && (
                   <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
                     Coming Soon
+                  </span>
+                )}
+                {isReadOnlyDemo && type === 'mcq' && (
+                  <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded-full">
+                    Demo Restricted
                   </span>
                 )}
               </div>

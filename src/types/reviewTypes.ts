@@ -9,6 +9,9 @@ export interface Question {
     ai_feedback?: string;
     ai_reviewed?: boolean;
     is_default?: boolean;
+    question_type?: 'short' | 'mcq' | 'open';
+    options?: string[];
+    answer?: string;
 }
 
 export interface NoteWithQuestions {

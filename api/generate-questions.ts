@@ -12,6 +12,7 @@ interface Question {
   mastery_context: string;
   options?: string[];
   answer?: string;
+  question_type?: 'short' | 'mcq' | 'open';
 }
 
 interface ConceptWithMastery {
@@ -115,7 +116,8 @@ const handler: Handler = async (event) => {
       "hint": "Review the four necessary conditions for deadlock to occur.",
       "connects": ["Deadlock"],
       "difficulty": "easy",
-      "mastery_context": "Tests recall of deadlock conditions."`;
+      "mastery_context": "Tests recall of deadlock conditions.",
+      "question_type": "mcq"`;
     } else if (questionTypeFilter === 'open') {
       questionTypeInstruction = "Generate open-ended questions that require detailed explanation, comparison, or synthesis of multiple concepts.";
     }
@@ -157,6 +159,7 @@ const handler: Handler = async (event) => {
       4.  FORMAT: Return ONLY a valid JSON array of question objects, no markdown. Each object MUST include a 'difficulty' field with one of these exact string values: "easy", "medium", or "hard".
       5.  HINTS: Provide a useful hint for each question.
       6.  CONNECTIONS: The 'connects' array should list the key concepts tested.
+      7.  QUESTION TYPE: Add a "question_type" field to each question with the value "${questionTypeFilter || 'short'}"
 
       EXAMPLE JSON OBJECT FORMAT:
       {

@@ -21,6 +21,8 @@ interface QuestionData {
   answer?: string | null; // Correct answer for MCQs
   connects?: string[] | null;
   difficulty?: 'easy' | 'medium' | 'hard' | null;
+  question_type?: 'short' | 'mcq' | 'open' | null;
+  options?: string[] | null;
 }
 
 interface UserDifficultyRating {
@@ -177,7 +179,7 @@ const handler: Handler = async (event) => {
     // Fetch the full review_answers records using the review answer IDs
     const { data: reviewAnswersData, error: reviewAnswersError } = await supabase
       .from('review_answers')
-      .select('id, question_text, original_question_id, difficulty_rating, connects, hint, mastery_context, original_difficulty')
+      .select('id, question_text, original_question_id, difficulty_rating, connects, hint, mastery_context, original_difficulty, question_type')
       .in('id', reviewAnswerIds);
       
     if (reviewAnswersError) throw new Error(`Could not fetch review answers: ${reviewAnswersError.message}`);
@@ -198,7 +200,7 @@ const handler: Handler = async (event) => {
     if (originalQuestionIds.length > 0) {
       const { data: questionsData, error: questionsError } = await supabase
         .from('questions')
-        .select('id, question, answer, difficulty, connects')
+        .select('id, question, answer, difficulty, connects, question_type, options')
         .in('id', originalQuestionIds);
         
       if (questionsError) {
@@ -235,17 +237,24 @@ const handler: Handler = async (event) => {
           ? originalQuestionsMap.get(reviewAnswer.original_question_id) 
           : null;
           
+        // Check if this is an MCQ question
+        const isMCQ = originalQuestion?.question_type === 'mcq' || reviewAnswer.question_type === 'mcq';
+        const mcqOptions = originalQuestion?.options || [];
+        const correctAnswer = originalQuestion?.answer || 'N/A';
+        
         return `
           Review Answer ID: "${reviewAnswer.id}"
           Question: "${reviewAnswer.question_text}"
-          Correct Answer (if available for MCQ): "${originalQuestion?.answer || 'N/A (Not an MCQ or answer not provided)'}"
+          ${isMCQ ? `Question Type: Multiple Choice
+          Options: ${JSON.stringify(mcqOptions)}
+          Correct Answer: "${correctAnswer}"` : 'Question Type: Short Answer'}
           Student's Answer: "${ans.answerText}"
           `;
       }).join('\n')}
 
       YOUR TASK: For each question, evaluate the student's answer.
       RULES:
-      1.  For MCQs (Correct Answer provided), check if student's answer matches. For others, judge based on NOTE CONTENT.
+      1.  For MCQs, check if student's answer exactly matches the correct answer. For short answers, judge based on NOTE CONTENT.
       2.  Provide concise, constructive feedback. If wrong, briefly explain why and suggest correct elements.
       3.  Return ONLY a valid JSON array of feedback objects.
       JSON OUTPUT FORMAT (Array of objects):
@@ -264,7 +273,7 @@ const handler: Handler = async (event) => {
 
     const { data: userRatedAnswersData } = await supabase
       .from('review_answers')
-      .select('id, difficulty_rating, original_difficulty')
+      .select('id, difficulty_rating, original_difficulty, question_type')
       .eq('user_id', user.id)
       .in('id', reviewAnswerIds);
 

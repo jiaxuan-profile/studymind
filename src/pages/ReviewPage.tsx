@@ -1,4 +1,3 @@
-// src/pages/ReviewPage.tsx
 import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../store';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -64,6 +63,9 @@ const ReviewPage: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [loadingReviewProcess, setLoadingReviewProcess] = useState(false);
   const [isInitiatingReview, setIsInitiatingReview] = useState(false);
+  
+  // For MCQ questions
+  const [selectedOption, setSelectedOption] = useState<string | undefined>(undefined);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -195,7 +197,7 @@ const ReviewPage: React.FC = () => {
 
       const { data: allQuestions, error } = await supabase
         .from('questions')
-        .select('id, note_id, question, hint, connects, difficulty, mastery_context, is_default')
+        .select('id, note_id, question, hint, connects, difficulty, mastery_context, is_default, question_type, options, answer')
         .eq('user_id', authUser.id);
 
       if (error) throw error;
@@ -276,8 +278,19 @@ const ReviewPage: React.FC = () => {
   useEffect(() => {
     if (currentStep === 'review' && currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
       const existingAnswer = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+      
+      // Reset selected option for MCQ questions
+      setSelectedOption(undefined);
+      
       if (existingAnswer) {
-        setUserAnswer(existingAnswer.answer);
+        // For MCQ questions, the answer is stored in userAnswer but represents the selected option
+        if (currentQuestions[currentQuestionIndex].question_type === 'mcq' && 
+            currentQuestions[currentQuestionIndex].options) {
+          setSelectedOption(existingAnswer.answer);
+        } else {
+          setUserAnswer(existingAnswer.answer);
+        }
+        
         setIsAnswerSaved(true);
         
         // Load AI feedback if it exists for this question
@@ -376,10 +389,27 @@ const ReviewPage: React.FC = () => {
     setIsAnswerSaved(false);
   };
 
+  const handleSelectOption = (option: string) => {
+    setSelectedOption(option);
+    setUserAnswer(option); // Store the selected option in userAnswer for consistency
+    setIsAnswerSaved(false);
+  };
+
   const handleNavigation = async (direction: 'next' | 'previous') => {
-    if (userAnswer.trim() && !isAnswerSaved) await saveAnswerHandler();
-    if (direction === 'next' && currentQuestionIndex < currentQuestions.length - 1) setCurrentQuestionIndex(prev => prev + 1);
-    else if (direction === 'previous' && currentQuestionIndex > 0) setCurrentQuestionIndex(prev => prev - 1);
+    // For MCQ questions, check if an option is selected
+    const currentQuestion = currentQuestions[currentQuestionIndex];
+    const isMCQ = currentQuestion?.question_type === 'mcq' && currentQuestion?.options;
+    
+    if (isMCQ ? (selectedOption && !isAnswerSaved) : (userAnswer.trim() && !isAnswerSaved)) {
+      await saveAnswerHandler();
+    }
+    
+    if (direction === 'next' && currentQuestionIndex < currentQuestions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    }
+    else if (direction === 'previous' && currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    }
   };
 
   const resetReview = () => {
@@ -392,6 +422,7 @@ const ReviewPage: React.FC = () => {
     setSessionStats({ easy: 0, medium: 0, hard: 0 });
     setIsReviewComplete(false);
     setUserAnswer('');
+    setSelectedOption(undefined);
     setUserAnswers([]);
     setIsAnswerSaved(false);
     setCurrentSessionId(null);
@@ -416,6 +447,11 @@ const ReviewPage: React.FC = () => {
 
   const currentQuestionForDisplay = currentQuestions[currentQuestionIndex];
   const aiFeedbackCompletedForCurrentQuestion = aiReviewFeedback !== null;
+  
+  // Check if current question is MCQ
+  const isMCQ = currentQuestionForDisplay?.question_type === 'mcq' && 
+                currentQuestionForDisplay?.options && 
+                currentQuestionForDisplay.options.length > 0;
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {
@@ -532,6 +568,9 @@ const ReviewPage: React.FC = () => {
           reviewedCount={reviewedCount}
           answersSavedCount={userAnswers.length}
           sessionStats={sessionStats}
+          // MCQ props
+          selectedOption={selectedOption}
+          onSelectOption={handleSelectOption}
         />
       </>
     );

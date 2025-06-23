@@ -12,6 +12,8 @@ interface AnswerInputAreaProps {
   isAiReviewing?: boolean;
   onAiReviewAnswer: () => Promise<void>;
   isReadOnly?: boolean;
+  isMCQ?: boolean;
+  selectedOption?: string;
 }
 
 const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
@@ -25,9 +27,11 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
   isAiReviewing = false,
   onAiReviewAnswer,
   isReadOnly,
+  isMCQ = false,
+  selectedOption,
 }) => {
 
-  const canRequestAiFeedback = userAnswer.trim() !== '' && isAnswerSaved;
+  const canRequestAiFeedback = (isMCQ ? selectedOption : userAnswer.trim()) !== '' && isAnswerSaved;
   const aiFeedbackAlreadyExists = aiReviewFeedback !== null;
 
   return (
@@ -46,71 +50,133 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
       </div>
 
       <div className="space-y-4">
-        {/* Use a markdown editor-like appearance */}
-        <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
-          {/* Simple toolbar */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 border-b border-gray-300 dark:border-gray-600 flex items-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {isReadOnly ? "Answer locked in demo mode or after AI review" : "Type your answer below"}
-            </span>
-          </div>
-          
-          {/* Text area with improved styling */}
-          <textarea
-            value={userAnswer}
-            onChange={(e) => onUserAnswerChange(e.target.value)}
-            readOnly={isReadOnly}
-            disabled={isReadOnly}
-            placeholder={isReadOnly ? "Answer locked in demo mode or after AI review." : "Type your answer here..."}
-            className={`w-full h-32 p-4 border-0 focus:ring-0 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${isReadOnly ? 'opacity-80 cursor-not-allowed' : ''}`}
-          />
-          
-          {/* Character count and buttons */}
-          <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 border-t border-gray-300 dark:border-gray-600 flex justify-between items-center">
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              {userAnswer.length} characters
-            </span>
+        {/* For MCQ questions, we don't need a text area */}
+        {!isMCQ && (
+          /* Use a markdown editor-like appearance */
+          <div className="border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden">
+            {/* Simple toolbar */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 border-b border-gray-300 dark:border-gray-600 flex items-center">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {isReadOnly ? "Answer locked in demo mode or after AI review" : "Type your answer below"}
+              </span>
+            </div>
+            
+            {/* Text area with improved styling */}
+            <textarea
+              value={userAnswer}
+              onChange={(e) => onUserAnswerChange(e.target.value)}
+              readOnly={isReadOnly}
+              disabled={isReadOnly}
+              placeholder={isReadOnly ? "Answer locked in demo mode or after AI review." : "Type your answer here..."}
+              className={`w-full h-32 p-4 border-0 focus:ring-0 resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${isReadOnly ? 'opacity-80 cursor-not-allowed' : ''}`}
+            />
+            
+            {/* Character count and buttons */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 px-3 py-2 border-t border-gray-300 dark:border-gray-600 flex justify-between items-center">
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                {userAnswer.length} characters
+              </span>
 
-            <div className="flex items-center space-x-3">
-              {/* AI Review Button */}
-              {onAiReviewAnswer && (
+              <div className="flex items-center space-x-3">
+                {/* AI Review Button */}
+                {onAiReviewAnswer && (
+                  <button
+                    onClick={onAiReviewAnswer}
+                    disabled={isAiReviewing || !canRequestAiFeedback || aiFeedbackAlreadyExists || isReadOnly}
+                    className="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-600 rounded-lg shadow-sm text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isAiReviewing ? (
+                      <>
+                        Processing...
+                      </>
+                    ) : aiFeedbackAlreadyExists ? (
+                      'AI Feedback Received'
+                    ) : (
+                      'Get AI Feedback'
+                    )}
+                  </button>
+                )}
+
                 <button
-                  onClick={onAiReviewAnswer}
-                  disabled={isAiReviewing || !canRequestAiFeedback || aiFeedbackAlreadyExists || isReadOnly}
-                  className="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-600 rounded-lg shadow-sm text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  onClick={onSaveAnswer}
+                  disabled={!userAnswer.trim() || isSaving || isAnswerSaved || isReadOnly}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  {isAiReviewing ? (
+                  {isSaving ? (
                     <>
-                      Processing...
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Saving...
                     </>
-                  ) : aiFeedbackAlreadyExists ? (
-                    'AI Feedback Received'
                   ) : (
-                    'Get AI Feedback'
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      {isAnswerSaved ? 'Saved' : 'Save Answer'}
+                    </>
                   )}
                 </button>
-              )}
-
-              <button
-                onClick={onSaveAnswer}
-                disabled={!userAnswer.trim() || isSaving || isAnswerSaved || isReadOnly}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    {isAnswerSaved ? 'Saved' : 'Save Answer'}
-                  </>
-                )}
-              </button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
+
+        {/* For MCQ questions, show a message about the selected option */}
+        {isMCQ && (
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            {selectedOption ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                  <span className="text-gray-800 dark:text-gray-200">
+                    Selected: <span className="font-medium">{selectedOption}</span>
+                  </span>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  {/* AI Review Button for MCQ */}
+                  {onAiReviewAnswer && (
+                    <button
+                      onClick={onAiReviewAnswer}
+                      disabled={isAiReviewing || !canRequestAiFeedback || aiFeedbackAlreadyExists || isReadOnly}
+                      className="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-600 rounded-lg shadow-sm text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {isAiReviewing ? (
+                        <>
+                          Processing...
+                        </>
+                      ) : aiFeedbackAlreadyExists ? (
+                        'AI Feedback Received'
+                      ) : (
+                        'Get AI Feedback'
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    onClick={onSaveAnswer}
+                    disabled={!selectedOption || isSaving || isAnswerSaved || isReadOnly}
+                    className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isSaving ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        {isAnswerSaved ? 'Saved' : 'Save Answer'}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 dark:text-gray-400">
+                Please select an answer option above
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* AI Feedback Display */}

@@ -226,7 +226,14 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
     ]);
 
     const saveAnswerHandler = useCallback(async () => {
-        if (!userAnswer.trim() || !currentSessionId) {
+        // For MCQ questions, check if we have a selected option
+        const currentQ = currentQuestion;
+        const isMCQ = currentQ?.question_type === 'mcq' && currentQ?.options;
+        
+        // For MCQ, we need a selected option; for short answer, we need text
+        const hasValidAnswer = isMCQ ? !!props.userAnswer : !!props.userAnswer.trim();
+        
+        if (!hasValidAnswer || !currentSessionId) {
             // Allow saving an empty answer in demo if user explicitly clicks save and the input is empty
             // Or if they typed something and then cleared it.
             if (isReadOnlyDemo && currentSessionId) { // Check currentSessionId for demo too to ensure we are in a session context
@@ -319,8 +326,8 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
         return Promise.resolve();
     }, [
-        userAnswer, currentSessionId, isReadOnlyDemo, currentQuestionIndex, // userAnswers is not strictly needed here as we find and update/create
-        pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer, userAnswers
+        userAnswer, currentSessionId, isReadOnlyDemo, currentQuestionIndex, currentQuestion, // userAnswers is not strictly needed here as we find and update/create
+        pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer, userAnswers, props.userAnswer
     ]);
 
     const handleDifficultyResponseHandler = useCallback(async (difficulty: 'easy' | 'medium' | 'hard') => {
@@ -438,10 +445,18 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
         // Check if there's an unsaved text answer in the input field compared to the latest in userAnswers state
         const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
-        const isUnsavedText = userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim());
+        
+        // For MCQ questions, check if an option is selected but not saved
+        const currentQ = currentQuestion;
+        const isMCQ = currentQ?.question_type === 'mcq' && currentQ?.options;
+        
+        // Determine if there's unsaved content based on question type
+        const isUnsavedText = isMCQ 
+            ? (userAnswer && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer))
+            : (userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim()));
         
         // Also check if isAnswerSaved is false, indicating the last explicit save attempt might not have matched the current input
-        if (isUnsavedText || !isAnswerSaved && userAnswer.trim()) {
+        if (isUnsavedText || !isAnswerSaved && (isMCQ ? userAnswer : userAnswer.trim())) {
             await saveAnswerHandler(); // Ensure the latest text answer is saved
         }
 
@@ -472,21 +487,34 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
         return Promise.resolve();
     }, [
-        currentSessionId, userAnswer, userAnswers, currentQuestionIndex, isAnswerSaved, // Dependencies for checking unsaved text
+        currentSessionId, userAnswer, userAnswers, currentQuestionIndex, isAnswerSaved, currentQuestion, // Dependencies for checking unsaved text
         saveAnswerHandler, sessionDuration, pageReviewedCount, pageSessionStats,
         addToast, setIsReviewComplete, setSessionStartTime,
     ]);
 
     const handleAiReviewAnswerHandler = useCallback(async () => {
+        // For MCQ questions, check if an option is selected
+        const currentQ = currentQuestion;
+        const isMCQ = currentQ?.question_type === 'mcq' && currentQ?.options;
+        
         // Ensure an answer is saved before AI review, as AI needs the text
-        if (!isAnswerSaved && userAnswer.trim()) {
-             addToast('Please save your current answer before requesting AI feedback.', 'warning');
-             return;
+        if (!isAnswerSaved) {
+            if (isMCQ && userAnswer) {
+                // For MCQ, if an option is selected but not saved, save it first
+                await saveAnswerHandler();
+            } else if (!isMCQ && userAnswer.trim()) {
+                // For short answer, if text is entered but not saved, prompt to save
+                addToast('Please save your current answer before requesting AI feedback.', 'warning');
+                return;
+            }
         }
-        if (!userAnswer.trim()) { // Check after the isAnswerSaved check
+        
+        // Check if we have a valid answer to review
+        if (isMCQ ? !userAnswer : !userAnswer.trim()) {
             addToast('Please enter and save an answer before requesting AI feedback.', 'warning');
             return;
         }
+        
         if (!currentQuestion) {
             addToast('No current question to review.', 'error');
             return;
@@ -588,7 +616,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
     }, [
         currentQuestion, userAnswer, isReadOnlyDemo, isAnswerSaved, userAnswers, currentQuestionIndex,
-        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing, pageSetUserAnswers
+        addToast, setAiReviewFeedback, setAiReviewIsCorrect, setIsAiReviewing, pageSetUserAnswers, saveAnswerHandler
     ]);
 
     return {

@@ -15,6 +15,9 @@ interface Question {
   connects?: string[];
   difficulty: 'easy' | 'medium' | 'hard';
   mastery_context?: string;
+  options?: string[];
+  answer?: string;
+  question_type?: 'short' | 'mcq' | 'open';
 }
 type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
 
@@ -66,6 +69,10 @@ interface ActiveReviewScreenProps {
   reviewedCount: number;
   answersSavedCount: number;
   sessionStats: { easy: number; medium: number; hard: number };
+
+  // Props for MCQ
+  selectedOption?: string;
+  onSelectOption?: (option: string) => void;
 }
 
 const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
@@ -100,6 +107,8 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
     reviewedCount,
     answersSavedCount,
     sessionStats,
+    selectedOption,
+    onSelectOption,
   } = props;
 
   const { isReadOnlyDemo } = useDemoMode();
@@ -116,6 +125,11 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
   // Get the selected rating for the current question
   const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
   const selectedRating = currentAnswerRecord?.difficulty_rating || null;
+  
+  // Check if this is an MCQ question
+  const isMCQ = currentQuestion.question_type === 'mcq' && 
+                currentQuestion.options && 
+                currentQuestion.options.length > 0;
 
   return (
     <div className="fade-in">
@@ -141,6 +155,8 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
               getDifficultyIcon={getDifficultyIcon}
               showHint={showHint}
               onShowHint={() => setShowHint(true)}
+              selectedOption={selectedOption}
+              onSelectOption={onSelectOption}
             />
 
             <div className="p-6">
@@ -155,6 +171,8 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 isAiReviewing={isAiReviewing}
                 onAiReviewAnswer={onAiReviewAnswer}
                 isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
+                isMCQ={isMCQ}
+                selectedOption={selectedOption}
               />
 
               <ReviewControls

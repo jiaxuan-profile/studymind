@@ -1,4 +1,3 @@
-// src/components/view-session/SessionAnswerDisplay.tsx
 import React from 'react';
 import { Award, CheckCircle, XCircle } from 'lucide-react';
 
@@ -16,6 +15,8 @@ interface ReviewAnswer {
   original_difficulty?: string;
   ai_response_text?: string | null;
   is_correct?: boolean | null;
+  question_type?: 'short' | 'mcq' | 'open';
+  options?: string[] | null;
 }
 
 interface SessionAnswerDisplayProps {
@@ -25,6 +26,8 @@ interface SessionAnswerDisplayProps {
 const SessionAnswerDisplay: React.FC<SessionAnswerDisplayProps> = ({
   currentAnswer,
 }) => {
+  const isMCQ = currentAnswer?.question_type === 'mcq' && currentAnswer?.options;
+
   return (
     <div className="mb-8">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
@@ -33,11 +36,24 @@ const SessionAnswerDisplay: React.FC<SessionAnswerDisplayProps> = ({
       </h3>
       
       <div className="space-y-4">
-        <div className="w-full p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 min-h-40">
-          <p className="text-gray-800 dark:text-gray-200">
-            {currentAnswer?.answer_text || 'No answer saved for this question'}
-          </p>
-        </div>
+        {isMCQ ? (
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center">
+              <div className="w-5 h-5 rounded-full border-2 border-primary flex-shrink-0 mr-3">
+                <div className="w-3 h-3 bg-primary rounded-full m-auto"></div>
+              </div>
+              <span className="text-gray-800 dark:text-gray-200 font-medium">
+                Selected: {currentAnswer?.answer_text || 'No answer selected'}
+              </span>
+            </div>
+          </div>
+        ) : (
+          <div className="w-full p-4 border border-gray-200 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 min-h-40">
+            <p className="text-gray-800 dark:text-gray-200">
+              {currentAnswer?.answer_text || 'No answer saved for this question'}
+            </p>
+          </div>
+        )}
 
         {/* AI Feedback Display */}
         {currentAnswer?.ai_response_text && (

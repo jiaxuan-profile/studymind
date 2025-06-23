@@ -1,4 +1,3 @@
-// src/components/view-session/SessionQuestionDisplay.tsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { BookOpen, HelpCircle, TrendingUp, Lightbulb, Target, Zap, Brain } from 'lucide-react';
@@ -15,6 +14,8 @@ interface ReviewAnswer {
   hint?: string;
   mastery_context?: string;
   original_difficulty?: string;
+  question_type?: 'short' | 'mcq' | 'open';
+  options?: string[] | null;
 }
 
 interface SessionQuestionDisplayProps {
@@ -49,6 +50,8 @@ const SessionQuestionDisplay: React.FC<SessionQuestionDisplayProps> = ({
       default: return <HelpCircle className="h-4 w-4" />;
     }
   };
+
+  const isMCQ = currentAnswer.question_type === 'mcq' && currentAnswer.options && currentAnswer.options.length > 0;
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -119,6 +122,38 @@ const SessionQuestionDisplay: React.FC<SessionQuestionDisplayProps> = ({
             <p className="text-gray-800 dark:text-gray-200 text-lg leading-relaxed">{currentAnswer?.question_text}</p>
           </div>
         </div>
+
+        {/* Display MCQ options if this was an MCQ question */}
+        {isMCQ && currentAnswer.options && (
+          <div className="mb-6">
+            <h3 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-3">Options:</h3>
+            <div className="space-y-2">
+              {currentAnswer.options.map((option, index) => (
+                <div 
+                  key={index}
+                  className={`p-3 border-2 rounded-lg ${
+                    currentAnswer.answer_text === option
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                      : 'border-gray-200 dark:border-gray-600'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mr-3 ${
+                      currentAnswer.answer_text === option
+                        ? 'border-primary'
+                        : 'border-gray-400 dark:border-gray-500'
+                    }`}>
+                      {currentAnswer.answer_text === option && (
+                        <div className="w-3 h-3 bg-primary rounded-full m-auto"></div>
+                      )}
+                    </div>
+                    <span className="text-gray-800 dark:text-gray-200">{option}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {currentAnswer?.mastery_context && (
           <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/30 rounded-lg border border-amber-200 dark:border-amber-700/50">

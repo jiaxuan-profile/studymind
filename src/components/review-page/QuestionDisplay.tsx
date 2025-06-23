@@ -9,6 +9,9 @@ interface Question {
   connects?: string[];
   difficulty: 'easy' | 'medium' | 'hard';
   mastery_context?: string;
+  options?: string[];
+  answer?: string;
+  question_type?: 'short' | 'mcq' | 'open';
 }
 
 type CurrentQuestionType = Question & { noteId: string; noteTitle: string };
@@ -21,6 +24,8 @@ interface QuestionDisplayProps {
   getDifficultyIcon: (difficulty: string) => React.ReactNode;
   showHint: boolean;
   onShowHint: () => void;
+  selectedOption?: string;
+  onSelectOption?: (option: string) => void;
 }
 
 const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
@@ -31,8 +36,12 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
   getDifficultyIcon,
   showHint,
   onShowHint,
+  selectedOption,
+  onSelectOption,
 }) => {
   if (!currentQuestion) return null; 
+
+  const isMCQ = currentQuestion.question_type === 'mcq' && currentQuestion.options && currentQuestion.options.length > 0;
 
   return (
     <>
@@ -75,6 +84,39 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
             <p className="text-gray-800 dark:text-gray-200 text-lg leading-relaxed">{currentQuestion.question}</p>
           </div>
         </div>
+
+        {/* Multiple Choice Options */}
+        {isMCQ && (
+          <div className="mb-6">
+            <h3 className="text-base font-medium text-gray-800 dark:text-gray-200 mb-3">Select the correct answer:</h3>
+            <div className="space-y-2">
+              {currentQuestion.options?.map((option, index) => (
+                <div 
+                  key={index}
+                  onClick={() => onSelectOption && onSelectOption(option)}
+                  className={`p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                    selectedOption === option
+                      ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                      : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                  }`}
+                >
+                  <div className="flex items-center">
+                    <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mr-3 ${
+                      selectedOption === option
+                        ? 'border-primary'
+                        : 'border-gray-400 dark:border-gray-500'
+                    }`}>
+                      {selectedOption === option && (
+                        <div className="w-3 h-3 bg-primary rounded-full m-auto"></div>
+                      )}
+                    </div>
+                    <span className="text-gray-800 dark:text-gray-200">{option}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Combined hint and mastery context in a single row */}
         <div className="flex flex-col md:flex-row gap-4 mb-4">
