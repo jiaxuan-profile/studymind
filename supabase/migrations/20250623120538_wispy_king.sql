@@ -400,3 +400,6 @@ BEGIN
   RETURN total_generated;
 END;
 $$;
+
+ALTER TABLE flashcard_sessions
+  ALTER COLUMN user_id SET DEFAULT auth.uid();
