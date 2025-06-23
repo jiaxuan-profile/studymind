@@ -131,7 +131,7 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
       </div>
       {isReadOnly && (
          <p className="mt-3 text-xs text-center text-orange-600 dark:text-orange-400">
-            Rating is locked after AI review for this question.
+            Rating is locked in demo mode.
         </p>
       )}
     </div>

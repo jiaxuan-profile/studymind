@@ -1,5 +1,6 @@
 // src/components/review-page/ActiveReviewScreen.tsx
 import React, { useState, useEffect } from 'react';
+import { useDemoMode } from '../../contexts/DemoModeContext';
 
 import ReviewHeader from './ReviewHeader';
 import QuestionDisplay from './QuestionDisplay';
@@ -105,6 +106,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
     sessionStats,
   } = props;
 
+  const { isReadOnlyDemo } = useDemoMode();
   const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
@@ -155,7 +157,7 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 aiReviewIsCorrect={aiReviewIsCorrect}
                 isAiReviewing={isAiReviewing}
                 onAiReviewAnswer={onAiReviewAnswer} // Now correctly typed as () => Promise<void>
-                isReadOnly={aiFeedbackCompleted}
+                isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
               />
 
               <ReviewControls
@@ -164,13 +166,14 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
                 onFinishSession={onFinishSession}
                 isFirstQuestion={isFirstQuestion}
                 isLastQuestion={isLastQuestion}
+                isReadOnlyDemo={isReadOnlyDemo}
               />
 
               {/* MODIFIED: Passing selectedRating instead of currentQuestionIndex and userAnswers */}
               <DifficultyRating
                 onRateDifficulty={onRateDifficulty}
                 selectedRating={selectedRating}
-                isReadOnly={aiFeedbackCompleted}
+                isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
               />
             </div>
           </div>

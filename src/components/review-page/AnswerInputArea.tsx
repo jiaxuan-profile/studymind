@@ -52,8 +52,8 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
           onChange={(e) => onUserAnswerChange(e.target.value)}
           readOnly={isReadOnly}
           disabled={isReadOnly}
-          placeholder={isReadOnly ? "Answer locked after AI review." : "Type your answer here..."}
-          className="w-full h-40 p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+          placeholder={isReadOnly ? "Answer locked in demo mode or after AI review." : "Type your answer here..."}
+          className={`w-full h-40 p-4 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary resize-none bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 ${isReadOnly ? 'opacity-80 cursor-not-allowed' : ''}`}
         />
 
         <div className="flex justify-between items-center">
@@ -66,7 +66,7 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
             {onAiReviewAnswer && (
               <button
                 onClick={onAiReviewAnswer}
-                disabled={isAiReviewing || !canRequestAiFeedback || aiFeedbackAlreadyExists}
+                disabled={isAiReviewing || !canRequestAiFeedback || aiFeedbackAlreadyExists || isReadOnly}
                 className="inline-flex items-center px-4 py-2 border border-purple-300 dark:border-purple-600 rounded-lg shadow-sm text-sm font-medium text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/30 hover:bg-purple-100 dark:hover:bg-purple-900/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isAiReviewing ? (
@@ -83,7 +83,7 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
 
             <button
               onClick={onSaveAnswer}
-              disabled={!userAnswer.trim() || isSaving || isAnswerSaved}
+              disabled={!userAnswer.trim() || isSaving || isAnswerSaved || isReadOnly}
               className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {isSaving ? (

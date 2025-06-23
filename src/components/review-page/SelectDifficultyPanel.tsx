@@ -1,5 +1,6 @@
 // src/components/review-page/SelectDifficultyPanel.tsx
 import React from 'react';
+import { useDemoMode } from '../../contexts/DemoModeContext';
 
 interface SelectDifficultyPanelProps {
   generateNewQuestions: boolean;
@@ -16,6 +17,8 @@ const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
   setSelectedDifficulty,
   getDifficultyIcon,
 }) => {
+  const { isReadOnlyDemo } = useDemoMode();
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="bg-gradient-to-r from-accent/10 to-warning/10 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -28,17 +31,23 @@ const SelectDifficultyPanel: React.FC<SelectDifficultyPanelProps> = ({
       <div className="p-6 space-y-4">
         <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg">
           <div className="space-y-3">
-            <label className="flex items-center space-x-2 cursor-pointer">
+            <label className={`flex items-center space-x-2 ${isReadOnlyDemo ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={generateNewQuestions}
-                onChange={(e) => setGenerateNewQuestions(e.target.checked)}
+                onChange={(e) => !isReadOnlyDemo && setGenerateNewQuestions(e.target.checked)}
                 className="rounded border-gray-300 text-primary focus:ring-primary"
+                disabled={isReadOnlyDemo}
               />
               <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
                 Generate 5 new questions for this session
               </span>
             </label>
+            {isReadOnlyDemo && (
+              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+                Question generation is disabled in demo mode.
+              </p>
+            )}
           </div>
         </div>
 

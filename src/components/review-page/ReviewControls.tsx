@@ -8,6 +8,7 @@ interface ReviewControlsProps {
   onFinishSession: () => Promise<void>;
   isFirstQuestion: boolean;
   isLastQuestion: boolean;
+  isReadOnlyDemo?: boolean;
 }
 
 const ReviewControls: React.FC<ReviewControlsProps> = ({
@@ -16,6 +17,7 @@ const ReviewControls: React.FC<ReviewControlsProps> = ({
   onFinishSession,
   isFirstQuestion,
   isLastQuestion,
+  isReadOnlyDemo = false,
 }) => {
   return (
     <div className="mb-8 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg flex justify-between items-center">
@@ -31,7 +33,8 @@ const ReviewControls: React.FC<ReviewControlsProps> = ({
       {isLastQuestion ? (
         <button
           onClick={onFinishSession}
-          className="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
+          disabled={isReadOnlyDemo}
+          className="inline-flex items-center px-6 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           Finish Session
           <CheckCircle className="h-4 w-4 ml-2" />
