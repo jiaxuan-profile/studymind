@@ -1,6 +1,6 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User, ConceptRelationship, PomodoroSettings, Subject } from '../types';
+import { Note, Concept, User, ConceptRelationship, Subject } from '../types';
 import { toNote } from '../utils/transformers';
 import { withAuthenticatedUser } from '../utils/authenticatedUser';
 import { getAllConcepts, getAllSubjects } from '../services/databaseService';
@@ -14,6 +14,21 @@ interface PaginationState {
   totalNotes: number;
 }
 
+interface AppSettings {
+  pomodoroTimer: {
+    workDuration: number;
+    shortBreakDuration: number;
+    longBreakDuration: number;
+    cyclesBeforeLongBreak: number;
+    soundEnabled: boolean;
+  };
+  audio: {
+    ttsVolume: number;
+    ttsPitch: number;
+    ttsRate: number;
+  };
+}
+
 interface State {
   loadSubjects: () => Promise<void>;
   notes: Note[];
@@ -25,7 +40,7 @@ interface State {
   isLoading: boolean;
   error: string | null;
   pagination: PaginationState;
-  pomodoroSettings: PomodoroSettings;
+  appSettings: AppSettings;
 
   addNote: (note: Partial<Note>) => void;
   updateNote: (id: string, updates: Partial<Note>) => void;
@@ -43,8 +58,38 @@ interface State {
   resetStore: () => void;
   loadConcepts: () => Promise<void>;
 
-  updatePomodoroSettings: (updates: Partial<PomodoroSettings>) => void;
+  updateAppSettings: (updates: Partial<AppSettings> | ((current: AppSettings) => Partial<AppSettings>)) => void;
+  
+  // For backward compatibility
+  pomodoroSettings: AppSettings['pomodoroTimer'];
+  updatePomodoroSettings: (updates: Partial<AppSettings['pomodoroTimer']>) => void;
 }
+
+// Helper function for deep merging objects
+const deepMerge = <T extends Record<string, any>>(target: T, source: Partial<T>): T => {
+  const result = { ...target };
+  
+  for (const key in source) {
+    if (source[key] !== undefined) {
+      if (
+        source[key] !== null &&
+        typeof source[key] === 'object' &&
+        !Array.isArray(source[key]) &&
+        target[key] !== null &&
+        typeof target[key] === 'object' &&
+        !Array.isArray(target[key])
+      ) {
+        // If both source and target values are objects, recursively merge them
+        result[key] = deepMerge(target[key], source[key]);
+      } else {
+        // Otherwise, just assign the source value to the target
+        result[key] = source[key];
+      }
+    }
+  }
+  
+  return result;
+};
 
 export const useStore = create<State>((set, get) => ({
   notes: [],
@@ -61,12 +106,28 @@ export const useStore = create<State>((set, get) => ({
     pageSize: 12,
     totalNotes: 0,
   },
-  pomodoroSettings: {
-    workDuration: 25,
-    shortBreakDuration: 5,
-    longBreakDuration: 15,
-    cyclesBeforeLongBreak: 4,
-    soundEnabled: true,
+  appSettings: {
+    pomodoroTimer: {
+      workDuration: 25,
+      shortBreakDuration: 5,
+      longBreakDuration: 15,
+      cyclesBeforeLongBreak: 4,
+      soundEnabled: true,
+    },
+    audio: {
+      ttsVolume: 1.0,
+      ttsPitch: 1.0,
+      ttsRate: 1.0,
+    }
+  },
+
+  // For backward compatibility
+  get pomodoroSettings() {
+    return get().appSettings.pomodoroTimer;
+  },
+  
+  updatePomodoroSettings: (updates) => {
+    get().updateAppSettings({ pomodoroTimer: updates });
   },
 
   loadNotes: async (page = 1, pageSize = 12, options = {}) => {
@@ -241,8 +302,15 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  // Pomodoro settings actions
-  updatePomodoroSettings: (updates) => set((state) => ({
-    pomodoroSettings: { ...state.pomodoroSettings, ...updates }
-  })),
+  // New unified settings update function
+  updateAppSettings: (updates) => set((state) => {
+    const currentSettings = state.appSettings;
+    const newUpdates = typeof updates === 'function' 
+      ? updates(currentSettings) 
+      : updates;
+    
+    return {
+      appSettings: deepMerge(currentSettings, newUpdates)
+    };
+  }),
 }));

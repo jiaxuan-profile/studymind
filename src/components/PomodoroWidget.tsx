@@ -25,7 +25,8 @@ const PomodoroWidget: React.FC = () => {
   const [canPlay, setCanPlay] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioReady, setAudioReady] = useState(false);
-  const { pomodoroSettings } = useStore();
+  const { appSettings } = useStore();
+  const pomodoroSettings = appSettings.pomodoroTimer;
 
   // Timer state
   const [isRunning, setIsRunning] = useState(false);

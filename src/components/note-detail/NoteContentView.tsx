@@ -9,6 +9,7 @@ import { Note, YEAR_LEVEL_OPTIONS } from '../../types';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { useStore } from '../../store';
 
 interface NoteContentViewProps {
   note: Note;
@@ -28,6 +29,8 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
   const [subjectName, setSubjectName] = useState<string>(
     note.subjectId ? `Subject ${note.subjectId}` : 'No subject'
   );
+  const { appSettings } = useStore();
+  const { audio } = appSettings;
 
   useEffect(() => {
     const fetchSubjectName = async () => {
@@ -101,10 +104,10 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
     // Create a new speech synthesis utterance
     const utterance = new SpeechSynthesisUtterance(note.summary);
 
-    // Configure the utterance with increased speed
-    utterance.rate = 1.3; // Increased from 0.9 to 1.3 for faster playback
-    utterance.pitch = 1.2;
-    utterance.volume = 1.0;
+    // Configure the utterance with user settings
+    utterance.volume = audio.ttsVolume;
+    utterance.pitch = audio.ttsPitch;
+    utterance.rate = audio.ttsRate;
 
     // Set up event handlers
     utterance.onstart = () => {
@@ -186,7 +189,10 @@ const NoteContentView: React.FC<NoteContentViewProps> = ({
                     onClick={handleReadSummary}
                     disabled={!note.summary}
                     className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-800/50 hover:bg-blue-200 dark:hover:bg-blue-800/70 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    title={isSpeaking ? 'Stop reading summary' : 'Read summary aloud (1.3x speed)'}
+                    title={isSpeaking 
+                      ? 'Stop reading summary' 
+                      : `Read summary aloud (Volume: ${Math.round(audio.ttsVolume * 100)}%, Pitch: ${audio.ttsPitch.toFixed(1)}, Rate: ${audio.ttsRate.toFixed(1)}x)`
+                    }
                   >
                     {isSpeaking ? (
                       <>

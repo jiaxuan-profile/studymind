@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X, Bell, Settings, CheckCircle, XCircle, AlertTriangle, Info, Trash2, BookMarked as MarkAsRead, Clock } from 'lucide-react';
 import { useNotifications } from '../contexts/NotificationContext';
 import { Notification } from '../types/notification';
-import PomodoroSettingsPanel from './PomodoroSettingsPanel';
+import AppSettingsPanel from './AppSettingsPanel';
 
 interface NotificationCenterProps {
   isOpen: boolean;
@@ -209,7 +209,7 @@ const NotificationCenter: React.FC<NotificationCenterProps> = ({ isOpen, onClose
               </div>
             ) : (
               <div className="h-full overflow-y-auto p-6 bg-gray-50 dark:bg-gray-800/30">
-                <PomodoroSettingsPanel />
+                <AppSettingsPanel />
               </div>
             )}
           </div>
