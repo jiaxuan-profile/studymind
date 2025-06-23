@@ -125,12 +125,25 @@ export async function generateFlashcardsForStrugglingConcepts(
   maxConcepts: number = 5
 ): Promise<number> {
   try {
-    const { data, error } = await supabase.rpc('generate_flashcards_for_struggling_concepts', {
-      max_concepts: maxConcepts
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error("User not authenticated");
+
+    const response = await fetch('/api/generate-flashcards', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ maxConcepts })
     });
 
-    if (error) throw error;
-    return data || 0;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to generate flashcards');
+    }
+
+    const data = await response.json();
+    return data.count || 0;
   } catch (error) {
     console.error('Error generating flashcards for struggling concepts:', error);
     throw error;

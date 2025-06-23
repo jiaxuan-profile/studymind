@@ -60,6 +60,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/summarize', '/summarize'),
       },
+      '/api/generate-flashcards': {
+        target: 'https://study.studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/generate-flashcards', '/generate-flashcards'),
+      },
     },
   },
 });
