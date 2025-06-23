@@ -453,19 +453,20 @@ const FlashcardsPage: React.FC = () => {
               </div>
 
               {/* Current Flashcard */}
-              <div 
-                className={`relative w-full h-96 cursor-pointer transition-transform duration-700 transform-gpu ${
-                  isFlipped ? 'rotate-y-180' : ''
-                }`}
-                onClick={handleFlip}
-              >
-                {/* Front */}
-                <div 
-                  className={`absolute inset-0 p-8 flex flex-col backface-hidden ${
-                    isFlipped ? 'opacity-0' : 'opacity-100'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-6">
+<div className="w-full h-96 [perspective:1000px]">
+    <div
+        className={`relative w-full h-96 cursor-pointer transition-transform duration-700 transform-gpu [transform-style:preserve-3d] ${
+            isFlipped ? 'rotate-y-180' : ''
+        }`}
+        onClick={handleFlip}
+    >
+        {/* Front Face */}
+        <div
+            className={`absolute inset-0 p-8 flex flex-col backface-hidden`} // NO OPACITY CLASSES
+        >
+            {/* Insert your actual original front content structure here */}
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
                     <div className="flex items-center">
                       <span className={`h-3 w-3 rounded-full ${
                         flashcards[currentIndex].masteryLevel < 0.3 
@@ -478,7 +479,8 @@ const FlashcardsPage: React.FC = () => {
                         {flashcards[currentIndex].conceptName}
                       </span>
                     </div>
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                </div>
+                <span className={`px-2 py-0.5 text-xs rounded-full ${
                       flashcards[currentIndex].difficulty === 'easy' 
                         ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
                         : flashcards[currentIndex].difficulty === 'medium'
@@ -487,31 +489,27 @@ const FlashcardsPage: React.FC = () => {
                     }`}>
                       {flashcards[currentIndex].difficulty}
                     </span>
-                  </div>
-                  
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-xl text-gray-900 dark:text-gray-100 text-center">
-                      {flashcards[currentIndex].frontContent}
-                    </p>
-                  </div>
-                  
-                  <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
-                    Tap to reveal answer
-                  </div>
-                </div>
+            </div>
+            <div className="flex-1 flex items-center justify-center">
+                <p className="text-xl text-gray-900 dark:text-gray-100 text-center">
+                    {flashcards[currentIndex]?.frontContent}
+                </p>
+            </div>
+            <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-6">
+                Tap to reveal answer
+            </div>
+        </div>
 
-                {/* Back */}
-                <div 
-                  className={`absolute inset-0 p-8 flex flex-col backface-hidden rotate-y-180 ${
-                    isFlipped ? 'opacity-100' : 'opacity-0'
-                  }`}
-                >
-                  <div className="flex-1 flex items-center justify-center">
-                    <p className="text-xl text-gray-900 dark:text-gray-100 text-center">
-                      {flashcards[currentIndex].backContent}
-                    </p>
-                  </div>
-                  
+        {/* Back Face */}
+        <div
+            className={`absolute inset-0 p-8 flex flex-col backface-hidden rotate-y-180`} // NO OPACITY CLASSES
+        >
+            {/* Insert your actual original back content structure here */}
+            <div className="flex-1 flex items-center justify-center">
+                <p className="text-xl text-gray-900 dark:text-gray-100 text-center">
+                    {flashcards[currentIndex]?.backContent}
+                </p>
+            </div>
                   <div className="mt-6 grid grid-cols-3 gap-4">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleResponse(1); }}
@@ -535,8 +533,9 @@ const FlashcardsPage: React.FC = () => {
                       <span>Easy</span>
                     </button>
                   </div>
-                </div>
-              </div>
+        </div>
+    </div>
+</div>
 
               {/* Progress Bar */}
               <div className="p-4 border-t border-gray-200 dark:border-gray-700">
