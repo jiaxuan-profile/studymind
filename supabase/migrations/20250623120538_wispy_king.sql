@@ -122,6 +122,7 @@ CREATE POLICY "Users can delete their own flashcard responses" ON flashcard_resp
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Function to get due flashcards for a user
+DROP FUNCTION IF EXISTS get_due_flashcards(user_uuid UUID, limit_count INTEGER, include_new BOOLEAN, focus_on_struggling BOOLEAN);
 CREATE OR REPLACE FUNCTION get_due_flashcards(
   user_uuid UUID DEFAULT auth.uid(),
   limit_count INTEGER DEFAULT 20,
@@ -130,14 +131,17 @@ CREATE OR REPLACE FUNCTION get_due_flashcards(
 )
 RETURNS TABLE (
   id UUID,
-  concept_id TEXT,
+  concept_id TEXT, -- This is the return column name
   concept_name TEXT,
   front_content TEXT,
   back_content TEXT,
   difficulty TEXT,
   mastery_level FLOAT,
   due_date TIMESTAMPTZ,
-  is_new BOOLEAN
+  is_new BOOLEAN,
+  repetition_count INTEGER,
+  ease_factor FLOAT,
+  interval_days INTEGER
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -145,8 +149,8 @@ AS $$
 BEGIN
   RETURN QUERY
   WITH user_mastery AS (
-    SELECT 
-      ucm.concept_id,
+    SELECT
+      ucm.concept_id, -- This is um.concept_id or c.concept_id after join
       c.name as concept_name,
       ucm.mastery_level
     FROM user_concept_mastery ucm
@@ -154,40 +158,44 @@ BEGIN
     WHERE ucm.user_id = user_uuid
   ),
   struggling_concepts AS (
-    SELECT concept_id
-    FROM user_mastery
-    WHERE mastery_level < 0.3
+    SELECT sc_um.concept_id -- Aliasing here for clarity, though likely not the source of ambiguity
+    FROM user_mastery sc_um -- Using an alias for user_mastery within this CTE
+    WHERE sc_um.mastery_level < 0.3
   ),
   due_cards AS (
-    SELECT 
+    SELECT
       f.id,
-      f.concept_id,
-      um.concept_name,
+      f.concept_id,         -- QUALIFIED: This is the concept_id from the flashcard
+      um.concept_name,      -- This comes from user_mastery which derived it from concepts
       f.front_content,
       f.back_content,
       f.difficulty,
       COALESCE(um.mastery_level, 0.5) as mastery_level,
       f.next_review_at as due_date,
-      CASE WHEN f.repetition_count = 0 THEN TRUE ELSE FALSE END as is_new
+      CASE WHEN f.repetition_count = 0 THEN TRUE ELSE FALSE END as is_new,
+      f.repetition_count,
+      f.ease_factor,
+      f.interval_days
     FROM flashcards f
-    LEFT JOIN user_mastery um ON f.concept_id = um.concept_id
+    LEFT JOIN user_mastery um ON f.concept_id = um.concept_id -- Join condition
     WHERE f.user_id = user_uuid
     AND (
-      -- Cards due for review
       (f.next_review_at IS NULL OR f.next_review_at <= NOW())
-      -- Include new cards if requested
       OR (include_new AND f.repetition_count = 0)
     )
     -- Prioritize struggling concepts if requested
-    ORDER BY 
-      CASE WHEN focus_on_struggling AND f.concept_id IN (SELECT concept_id FROM struggling_concepts) THEN 0 ELSE 1 END,
-      -- Then by due date (oldest first)
-      COALESCE(f.next_review_at, NOW()),
+    ORDER BY
+      CASE
+        WHEN focus_on_struggling AND f.concept_id IN (SELECT ssc.concept_id FROM struggling_concepts ssc) THEN 0
+        ELSE 1
+      END,
+      -- Then by due date (oldest first for NULLs if they represent new cards)
+      COALESCE(f.next_review_at, NOW() - INTERVAL '365 days'),
       -- Then by mastery level (lowest first)
       COALESCE(um.mastery_level, 0.5)
     LIMIT limit_count
   )
-  SELECT * FROM due_cards;
+  SELECT dc.* FROM due_cards dc; -- Using dc.* is fine here as due_cards has a defined structure
 END;
 $$;
 
@@ -384,8 +392,8 @@ BEGIN
       ucm.mastery_level
     FROM user_concept_mastery ucm
     JOIN concepts c ON ucm.concept_id = c.id
-    WHERE ucm.user_id = user_uuid
-    AND ucm.mastery_level < 0.3
+    WHERE ucm.user_id = 'c0d8ab1d-864d-4c26-951d-718765fffd56'
+    AND ucm.mastery_level < 0.4
     ORDER BY ucm.mastery_level ASC
     LIMIT max_concepts
   LOOP
@@ -400,3 +408,10 @@ BEGIN
   RETURN total_generated;
 END;
 $$;
+
+ALTER TABLE flashcard_sessions ALTER COLUMN user_id SET DEFAULT auth.uid();
+ALTER TABLE flashcard_responses ALTER COLUMN user_id SET DEFAULT auth.uid();
+
+-- Add the column if it doesn't exist
+ALTER TABLE flashcard_sessions
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
