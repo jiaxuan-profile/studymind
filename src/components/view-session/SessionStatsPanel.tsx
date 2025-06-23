@@ -1,4 +1,3 @@
-// src/components/view-session/SessionStatsPanel.tsx
 import React from 'react';
 import { TrendingUp, RefreshCw, CheckCircle, HelpCircle, XCircle } from 'lucide-react';
 

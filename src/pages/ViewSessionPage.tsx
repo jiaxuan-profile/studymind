@@ -1,5 +1,3 @@
-// src/pages/ViewSessionPage.tsx
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../services/supabase';
@@ -45,6 +43,10 @@ interface ReviewAnswer {
   hint?: string;
   mastery_context?: string;
   original_difficulty?: string;
+  ai_response_text?: string | null;
+  is_correct?: boolean | null;
+  question_type?: 'short' | 'mcq' | 'open';
+  options?: string[] | null;
 }
 
 const ViewSessionPage: React.FC = () => {

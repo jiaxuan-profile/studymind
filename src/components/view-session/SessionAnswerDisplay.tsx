@@ -29,7 +29,7 @@ const SessionAnswerDisplay: React.FC<SessionAnswerDisplayProps> = ({
   const isMCQ = currentAnswer?.question_type === 'mcq' && currentAnswer?.options;
 
   return (
-    <div className="mb-8">
+    <div className="mb-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
         <Award className="h-5 w-5 text-primary mr-2" />
         Your Answer
