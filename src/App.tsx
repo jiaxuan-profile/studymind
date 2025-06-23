@@ -13,6 +13,7 @@ import ConceptsPage from './pages/ConceptsPage';
 import ReviewPage from './pages/ReviewPage';
 import ReviewHistoryPage from './pages/ReviewHistoryPage';
 import ViewSessionPage from './pages/ViewSessionPage';
+import FlashcardsPage from './pages/FlashcardsPage';
 import HelpSupportPage from './pages/HelpSupportPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
@@ -112,6 +113,7 @@ function AppRoutes() {
           <Route path="notes" element={<NotesPage />} />
           <Route path="notes/:id" element={<NoteDetailPage />} />
           <Route path="concepts" element={<ConceptsPage />} />
+          <Route path="flashcards" element={<FlashcardsPage />} />
           <Route path="review" element={<ReviewPage />} />
           <Route path="history" element={<ReviewHistoryPage />} />
           <Route path="session/:sessionId" element={<ViewSessionPage />} />

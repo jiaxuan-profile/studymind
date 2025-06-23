@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle, History } from 'lucide-react';
+import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle, History, Layers } from 'lucide-react';
 import { useStore } from '../store';
 
 interface SidebarProps {
@@ -75,6 +75,18 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
         >
           <BrainCircuit className="mr-3 h-5 w-5" />
           Concept Graph
+        </NavLink>
+
+        <NavLink
+          to="/flashcards"
+          className={({ isActive }) =>
+            isActive
+              ? "flex items-center px-2 py-2 text-sm font-medium rounded-md bg-primary text-white"
+              : "flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
+          }
+        >
+          <Layers className="mr-3 h-5 w-5" />
+          Flashcards
         </NavLink>
 
         <NavLink

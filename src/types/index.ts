@@ -178,6 +178,45 @@ export interface ReviewSession {
   user_id: string;
 }
 
+// --- FLASHCARD TYPES ---
+
+export interface Flashcard {
+  id: string;
+  conceptId: string;
+  conceptName: string;
+  frontContent: string;
+  backContent: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  masteryLevel: number;
+  dueDate: Date | null;
+  isNew: boolean;
+  lastShownAt?: Date | null;
+  repetitionCount: number;
+  easeFactor: number;
+  intervalDays: number;
+}
+
+export interface FlashcardSession {
+  id: string;
+  startedAt: Date;
+  completedAt?: Date;
+  cardsStudied: number;
+  correctCount: number;
+  incorrectCount: number;
+  sessionDurationSeconds?: number;
+  focusAreas: string[];
+}
+
+export interface FlashcardResponse {
+  id: string;
+  flashcardId: string;
+  sessionId?: string;
+  responseQuality: number; // 0-5 scale
+  responseTimeMs?: number;
+  createdAt: Date;
+  notes?: string;
+}
+
 // --- UI & VISUALIZATION TYPES ---
 
 // Data model for a node in the react-force-graph-2d component.
@@ -214,13 +253,20 @@ export interface GraphData {
 
 // --- SETTINGS TYPES ---
 
-// User-specific settings for the Pomodoro timer.
-export interface PomodoroSettings {
-  workDuration: number;
-  shortBreakDuration: number;
-  longBreakDuration: number;
-  cyclesBeforeLongBreak: number;
-  soundEnabled: boolean;
+// App settings structure
+export interface AppSettings {
+  pomodoroTimer: {
+    workDuration: number;
+    shortBreakDuration: number;
+    longBreakDuration: number;
+    cyclesBeforeLongBreak: number;
+    soundEnabled: boolean;
+  };
+  audio: {
+    ttsVolume: number;
+    ttsPitch: number;
+    ttsRate: number;
+  };
 }
 
 // Subscription tier type

@@ -316,3 +316,13 @@
 }
 
 .quick-action-btn { @apply inline-flex items-center px-2 py-1 text-xs font-medium rounded border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100; }
+
+/* 3D flip animation for flashcards */
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
