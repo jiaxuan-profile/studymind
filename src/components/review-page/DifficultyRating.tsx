@@ -1,4 +1,3 @@
-// src/components/review-page/DifficultyRating.tsx
 import React from 'react';
 import { XCircle, HelpCircle, CheckCircle } from 'lucide-react';
 
@@ -15,7 +14,7 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
 }) => {
   const getButtonStyles = (difficulty: 'easy' | 'medium' | 'hard') => {
     const isSelected = selectedRating === difficulty;
-    const baseStyles = "flex items-center justify-center gap-3 p-4 border-2 rounded-lg transition-all";
+    const baseStyles = "flex items-center justify-center gap-3 p-3 border-2 rounded-lg transition-all";
     let specificStyles = "";
 
     // Determine color theme based on difficulty
@@ -72,25 +71,25 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow border border-gray-200 dark:border-gray-700 mt-6">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
+    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700 mt-4">
+      <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
         How difficult did you find this question?
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-3 gap-2">
         <button
           onClick={() => handleRate('hard')}
           disabled={isReadOnly}
           className={getButtonStyles('hard')}
           type="button" // Explicitly type as button
         >
-          <XCircle className="h-6 w-6" />
+          <XCircle className="h-5 w-5" />
           <div className="text-left">
             <div className="font-semibold">Difficult</div>
-            <div className="text-sm opacity-75">Need more practice</div>
+            <div className="text-xs opacity-75">Need more practice</div>
           </div>
           {selectedRating === 'hard' && (
             <div className="ml-auto">
-              <CheckCircle className="h-5 w-5" />
+              <CheckCircle className="h-4 w-4" />
             </div>
           )}
         </button>
@@ -100,14 +99,14 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
           className={getButtonStyles('medium')}
           type="button"
         >
-          <HelpCircle className="h-6 w-6" />
+          <HelpCircle className="h-5 w-5" />
           <div className="text-left">
             <div className="font-semibold">Somewhat</div>
-            <div className="text-sm opacity-75">Getting there</div>
+            <div className="text-xs opacity-75">Getting there</div>
           </div>
           {selectedRating === 'medium' && (
             <div className="ml-auto">
-              <CheckCircle className="h-5 w-5" />
+              <CheckCircle className="h-4 w-4" />
             </div>
           )}
         </button>
@@ -117,14 +116,14 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
           className={getButtonStyles('easy')}
           type="button"
         >
-          <CheckCircle className="h-6 w-6" />
+          <CheckCircle className="h-5 w-5" />
           <div className="text-left">
             <div className="font-semibold">Easy</div>
-            <div className="text-sm opacity-75">Well understood</div>
+            <div className="text-xs opacity-75">Well understood</div>
           </div>
           {selectedRating === 'easy' && (
             <div className="ml-auto">
-              <CheckCircle className="h-5 w-5" />
+              <CheckCircle className="h-4 w-4" />
             </div>
           )}
         </button>

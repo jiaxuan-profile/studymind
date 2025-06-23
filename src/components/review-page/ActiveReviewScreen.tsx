@@ -1,4 +1,3 @@
-// src/components/review-page/ActiveReviewScreen.tsx
 import React, { useState, useEffect } from 'react';
 import { useDemoMode } from '../../contexts/DemoModeContext';
 
@@ -136,54 +135,70 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-3">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <QuestionDisplay
-              currentQuestion={currentQuestion}
-              currentQuestionIndex={currentQuestionIndex}
-              totalQuestionsInSession={totalQuestionsInSession}
-              getDifficultyColor={getDifficultyColor}
-              getDifficultyIcon={getDifficultyIcon}
-              showHint={showHint}
-              onShowHint={() => setShowHint(true)}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-4">
+              {/* Main content area - takes 3/4 of the space on large screens */}
+              <div className="lg:col-span-3">
+                <QuestionDisplay
+                  currentQuestion={currentQuestion}
+                  currentQuestionIndex={currentQuestionIndex}
+                  totalQuestionsInSession={totalQuestionsInSession}
+                  getDifficultyColor={getDifficultyColor}
+                  getDifficultyIcon={getDifficultyIcon}
+                  showHint={showHint}
+                  onShowHint={() => setShowHint(true)}
+                />
 
-            <div className="p-6">
-              <AnswerInputArea
-                userAnswer={userAnswer}
-                onUserAnswerChange={onUserAnswerChange}
-                isAnswerSaved={isAnswerSaved}
-                isSaving={isSaving}
-                onSaveAnswer={onSaveAnswer}
-                aiReviewFeedback={aiReviewFeedback}
-                aiReviewIsCorrect={aiReviewIsCorrect}
-                isAiReviewing={isAiReviewing}
-                onAiReviewAnswer={onAiReviewAnswer} // Now correctly typed as () => Promise<void>
-                isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
-              />
+                <div className="p-6">
+                  <AnswerInputArea
+                    userAnswer={userAnswer}
+                    onUserAnswerChange={onUserAnswerChange}
+                    isAnswerSaved={isAnswerSaved}
+                    isSaving={isSaving}
+                    onSaveAnswer={onSaveAnswer}
+                    aiReviewFeedback={aiReviewFeedback}
+                    aiReviewIsCorrect={aiReviewIsCorrect}
+                    isAiReviewing={isAiReviewing}
+                    onAiReviewAnswer={onAiReviewAnswer}
+                    isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
+                  />
 
-              <ReviewControls
-                onNavigatePrevious={onNavigatePrevious}
-                onNavigateNext={onNavigateNext}
-                onFinishSession={onFinishSession}
-                isFirstQuestion={isFirstQuestion}
-                isLastQuestion={isLastQuestion}
-                isReadOnlyDemo={isReadOnlyDemo}
-              />
+                  <ReviewControls
+                    onNavigatePrevious={onNavigatePrevious}
+                    onNavigateNext={onNavigateNext}
+                    onFinishSession={onFinishSession}
+                    isFirstQuestion={isFirstQuestion}
+                    isLastQuestion={isLastQuestion}
+                    isReadOnlyDemo={isReadOnlyDemo}
+                  />
 
-              {/* MODIFIED: Passing selectedRating instead of currentQuestionIndex and userAnswers */}
-              <DifficultyRating
-                onRateDifficulty={onRateDifficulty}
-                selectedRating={selectedRating}
-                isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
-              />
+                  <DifficultyRating
+                    onRateDifficulty={onRateDifficulty}
+                    selectedRating={selectedRating}
+                    isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
+                  />
+                </div>
+              </div>
+              
+              {/* Right sidebar - takes 1/4 of the space on large screens */}
+              <div className="lg:col-span-1 border-l border-gray-200 dark:border-gray-700 hidden lg:block">
+                <SessionProgressSidebar
+                  reviewedCount={reviewedCount}
+                  answersSavedCount={answersSavedCount}
+                  sessionStats={sessionStats}
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <SessionProgressSidebar
-          reviewedCount={reviewedCount}
-          answersSavedCount={answersSavedCount}
-          sessionStats={sessionStats}
-        />
+        {/* Mobile-only session progress - shown below on small screens */}
+        <div className="lg:hidden">
+          <SessionProgressSidebar
+            reviewedCount={reviewedCount}
+            answersSavedCount={answersSavedCount}
+            sessionStats={sessionStats}
+          />
+        </div>
       </div>
     </div>
   );
