@@ -11,6 +11,7 @@ import {
   ChevronDown
 } from 'lucide-react';
 import { useStore } from '../store';
+import TimerCompletionOverlay from './TimerCompletionOverlay';
 
 interface PomodoroStats {
   completedPomodoros: number;
@@ -33,6 +34,10 @@ const PomodoroWidget: React.FC = () => {
   const [currentCycle, setCurrentCycle] = useState(1);
   const [completedCycles, setCompletedCycles] = useState(0);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  // Completion overlay state
+  const [showCompletionOverlay, setShowCompletionOverlay] = useState(false);
+  const [completionOverlayType, setCompletionOverlayType] = useState<TimerState>('work');
 
   // Stats
   const [stats, setStats] = useState<PomodoroStats>({
@@ -169,6 +174,10 @@ const PomodoroWidget: React.FC = () => {
     if (canPlay) {
       playNotificationSound();
     }
+
+    // Show the completion overlay with the appropriate type
+    setCompletionOverlayType(currentState);
+    setShowCompletionOverlay(true);
 
     setTimeout(() => {
       if (currentState === 'work') {
@@ -531,6 +540,14 @@ const PomodoroWidget: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* Timer Completion Overlay */}
+      <TimerCompletionOverlay
+        isOpen={showCompletionOverlay}
+        type={completionOverlayType}
+        onClose={() => setShowCompletionOverlay(false)}
+        autoCloseDelay={6000} // Auto-close after 6 seconds
+      />
     </div>
   );
 };
