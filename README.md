@@ -55,6 +55,17 @@ StudyMind supports both formative and summative assessment strategies:
   - Facilitates better recall during study sessions
   - Personalizes the learning experience for each note
 
+### 🎯 Smart Flashcards
+- **AI-Generated Flashcards**: Automatically created from your notes and concepts
+- **Spaced Repetition Algorithm**: Optimizes review intervals for maximum retention
+- **Adaptive Difficulty**: Focuses on your struggling concepts first
+- **Mastery Tracking**: Updates concept mastery levels based on your performance
+- **Interactive Interface**: Beautiful 3D card flip animations
+- **Self-Assessment**: Rate your knowledge as Easy, Medium, or Hard
+- **Session Statistics**: Track your progress and accuracy
+- **Customizable Filters**: Control which cards to study and in what order
+- **Struggling Concepts Focus**: Automatically targets areas where you need the most help
+
 ### 🎓 Advanced Review System
 - **Session-Based Learning**: Track progress across multiple study sessions
 - **Wizard-Style Setup**: Easy note and difficulty selection with question type options
@@ -133,6 +144,11 @@ StudyMind supports both formative and summative assessment strategies:
 - **Persistent Settings**: Theme preference saved across sessions
 - **Comprehensive Coverage**: Dark mode support for all components and pages
 
+### 🔊 Audio Settings
+- **Text-to-Speech Controls**: Customize volume, pitch, and rate for AI summary playback
+- **Live Preview**: Test your settings with a sample playback
+- **Persistent Preferences**: Settings saved across sessions
+
 ## Database Setup
 
 All database migrations are located in the `supabase/migrations/` folder. Execute them in order to set up the complete database schema:
@@ -171,7 +187,33 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - Global concept sharing and mastery tracking
    - User-specific mastery levels
 
+9. **Smart Flashcards** (`20250623120538_wispy_king.sql`)
+   - Flashcards with spaced repetition algorithm
+   - Flashcard sessions and response tracking
+   - Automatic generation for struggling concepts
+
 ## Recent Updates
+
+### ✅ Smart Flashcards
+- **AI-Generated Flashcards**: Automatically created from your notes and concepts
+- **Spaced Repetition Algorithm**: Optimizes review intervals for maximum retention
+- **Adaptive Difficulty**: Focuses on your struggling concepts first
+- **Mastery Tracking**: Updates concept mastery levels based on your performance
+- **Interactive Interface**: Beautiful 3D card flip animations
+- **Self-Assessment**: Rate your knowledge as Easy, Medium, or Hard
+- **Session Statistics**: Track your progress and accuracy
+- **Customizable Filters**: Control which cards to study and in what order
+
+### ✅ Enhanced Audio Settings
+- **Text-to-Speech Controls**: Customize volume, pitch, and rate for AI summary playback
+- **Live Preview**: Test your settings with a sample playback
+- **Persistent Preferences**: Settings saved across sessions
+
+### ✅ Improved Timer Notifications
+- **Session Completion Overlay**: Beautiful visual notification when timer completes
+- **Customizable Appearance**: Different styles for work, short breaks, and long breaks
+- **Auto-dismiss**: Automatically closes after a configurable delay
+- **Manual Dismiss**: Click to continue immediately
 
 ### ✅ Concept Mastery Gamification
 - **Visual Mastery Indicators**: Nodes in concept graph sized and colored by mastery level
