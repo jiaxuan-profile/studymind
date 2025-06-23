@@ -2,6 +2,23 @@
 import { supabase } from './supabase';
 import { Flashcard, FlashcardSession, FlashcardResponse } from '../types';
 
+interface DueFlashcardRPCResponse {
+  id: string;
+  concept_id: string;
+  concept_name: string;
+  front_content: string;
+  back_content: string;
+  difficulty: 'easy' | 'medium' | 'hard'; // Or your Flashcard['difficulty'] type
+  mastery_level: number;
+  due_date: string | null; // ISO string
+  is_new: boolean;
+  // These are not in your get_due_flashcards RETURNS TABLE but you map them
+  // repetition_count?: number;
+  // ease_factor?: number;
+  // interval_days?: number;
+}
+
+
 // Get flashcards due for review
 export async function getDueFlashcards(
   limit: number = 20,
@@ -17,7 +34,7 @@ export async function getDueFlashcards(
 
     if (error) throw error;
 
-    return (data || []).map((card: any) => ({
+    return (data || []).map((card: DueFlashcardRPCResponse): Flashcard => ({
       id: card.id,
       conceptId: card.concept_id,
       conceptName: card.concept_name,
@@ -27,9 +44,9 @@ export async function getDueFlashcards(
       masteryLevel: card.mastery_level,
       dueDate: card.due_date ? new Date(card.due_date) : null,
       isNew: card.is_new,
-      repetitionCount: card.repetition_count || 0,
-      easeFactor: card.ease_factor || 2.5,
-      intervalDays: card.interval_days || 1
+      repetitionCount: 0, // Placeholder, see note
+      easeFactor: 2.5,    // Placeholder, see note
+      intervalDays: 1
     }));
   } catch (error) {
     console.error('Error fetching due flashcards:', error);
@@ -94,10 +111,17 @@ export async function recordFlashcardResponse(
   notes?: string
 ): Promise<void> {
   try {
+    const { data: { user }, error: userError } = await supabase.auth.getUser(); // Get current user
+    if (userError || !user) {
+      console.error('Error fetching user for response recording:', userError);
+      throw new Error('User not authenticated or error fetching user.');
+    }
+
     // First record the response
     const { error: responseError } = await supabase
       .from('flashcard_responses')
       .insert({
+        user_id: user.id,
         flashcard_id: flashcardId,
         session_id: sessionId,
         response_quality: responseQuality,
@@ -203,7 +227,7 @@ export async function getFlashcardStats(): Promise<{
     const totalCards = totalData?.length || 0;
     const cardsToReview = dueData?.length || 0;
     const cardsLearned = totalCards - cardsToReview;
-    
+
     let averageMastery = 0;
     if (masteryData && masteryData.length > 0) {
       const sum = masteryData.reduce((acc, curr) => acc + (curr.mastery_level || 0), 0);
