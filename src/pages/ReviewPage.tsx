@@ -403,7 +403,7 @@ const ReviewPage: React.FC = () => {
     setLoadingReviewProcess(false);
   };
 
-  const startReviewDisabled = isReadOnlyDemo || selectedNotes.length === 0 ||
+  const startReviewDisabled = selectedNotes.length === 0 ||
     (displayTotalQuestions === 0 && !generateNewQuestions) ||
     isGeneratingQuestions || loadingReviewProcess || loading;
 
