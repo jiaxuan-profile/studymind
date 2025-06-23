@@ -71,7 +71,7 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow border border-gray-200 dark:border-gray-700 mt-4">
+    <div className="p-4">
       <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center">
         How difficult did you find this question?
       </h3>

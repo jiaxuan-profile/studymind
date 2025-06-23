@@ -66,8 +66,6 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
       </div>
       
       <div className="p-6">
-        {/* Source note info moved to header */}
-        
         <div className="mb-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4 flex items-center">
             <HelpCircle className="h-6 w-6 text-primary mr-2" />
@@ -79,7 +77,7 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
         </div>
 
         {/* Combined hint and mastery context in a single row */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-4 mb-4">
           {currentQuestion.hint && (
             <div className={`flex-1 ${showHint ? 'slide-in' : ''}`}>
               {showHint ? (

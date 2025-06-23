@@ -13,7 +13,7 @@ const SessionProgressSidebar: React.FC<SessionProgressSidebarProps> = ({
   sessionStats,
 }) => {
   return (
-    <div className="h-full"> 
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       <div className="p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border-b border-gray-200 dark:border-gray-700">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100 flex items-center">
           <TrendingUp className="h-5 w-5 mr-2" />

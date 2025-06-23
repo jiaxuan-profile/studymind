@@ -31,8 +31,8 @@ const AnswerInputArea: React.FC<AnswerInputAreaProps> = ({
   const aiFeedbackAlreadyExists = aiReviewFeedback !== null;
 
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-3">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center">
           <Edit3 className="h-5 w-5 text-primary mr-2" />
           Your Answer
