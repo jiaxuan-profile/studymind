@@ -561,7 +561,7 @@ const PomodoroWidget: React.FC = () => {
         isOpen={showCompletionOverlay}
         type={completionOverlayType}
         onClose={() => setShowCompletionOverlay(false)}
-        autoCloseDelay={6000} // Auto-close after 6 seconds
+        autoCloseDelay={10000} // Auto-close after 10 seconds
       />
     </div>
   );

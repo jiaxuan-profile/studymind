@@ -1,6 +1,6 @@
 // src/pages/ConceptsPage.tsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { useStore } from '../store';
+import { useStore, UserMastery } from '../store';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Search, Info, RotateCcw, XCircle, Trophy, Target, TrendingUp } from 'lucide-react'; 
 import { GraphData, GraphNode, GraphLink } from '../types';
@@ -28,14 +28,6 @@ interface EnhancedGraphLink extends GraphLink {
   relationshipType?: string;
 }
 
-interface UserMastery {
-  concept_id: string;
-  mastery_level: number;
-  confidence_score: number;
-  last_reviewed_at?: string;
-  review_count: number;
-}
-
 const ConceptsPage: React.FC = () => {
   const { notes, theme } = useStore();
   const { isReadOnlyDemo } = useDemoMode();
@@ -44,10 +36,7 @@ const ConceptsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [categoryColors, setCategoryColors] = useState<CategoryColors>({});
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
   const [labelsEnabled, setLabelsEnabled] = useState(true);
   const [userMasteryData, setUserMasteryData] = useState<Map<string, UserMastery>>(new Map());
   const [masteryStats, setMasteryStats] = useState({
@@ -62,7 +51,7 @@ const ConceptsPage: React.FC = () => {
   const NODE_LABEL_ZOOM_THRESHOLD = 1.5;
   const LINK_LABEL_ZOOM_THRESHOLD = 2.0;
 
-  const handleZoom = useCallback((transform: any) => {
+   const handleZoom = useCallback((transform: { k: number; x: number; y: number }) => {
     setZoomLevel(transform.k);
   }, []);
 
@@ -180,8 +169,6 @@ const ConceptsPage: React.FC = () => {
 
         const allUserTags = [...new Set(userNotes.flatMap(n => n.tags || []))];
         const colors = generateCategoryColors(allUserTags);
-        setCategories(allUserTags);
-        setCategoryColors(colors);
         
         const noteIdToTagsMap = new Map(userNotes.map(n => [n.id, n.tags || []]));
         const conceptIdToNoteIdsMap = new Map<string, string[]>();
@@ -201,7 +188,7 @@ const ConceptsPage: React.FC = () => {
             return {
                 id: concept.id,
                 name: concept.name,
-                definition: concept.definition,
+                definition: concept.definition || '',
                 val: 1 + linkedNoteIds.length * 0.5 + (mastery?.mastery_level || 0.5) * 2, // Size based on mastery
                 color: getMasteryColor(mastery?.mastery_level || 0.5, colors[topCategory] || '#94A3B8'),
                 category: topCategory,
@@ -214,8 +201,8 @@ const ConceptsPage: React.FC = () => {
         const links: EnhancedGraphLink[] = relationships.map(rel => ({
             source: rel.source_id,
             target: rel.target_id,
-            value: rel.strength,
-            relationshipType: rel.relationship_type,
+            value: rel.strength || 1, 
+            relationshipType: rel.relationship_type || '', 
         }));
 
         setGraphData({ nodes, links });
@@ -343,10 +330,6 @@ const ConceptsPage: React.FC = () => {
     setSelectedConcept(null);
     handleResetView();
   }
-
-  const handleNodeHover = (node: GraphNode | null) => {
-    setHoveredNode(node);
-  };
 
   const handleSearch = () => {
     if (!searchTerm) {
@@ -562,7 +545,6 @@ const ConceptsPage: React.FC = () => {
                 graphData={graphData}
                 backgroundColor={theme === 'dark' ? '#1F2937' : '#FFFFFF'}
                 nodeLabel={getNodeTooltip}
-                onNodeHover={handleNodeHover}
                 onZoom={handleZoom}
                 nodeCanvasObject={(node, ctx, globalScale) => {
                   const n = node as GraphNode;

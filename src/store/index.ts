@@ -7,6 +7,14 @@ import { getAllConcepts, getAllSubjects } from '../services/databaseService';
 import { getAllNotes, updateNoteSummary, deleteNoteFromDatabase } from '../services/noteService';
 import { generateNoteSummary } from '../services/aiService';
 
+export interface UserMastery {
+  concept_id: string;
+  mastery_level: number;
+  confidence_score: number;
+  last_reviewed_at?: string;
+  review_count: number;
+}
+
 interface PaginationState {
   currentPage: number;
   totalPages: number;
@@ -21,6 +29,9 @@ interface AppSettings {
     longBreakDuration: number;
     cyclesBeforeLongBreak: number;
     soundEnabled: boolean;
+    enableSoundNotifications?: boolean;
+    notificationVolume?: number;
+    autoCloseOverlayDelay?: number;
   };
   audio: {
     ttsVolume: number;
@@ -59,7 +70,7 @@ interface State {
   loadConcepts: () => Promise<void>;
 
   updateAppSettings: (updates: Partial<AppSettings> | ((current: AppSettings) => Partial<AppSettings>)) => void;
-  
+
   // For backward compatibility
   pomodoroSettings: AppSettings['pomodoroTimer'];
   updatePomodoroSettings: (updates: Partial<AppSettings['pomodoroTimer']>) => void;
@@ -68,7 +79,7 @@ interface State {
 // Helper function for deep merging objects
 const deepMerge = <T extends Record<string, any>>(target: T, source: Partial<T>): T => {
   const result = { ...target };
-  
+
   for (const key in source) {
     if (source[key] !== undefined) {
       if (
@@ -87,7 +98,7 @@ const deepMerge = <T extends Record<string, any>>(target: T, source: Partial<T>)
       }
     }
   }
-  
+
   return result;
 };
 
@@ -113,6 +124,9 @@ export const useStore = create<State>((set, get) => ({
       longBreakDuration: 15,
       cyclesBeforeLongBreak: 4,
       soundEnabled: true,
+      enableSoundNotifications: true,
+      notificationVolume: 100,
+      autoCloseOverlayDelay: 10000
     },
     audio: {
       ttsVolume: 1.0,
@@ -121,13 +135,14 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  // For backward compatibility
   get pomodoroSettings() {
     return get().appSettings.pomodoroTimer;
   },
-  
+
   updatePomodoroSettings: (updates) => {
-    get().updateAppSettings({ pomodoroTimer: updates });
+    get().updateAppSettings(currentSettings => ({
+      pomodoroTimer: { ...currentSettings.pomodoroTimer, ...updates }
+    }));
   },
 
   loadNotes: async (page = 1, pageSize = 12, options = {}) => {
@@ -151,7 +166,7 @@ export const useStore = create<State>((set, get) => ({
     });
   },
 
-  addNote: async (note) => {   
+  addNote: async (note) => {
     await withAuthenticatedUser(set, async (userId) => {
       const newNote = {
         ...note,
@@ -166,7 +181,10 @@ export const useStore = create<State>((set, get) => ({
 
       set((state) => ({
         notes: [newNote, ...state.notes],
-        totalNotes: state.pagination.totalNotes + 1,
+        pagination: { // Ensure pagination is updated correctly
+          ...state.pagination,
+          totalNotes: state.pagination.totalNotes + 1,
+        }
       }));
     });
   },
@@ -175,18 +193,23 @@ export const useStore = create<State>((set, get) => ({
     notes: state.notes.map((note) => (note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note)),
   })),
 
-  deleteNote: async (id) => {   
+  deleteNote: async (id) => {
     await withAuthenticatedUser(set, async (userId) => {
       try {
         await deleteNoteFromDatabase(id, userId);
         console.log("Store: Note deleted from DB. Reloading notes list.");
 
         const { pagination } = get();
-        await get().loadNotes(pagination.currentPage, pagination.pageSize);
+        // After deleting, fetch the same page, or if it becomes empty, the previous one.
+        let newPage = pagination.currentPage;
+        if (get().notes.length === 1 && pagination.currentPage > 1) { // If it was the last note on a page > 1
+          newPage = pagination.currentPage - 1;
+        }
+        await get().loadNotes(newPage, pagination.pageSize);
       } catch (error) {
         console.error("Store: Error during deleteNote action:", error);
         set({ error: error instanceof Error ? error.message : 'Failed to delete note' });
-        throw error;
+        throw error; // Re-throw to allow UI to handle
       }
     }, 'User ID is required to delete note');
   },
@@ -203,8 +226,8 @@ export const useStore = create<State>((set, get) => ({
       }));
 
       const summary = await generateNoteSummary(note.content);
-      const userId = get().user?.id;
-      if (!userId) throw new Error('User not authenticated');
+      const userId = get().getAuthenticatedUserId()
+      if (!userId) throw new Error('User not authenticated for summary update');
       await updateNoteSummary(id, summary, userId);
 
       set(state => ({
@@ -241,6 +264,7 @@ export const useStore = create<State>((set, get) => ({
     const newTheme = state.theme === 'light' ? 'dark' : 'light';
     if (typeof window !== 'undefined') {
       localStorage.setItem('studymind-theme', newTheme);
+      document.documentElement.classList.toggle('dark', newTheme === 'dark');
     }
     return { theme: newTheme };
   }),
@@ -249,6 +273,7 @@ export const useStore = create<State>((set, get) => ({
     notes: [],
     concepts: [],
     relationships: [],
+    subjects: [],
     isLoading: false,
     error: null,
     pagination: {
@@ -261,11 +286,11 @@ export const useStore = create<State>((set, get) => ({
 
   loadSubjects: async () => {
     set({ isLoading: true, error: null });
-    
+
     try {
-      const userId = get().user?.id;
-      if (!userId) throw new Error('User not authenticated');
-      
+      const userId = get().getAuthenticatedUserId()
+      if (!userId) throw new Error('User not authenticated for loading subjects');
+
       const subjects = await getAllSubjects(userId);
       set({
         subjects,
@@ -281,11 +306,11 @@ export const useStore = create<State>((set, get) => ({
   },
 
   loadConcepts: async () => {
-    if (get().concepts.length > 0) {
+    if (get().concepts.length > 0 && get().relationships.length > 0) { // Check both
       return;
     }
 
-    set({ isLoading: true, error: null });    
+    set({ isLoading: true, error: null });
     try {
       const { concepts, relationships } = await getAllConcepts();
       set({
@@ -302,15 +327,29 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  // New unified settings update function
   updateAppSettings: (updates) => set((state) => {
     const currentSettings = state.appSettings;
-    const newUpdates = typeof updates === 'function' 
-      ? updates(currentSettings) 
+    const newUpdates = typeof updates === 'function'
+      ? updates(currentSettings)
       : updates;
-    
+
+    const mergedSettings = deepMerge(currentSettings, newUpdates);
+
     return {
-      appSettings: deepMerge(currentSettings, newUpdates)
+      appSettings: mergedSettings
     };
   }),
 }));
+
+if (typeof window !== 'undefined') {
+  const savedSettings = localStorage.getItem('appSettings');
+  if (savedSettings) {
+    try {
+      useStore.getState().updateAppSettings(JSON.parse(savedSettings));
+    } catch (e) {
+      console.error("Failed to load app settings from localStorage", e);
+    }
+  }
+  // Initialize theme class on html element
+  document.documentElement.classList.toggle('dark', useStore.getState().theme === 'dark');
+}
