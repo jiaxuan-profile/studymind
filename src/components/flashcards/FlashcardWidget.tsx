@@ -1,3 +1,4 @@
+// src/components/flashcards/FlashcardWidget.tsx
 import React, { useState, useEffect } from 'react';
 import {
   RotateCcw,
@@ -28,6 +29,7 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
   const [isDeckComplete, setIsDeckComplete] = useState(false);
 
   useEffect(() => {
+     console.log('FlashcardWidget: loadFlashcards useEffect triggered');
     loadFlashcards();
   }, []);
 
@@ -126,6 +128,7 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
       addToast('Failed to record response', 'error');
     }
 
+    addToast('Response recorded (Bypassed DB)', 'info'); 
     nextCard();
   };
 
@@ -133,9 +136,11 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     setIsFlipped(false);
     if (currentIndex < flashcards.length - 1) {
       setCurrentIndex(currentIndex + 1);
+      console.log('nextCard - setting isDeckComplete to false');
       setIsDeckComplete(false);
     } else {
       addToast('You\'ve reviewed all available flashcards!', 'success');
+      console.log('nextCard - setting isDeckComplete to true');
       setIsDeckComplete(true);
     }
   };
