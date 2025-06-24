@@ -107,11 +107,11 @@ const PomodoroWidget: React.FC = () => {
       let audioSrc = '';
       switch (currentState) {
         case 'work':
-          audioSrc = '/assets/focus_time.mp3';
+          audioSrc = '/assets/break_time.mp3';
           break;
         case 'shortBreak':
         case 'longBreak':
-          audioSrc = '/assets/break_time.mp3';
+          audioSrc = '/assets/focus_time.mp3';
           break;
         default:
           audioSrc = '/assets/focus_time.mp3';
