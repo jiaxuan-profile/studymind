@@ -9,7 +9,7 @@ import FlashcardWidget from '../components/flashcards/FlashcardWidget';
 import MasteryProgressCard from '../components/flashcards/MasteryProgressCard';
 
 const HomePage: React.FC = () => {
-  const { notes, concepts, isLoading, error } = useStore();
+  const { concepts, isLoading, error } = useStore();
   const navigate = useNavigate();
   const { isReadOnlyDemo } = useDemoMode();
   const [masteryStats, setMasteryStats] = useState({
@@ -84,7 +84,6 @@ const HomePage: React.FC = () => {
   };
 
   const handleViewAllFlashcards = () => {
-    // This will be implemented when we create the flashcards page
     navigate('/flashcards');
   };
 

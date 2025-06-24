@@ -182,6 +182,7 @@ const PomodoroWidget: React.FC = () => {
 
     setTimeout(() => {
       if (currentState === 'work') {
+        // Work session completed - update stats and determine next state
         const newStats = {
           ...stats,
           completedPomodoros: stats.completedPomodoros + 1,
@@ -190,20 +191,32 @@ const PomodoroWidget: React.FC = () => {
         };
         saveStats(newStats);
 
-        setCompletedCycles(prev => prev + 1);
+        // Increment completed cycles
+        const newCompletedCycles = completedCycles + 1;
+        setCompletedCycles(newCompletedCycles);
 
-        if (currentCycle >= pomodoroSettings.cyclesBeforeLongBreak) {
+        // Check if we should take a long break
+        if (newCompletedCycles >= pomodoroSettings.cyclesBeforeLongBreak) {
+          // Time for long break
           setCurrentState('longBreak');
           setTimeLeft(pomodoroSettings.longBreakDuration * 60);
-          setCurrentCycle(1);
+          // Keep completedCycles at max during long break, will reset when returning to work
+          setCurrentCycle(1); // Ready for next cycle after break
         } else {
+          // Short break
           setCurrentState('shortBreak');
           setTimeLeft(pomodoroSettings.shortBreakDuration * 60);
-          setCurrentCycle(prev => prev + 1);
+          setCurrentCycle(newCompletedCycles + 1); // Next work session number
         }
       } else {
+        // Break completed - return to work
         setCurrentState('work');
         setTimeLeft(pomodoroSettings.workDuration * 60);
+        // If we just finished a long break, reset the completed cycles
+        if (currentState === 'longBreak') {
+          setCompletedCycles(0);
+        }
+        // currentCycle remains the same as it represents the upcoming work session
       }
     }, 1000);
   };
@@ -418,7 +431,10 @@ const PomodoroWidget: React.FC = () => {
                   <div>
                     <h3 className="font-semibold text-gray-900 dark:text-white">{stateInfo.label}</h3>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Cycle {currentCycle} of {pomodoroSettings.cyclesBeforeLongBreak}
+                      {currentState === 'work' 
+                        ? `Cycle ${currentCycle} of ${pomodoroSettings.cyclesBeforeLongBreak}`
+                        : `After cycle ${completedCycles}`
+                      }
                     </p>
                   </div>
                 </div>
@@ -504,8 +520,8 @@ const PomodoroWidget: React.FC = () => {
               {/* Cycle Progress */}
               <div className="mb-4">
                 <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-                  <span>Progress</span>
-                  <span>{completedCycles} completed</span>
+                  <span>Cycle Progress</span>
+                  <span>{completedCycles} of {pomodoroSettings.cyclesBeforeLongBreak} completed</span>
                 </div>
                 <div className="flex space-x-1">
                   {Array.from({ length: pomodoroSettings.cyclesBeforeLongBreak }, (_, i) => (
@@ -513,9 +529,7 @@ const PomodoroWidget: React.FC = () => {
                       key={i}
                       className={`flex-1 h-2 rounded-full ${i < completedCycles
                         ? 'bg-primary dark:bg-primary-dark'
-                        : i === completedCycles - 1 && currentState !== 'work'
-                          ? 'bg-primary/50 dark:bg-primary-dark/50'
-                          : 'bg-gray-200 dark:bg-gray-700'
+                        : 'bg-gray-200 dark:bg-gray-700'
                         }`}
                     />
                   ))}

@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  RotateCcw, 
-  ThumbsUp, 
-  ThumbsDown, 
-  HelpCircle, 
-  Brain, 
+import {
+  RotateCcw,
+  ThumbsUp,
+  ThumbsDown,
+  HelpCircle,
+  Brain,
   ArrowRight,
   Check
 } from 'lucide-react';
@@ -112,20 +112,20 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     try {
       const currentCard = flashcards[currentIndex];
       const responseTime = responseStartTime ? Date.now() - responseStartTime : undefined;
-      
+
       await recordFlashcardResponse(
         currentCard.id,
-        null, // No session ID for dashboard widget
+        null, 
         quality,
         responseTime
       );
-      
+
       addToast('Response recorded', 'success');
     } catch (error) {
       console.error('Error recording response:', error);
       addToast('Failed to record response', 'error');
     }
-    
+
     nextCard();
   };
 
@@ -133,11 +133,10 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     setIsFlipped(false);
     if (currentIndex < flashcards.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setIsDeckComplete(false); 
+      setIsDeckComplete(false);
     } else {
-      // Reached the end of the deck
       addToast('You\'ve reviewed all available flashcards!', 'success');
-      setIsDeckComplete(true); 
+      setIsDeckComplete(true);
     }
   };
 
@@ -158,49 +157,34 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
     );
   }
 
-  if (isDeckComplete && flashcards.length > 0) { // flashcards.length > 0 ensures we don't show this if cards were initially empty
+  if (flashcards.length === 0 || (isDeckComplete && flashcards.length > 0)) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-        {/* "All Reviewed!" message and buttons */}
-      </div>
-    );
-  }
-
- if (flashcards.length === 0) { 
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-      <div className="text-center py-8">
-        <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Flashcards Available</h3>
-        <p className="text-gray-600 dark:text-gray-400 mb-4">
-          No flashcards are currently due for review.
-        </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-3">
-          <button
-            onClick={resetDeck} // Or loadFlashcards if you want to refresh
-            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-          >
-            <RotateCcw className="h-4 w-4 mr-2" />
-            Review Again
-          </button>
-          <button
-            onClick={onViewAllClick}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
-          >
-            Study All Due Cards
-            <ArrowRight className="h-4 w-4 ml-2" />
-          </button>
+        <div className="text-center py-8">
+          <Check className="h-12 w-12 text-green-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Flashcards Available</h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            No flashcards are currently due for review.
+          </p>
+          <div className="flex flex-col sm:flex-row justify-center gap-3">
+            <button
+              onClick={onViewAllClick}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
+            >
+              Study All Due Cards
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
     );
   }
 
   const currentCard = flashcards[currentIndex];
-  const masteryColor = currentCard.masteryLevel < 0.3 
-    ? 'bg-red-500' 
-    : currentCard.masteryLevel < 0.7 
-      ? 'bg-yellow-500' 
+  const masteryColor = currentCard.masteryLevel < 0.3
+    ? 'bg-red-500'
+    : currentCard.masteryLevel < 0.7
+      ? 'bg-yellow-500'
       : 'bg-green-500';
 
   return (
@@ -225,17 +209,15 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
       </div>
 
       {/* Flashcard */}
-      <div 
-        className={`relative w-full h-64 cursor-pointer transition-transform duration-700 transform-gpu [transform-style:preserve-3d] ${ 
-          isFlipped ? 'rotate-y-180' : ''
-        }`}
+      <div
+        className={`relative w-full h-64 cursor-pointer transition-transform duration-700 transform-gpu [transform-style:preserve-3d] ${isFlipped ? 'rotate-y-180' : ''
+          }`}
         onClick={handleFlip}
       >
         {/* Front */}
-        <div 
-          className={`absolute inset-0 p-6 flex flex-col backface-hidden ${
-            isFlipped ? 'opacity-0' : 'opacity-100'
-          }`}
+        <div
+          className={`absolute inset-0 p-6 flex flex-col backface-hidden ${isFlipped ? 'opacity-0' : 'opacity-100'
+            }`}
         >
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center">
@@ -244,40 +226,38 @@ const FlashcardWidget: React.FC<FlashcardWidgetProps> = ({ onViewAllClick }) => 
                 {currentCard.conceptName}
               </span>
             </div>
-            <span className={`px-2 py-0.5 text-xs rounded-full ${
-              currentCard.difficulty === 'easy' 
-                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' 
-                : currentCard.difficulty === 'medium'
-                  ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                  : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
-            }`}>
+            <span className={`px-2 py-0.5 text-xs rounded-full ${currentCard.difficulty === 'easy'
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+              : currentCard.difficulty === 'medium'
+                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300'
+              }`}>
               {currentCard.difficulty}
             </span>
           </div>
-          
+
           <div className="flex-1 flex items-center justify-center">
             <p className="text-lg text-gray-900 dark:text-gray-100 text-center">
               {currentCard.frontContent}
             </p>
           </div>
-          
+
           <div className="text-center text-sm text-gray-500 dark:text-gray-400 mt-4">
             Tap to reveal answer
           </div>
         </div>
 
         {/* Back */}
-        <div 
-          className={`absolute inset-0 p-6 flex flex-col backface-hidden rotate-y-180 ${
-            isFlipped ? 'opacity-100' : 'opacity-0'
-          }`}
+        <div
+          className={`absolute inset-0 p-6 flex flex-col backface-hidden rotate-y-180 ${isFlipped ? 'opacity-100' : 'opacity-0'
+            }`}
         >
           <div className="flex-1 flex items-center justify-center">
             <p className="text-lg text-gray-900 dark:text-gray-100 text-center">
               {currentCard.backContent}
             </p>
           </div>
-          
+
           <div className="mt-4 grid grid-cols-3 gap-2">
             <button
               onClick={(e) => { e.stopPropagation(); handleResponse(1); }}
