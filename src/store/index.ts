@@ -1,6 +1,6 @@
 // src/store/index.ts
 import { create } from 'zustand';
-import { Note, Concept, User, ConceptRelationship, Subject } from '../types';
+import { Note, Concept, User, ConceptRelationship, Subject, NoteConcept } from '../types';
 import { toNote } from '../utils/transformers';
 import { withAuthenticatedUser } from '../utils/authenticatedUser';
 import { getAllConcepts, getAllSubjects } from '../services/databaseService';
@@ -46,6 +46,7 @@ interface State {
   concepts: Concept[];
   relationships: ConceptRelationship[];
   subjects: Subject[];
+  noteConcepts: NoteConcept[];
   user: User | null;
   theme: 'light' | 'dark';
   isLoading: boolean;
@@ -90,10 +91,8 @@ const deepMerge = <T extends Record<string, any>>(target: T, source: Partial<T>)
         typeof target[key] === 'object' &&
         !Array.isArray(target[key])
       ) {
-        // If both source and target values are objects, recursively merge them
         result[key] = deepMerge(target[key], source[key]);
       } else {
-        // Otherwise, just assign the source value to the target
         result[key] = source[key];
       }
     }
@@ -107,6 +106,7 @@ export const useStore = create<State>((set, get) => ({
   concepts: [],
   relationships: [],
   subjects: [],
+  noteConcepts: [],
   user: null,
   theme: (typeof window !== 'undefined' && localStorage.getItem('studymind-theme') as 'light' | 'dark') || 'light',
   isLoading: false,
@@ -181,7 +181,7 @@ export const useStore = create<State>((set, get) => ({
 
       set((state) => ({
         notes: [newNote, ...state.notes],
-        pagination: { // Ensure pagination is updated correctly
+        pagination: {
           ...state.pagination,
           totalNotes: state.pagination.totalNotes + 1,
         }
@@ -200,16 +200,15 @@ export const useStore = create<State>((set, get) => ({
         console.log("Store: Note deleted from DB. Reloading notes list.");
 
         const { pagination } = get();
-        // After deleting, fetch the same page, or if it becomes empty, the previous one.
         let newPage = pagination.currentPage;
-        if (get().notes.length === 1 && pagination.currentPage > 1) { // If it was the last note on a page > 1
+        if (get().notes.length === 1 && pagination.currentPage > 1) {
           newPage = pagination.currentPage - 1;
         }
         await get().loadNotes(newPage, pagination.pageSize);
       } catch (error) {
         console.error("Store: Error during deleteNote action:", error);
         set({ error: error instanceof Error ? error.message : 'Failed to delete note' });
-        throw error; // Re-throw to allow UI to handle
+        throw error;
       }
     }, 'User ID is required to delete note');
   },
@@ -274,6 +273,7 @@ export const useStore = create<State>((set, get) => ({
     concepts: [],
     relationships: [],
     subjects: [],
+    noteConcepts: [],
     isLoading: false,
     error: null,
     pagination: {
@@ -306,23 +306,41 @@ export const useStore = create<State>((set, get) => ({
   },
 
   loadConcepts: async () => {
-    if (get().concepts.length > 0 && get().relationships.length > 0) { // Check both
+    const state = get();
+    const userId = state.getAuthenticatedUserId(); // Can be string | null
+
+    // Determine if a fetch is needed based on current state
+    const globalDataLoaded = state.concepts.length > 0 && state.relationships.length > 0;
+
+    // If a user is logged in, their specific data should also be loaded.
+    // If no user, noteConcepts should be empty (or we don't need them yet).
+    const userSpecificDataLoadedOrNotNeeded = !userId || (userId && state.noteConcepts.length > 0);
+
+    if (globalDataLoaded && userSpecificDataLoadedOrNotNeeded) {
+      // All necessary data seems to be loaded for the current context.
+      // Exception: if userId changed and noteConcepts are from a previous user,
+      // setUser should have cleared noteConcepts, triggering a reload if needed.
       return;
     }
 
     set({ isLoading: true, error: null });
     try {
-      const { concepts, relationships } = await getAllConcepts();
+      // Pass current userId (which can be null) to getAllConcepts
+      const { concepts, relationships, noteConcepts } = await getAllConcepts(userId);
+
       set({
         concepts: concepts as Concept[],
         relationships: relationships as ConceptRelationship[],
+        noteConcepts: noteConcepts as NoteConcept[], // Will be empty if userId was null
         isLoading: false
       });
     } catch (error) {
-      console.error('Store: Failed to load concepts:', error);
+      console.error('Store: Failed to load concepts data:', error);
       set({
-        error: error instanceof Error ? error.message : 'Failed to load concepts',
+        error: error instanceof Error ? error.message : 'Failed to load concepts data',
         isLoading: false,
+        // Potentially clear stale data on error to avoid inconsistent state
+        // concepts: [], relationships: [], noteConcepts: []
       });
     }
   },

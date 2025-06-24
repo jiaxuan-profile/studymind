@@ -52,6 +52,14 @@ export interface NoteConceptPayload {
   mastery_level: number;
 }
 
+export interface NoteConcept {
+  note_id: string;
+  concept_id: string;
+  relevance_score?: number; 
+  mastery_level?: number;
+  created_at?: string; 
+}
+
 // Main data model for a Note-Concept
 export interface NoteConceptWithDetails {
   noteId: string;

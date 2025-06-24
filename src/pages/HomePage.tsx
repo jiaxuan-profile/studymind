@@ -1,3 +1,4 @@
+// src/pages/HomePage.tsx
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
@@ -9,7 +10,7 @@ import FlashcardWidget from '../components/flashcards/FlashcardWidget';
 import MasteryProgressCard from '../components/flashcards/MasteryProgressCard';
 
 const HomePage: React.FC = () => {
-  const { concepts, isLoading, error } = useStore();
+  const { notes, concepts, isLoading, error } = useStore();
   const navigate = useNavigate();
   const { isReadOnlyDemo } = useDemoMode();
   const [masteryStats, setMasteryStats] = useState({
@@ -84,6 +85,7 @@ const HomePage: React.FC = () => {
   };
 
   const handleViewAllFlashcards = () => {
+    // This will be implemented when we create the flashcards page
     navigate('/flashcards');
   };
 

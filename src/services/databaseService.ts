@@ -1,37 +1,55 @@
 // src/services/databaseService.ts
-
 import { supabase } from './supabase';
-import { AllConceptsData, Subject, KnowledgeGap } from '../types';
+import { AllConceptsData, Subject, KnowledgeGap, Concept, ConceptRelationship, NoteConcept } from '../types';
 
-export async function getAllConcepts(): Promise<AllConceptsData> {
+export async function getAllConcepts(userId: string | null): Promise<AllConceptsData> { // userId can be null
   try {
-    // Parallelize requests for better performance
+    const promises = [
+      supabase.from('concepts').select('*'), // Global
+      supabase.from('concept_relationships').select('*') // Global
+    ];
+
+    if (userId) {
+      // Fetch user-specific note_concepts
+      promises.push(
+        supabase.from('note_concepts')
+          .select('*')
+          .eq('user_id', userId) // Assumes 'note_concepts' table has a 'user_id' column
+      );
+    } else {
+      // If no userId, resolve noteConcepts to an empty array
+      promises.push(Promise.resolve({ data: [], error: null }));
+    }
+
     const [
-      { data: concepts, error: conceptsError },
-      { data: relationships, error: relError },
-      { data: noteConcepts, error: ncError }
-    ] = await Promise.all([
-      supabase.from('concepts').select('*'),
-      supabase.from('concept_relationships').select('*'),
-      supabase.from('note_concepts').select('*')
-    ]);
+      conceptsResult,
+      relationshipsResult,
+      noteConceptsResult
+    ] = await Promise.all(promises);
+
+    // Destructure data and errors
+    const { data: concepts, error: conceptsError } = conceptsResult;
+    const { data: relationships, error: relError } = relationshipsResult;
+    const { data: noteConcepts, error: ncError } = noteConceptsResult as { data: NoteConcept[] | null, error: any }; // Cast for type safety
 
     // Handle errors collectively
     const error = conceptsError || relError || ncError;
     if (error) {
-      console.error("Database Service: Concept fetch error:", error);
+      console.error("Database Service: Concept data fetch error:", error);
       throw new Error(`Concept data fetch failed: ${error.message}`);
     }
 
     return {
-      concepts: concepts ?? [],
-      relationships: relationships ?? [],
-      noteConcepts: noteConcepts ?? []
+      concepts: (concepts as Concept[]) ?? [],
+      relationships: (relationships as ConceptRelationship[]) ?? [],
+      noteConcepts: (noteConcepts as NoteConcept[]) ?? [] // Will be empty if userId was null and no specific query was made
     };
 
   } catch (error) {
+    // This catch is for errors not originating from Supabase calls directly in Promise.all (e.g., setup errors)
+    // or if Promise.all itself throws for other reasons.
     console.error('Database Service: Error in getAllConcepts:', error);
-    throw error;
+    throw error; // Re-throw to be handled by the caller (store)
   }
 }
 
