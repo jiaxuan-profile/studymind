@@ -58,7 +58,7 @@ const ConceptsPage: React.FC = () => {
   const graphRef = useRef<any>(null);
   const initialLoadTriggered = useRef(false);
 
-  const HIGH_CONFIDENCE_THRESHOLD = 0.8; 
+  const HIGH_CONFIDENCE_THRESHOLD = 0.8;
 
   const NODE_LABEL_ZOOM_THRESHOLD = 1.5;
   const LINK_LABEL_ZOOM_THRESHOLD = 2.0;

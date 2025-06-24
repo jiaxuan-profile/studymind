@@ -1,43 +1,164 @@
 // src/pages/HomePage.tsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useStore } from '../store';
+import { useStore, UserMastery } from '../store'; // Import UserMastery
 import { PlusCircle, BookOpen, BrainCircuit, Lightbulb, GraduationCap } from 'lucide-react';
 import BoltBadge from '../components/BoltBadge';
 import DemoModeNotice from '../components/DemoModeNotice';
 import { useDemoMode } from '../contexts/DemoModeContext';
 import FlashcardWidget from '../components/flashcards/FlashcardWidget';
 import MasteryProgressCard from '../components/flashcards/MasteryProgressCard';
+import { supabase } from '../services/supabase'; // Import supabase client
 
 const HomePage: React.FC = () => {
-  const { notes, concepts, isLoading, error } = useStore();
+  const {
+    concepts: storeConcepts, // All global concepts
+    noteConcepts: storeUserNoteConcepts, // User's linked note-concepts
+    isLoading: storeIsLoading, // Global loading state from store
+    error: storeError,
+    getAuthenticatedUserId,
+    loadConcepts: storeLoadConcepts,
+  } = useStore();
+
   const navigate = useNavigate();
   const { isReadOnlyDemo } = useDemoMode();
+
+  // Component-level loading state for mastery stats calculation
+  const [masteryStatsLoading, setMasteryStatsLoading] = useState(true);
   const [masteryStats, setMasteryStats] = useState({
     totalConcepts: 0,
     masteredConcepts: 0,
     averageMastery: 0,
-    highConfidenceConcepts: 0
+    highConfidenceConcepts: 0,
   });
 
-  useEffect(() => {
-    useStore.getState().loadConcepts();
-    
-    // Calculate mastery stats
-    const totalConcepts = concepts.length;
-    const masteredConcepts = Math.round(totalConcepts * 0.4); // Placeholder calculation
-    const averageMastery = 0.65; // Placeholder
-    const highConfidenceConcepts = Math.round(totalConcepts * 0.3); // Placeholder
-    
-    setMasteryStats({
-      totalConcepts,
-      masteredConcepts,
-      averageMastery,
-      highConfidenceConcepts
-    });
-  }, [concepts.length]);
+  const HIGH_CONFIDENCE_THRESHOLD = 0.8; // Consistent with ConceptsPage
+  const MASTERED_THRESHOLD = 0.7; // Consistent with ConceptsPage
 
-  if (isLoading) {
+  const calculateAndSetMasteryStats = useCallback(async () => {
+    const currentUserId = getAuthenticatedUserId();
+    if (!currentUserId) {
+      setMasteryStats({
+        totalConcepts: 0,
+        masteredConcepts: 0,
+        averageMastery: 0,
+        highConfidenceConcepts: 0,
+      });
+      setMasteryStatsLoading(false);
+      return;
+    }
+
+    if (!storeConcepts.length || !storeUserNoteConcepts.length) {
+      if (!storeIsLoading) { // if not actively loading from store, means no data.
+        setMasteryStats({
+          totalConcepts: 0,
+          masteredConcepts: 0,
+          averageMastery: 0,
+          highConfidenceConcepts: 0,
+        });
+        setMasteryStatsLoading(false);
+      }
+      return;
+    }
+
+    setMasteryStatsLoading(true);
+
+    try {
+      // 1. Identify concepts learned by the user (from storeUserNoteConcepts)
+      const learnedConceptIdSet = new Set(storeUserNoteConcepts.map(nc => nc.concept_id));
+      if (learnedConceptIdSet.size === 0) {
+        setMasteryStats({
+          totalConcepts: 0,
+          masteredConcepts: 0,
+          averageMastery: 0,
+          highConfidenceConcepts: 0,
+        });
+        setMasteryStatsLoading(false);
+        return;
+      }
+      const learnedConceptIdsArray = Array.from(learnedConceptIdSet);
+
+      // 2. Fetch user_concept_mastery data for these learned concepts
+      const { data: masteryData, error: masteryError } = await supabase
+        .from('user_concept_mastery')
+        .select('concept_id, mastery_level, confidence_score') // Only select needed fields
+        .eq('user_id', currentUserId)
+        .in('concept_id', learnedConceptIdsArray);
+
+      if (masteryError) {
+        console.error("HomePage: Error fetching mastery data:", masteryError.message);
+        setMasteryStats({
+          totalConcepts: learnedConceptIdsArray.length, // Can still show total learned
+          masteredConcepts: 0,
+          averageMastery: 0,
+          highConfidenceConcepts: 0,
+        });
+        setMasteryStatsLoading(false);
+        return;
+      }
+
+      const masteryMap = new Map<string, UserMastery>();
+      (masteryData || []).forEach(m => masteryMap.set(m.concept_id, m as UserMastery));
+
+      // 3. Calculate stats
+      const totalLearnedConcepts = learnedConceptIdsArray.length;
+      let sumMastery = 0;
+      let masteredCount = 0;
+      let highConfidenceCount = 0;
+      let conceptsWithMasteryEntry = 0;
+
+      learnedConceptIdsArray.forEach(conceptId => {
+        const mastery = masteryMap.get(conceptId);
+        if (mastery) {
+          sumMastery += mastery.mastery_level;
+          conceptsWithMasteryEntry++;
+          if (mastery.mastery_level >= MASTERED_THRESHOLD) {
+            masteredCount++;
+          }
+          if (mastery.confidence_score >= HIGH_CONFIDENCE_THRESHOLD) {
+            highConfidenceCount++;
+          }
+        }
+      });
+
+      const avgMastery = conceptsWithMasteryEntry > 0 ? sumMastery / conceptsWithMasteryEntry : 0;
+
+      setMasteryStats({
+        totalConcepts: totalLearnedConcepts,
+        masteredConcepts: masteredCount,
+        averageMastery: avgMastery,
+        highConfidenceConcepts: highConfidenceCount,
+      });
+
+    } catch (err) {
+      console.error("HomePage: Failed to calculate mastery stats:", err);
+      // Set to default or error state
+      setMasteryStats({ totalConcepts: 0, masteredConcepts: 0, averageMastery: 0, highConfidenceConcepts: 0 });
+    } finally {
+      setMasteryStatsLoading(false);
+    }
+  }, [
+    getAuthenticatedUserId,
+    storeConcepts,
+    storeUserNoteConcepts,
+    MASTERED_THRESHOLD,
+    HIGH_CONFIDENCE_THRESHOLD,
+    storeIsLoading // Added to re-evaluate if store finishes loading
+  ]
+  );
+
+  useEffect(() => {
+    storeLoadConcepts();
+  }, [storeLoadConcepts]); // Runs once on mount or if storeLoadConcepts changes identity
+
+  useEffect(() => {
+    if (!storeIsLoading) { // Only calculate if the store is not in a global loading state
+      calculateAndSetMasteryStats();
+    }
+  }, [calculateAndSetMasteryStats, storeIsLoading]);
+
+
+  if (storeIsLoading && masteryStats.totalConcepts === 0) { // Show global loading if store is loading and no stats yet
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -48,10 +169,10 @@ const HomePage: React.FC = () => {
     );
   }
 
-  if (error) {
+  if (storeError) {
     return (
       <div className="text-center py-12">
-        <div className="text-red-600 mb-4">Error loading data: {error}</div>
+        <div className="text-red-600 mb-4">Error loading data: {storeError}</div>
         <button
           onClick={() => window.location.reload()}
           className="text-primary hover:text-primary-dark"
@@ -66,17 +187,10 @@ const HomePage: React.FC = () => {
     try {
       const id = Math.random().toString(36).substring(2, 11);
       const now = new Date();
-
       const newNote = {
-        id,
-        title: 'Untitled Note',
-        content: '',
-        tags: [],
-        createdAt: now,
-        updatedAt: now,
+        id, title: 'Untitled Note', content: '', tags: [], createdAt: now, updatedAt: now,
       };
-
-      await useStore.getState().addNote(newNote);
+      useStore.getState().addNote(newNote); 
       navigate(`/notes/${id}`, { state: { isNewNote: true } });
     } catch (error) {
       console.error("Error creating new note:", error);
@@ -85,7 +199,6 @@ const HomePage: React.FC = () => {
   };
 
   const handleViewAllFlashcards = () => {
-    // This will be implemented when we create the flashcards page
     navigate('/flashcards');
   };
 
@@ -147,15 +260,14 @@ const HomePage: React.FC = () => {
         </Link>
       </div>
 
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Smart Flashcards */}
         <div className="lg:col-span-2">
           <FlashcardWidget onViewAllClick={handleViewAllFlashcards} />
         </div>
-
-        {/* Mastery Progress */}
         <div>
-          <MasteryProgressCard 
+          <MasteryProgressCard
+            isLoading={masteryStatsLoading} // Pass loading state to the card
             totalConcepts={masteryStats.totalConcepts}
             masteredConcepts={masteryStats.masteredConcepts}
             averageMastery={masteryStats.averageMastery}
@@ -164,7 +276,6 @@ const HomePage: React.FC = () => {
         </div>
       </div>
 
-      {/* Study Tips */}
       <div className="mt-6 bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 flex items-center">
