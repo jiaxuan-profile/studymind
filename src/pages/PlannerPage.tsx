@@ -6,7 +6,7 @@ import ExamDatesList from '../components/planner/ExamDatesList';
 import StudyPlanForm from '../components/planner/StudyPlanForm';
 import StudyPlansList from '../components/planner/StudyPlansList';
 import { ExamDate } from '../types';
-import { Plus, CalendarDays, ListChecks } from 'lucide-react';
+import { Plus, CalendarDays, ListChecks, Sparkles } from 'lucide-react';
 
 const PlannerPage: React.FC = () => {
   const [isAddingNew, setIsAddingNew] = useState(false);
@@ -86,22 +86,39 @@ const PlannerPage: React.FC = () => {
         </button>
       </div>
 
-      {isAddingStudyPlan && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Generate New Study Plan</h2>
-          <StudyPlanForm onStudyPlanGenerated={handleStudyPlanAddedOrUpdated} onCancel={handleCancelStudyPlanForm} />
-        </div>
+      {!isAddingNew && !isAddingStudyPlan && (
+        <>
+          <button onClick={() => setIsAddingNew(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark">
+            <Plus className="h-5 w-5 mr-2" /> Add Exam Date
+          </button>
+          <button onClick={() => setIsAddingStudyPlan(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark">
+            <Sparkles className="h-5 w-5 mr-2" /> Generate Study Plan
+          </button>
+        </>
       )}
+
+      {
+        isAddingStudyPlan && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Generate New Study Plan</h2>
+            <StudyPlanForm onStudyPlanGenerated={handleStudyPlanAddedOrUpdated} onCancel={handleCancelStudyPlanForm} />
+          </div>
+        )
+      }
 
       {/* Content based on active tab */}
-      {activeTab === 'examDates' && (
-        <ExamDatesList key={`exam-dates-${refreshList}`} onEditExamDate={handleEditExamDate} onExamDateDeleted={handleExamDateAddedOrUpdated} onAddExamDate={() => setIsAddingNew(true)} />
-      )}
+      {
+        activeTab === 'examDates' && (
+          <ExamDatesList key={`exam-dates-${refreshList}`} onEditExamDate={handleEditExamDate} onExamDateDeleted={handleExamDateAddedOrUpdated} onAddExamDate={() => setIsAddingNew(true)} />
+        )
+      }
 
-      {activeTab === 'studyPlans' && (
-        <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => setIsAddingStudyPlan(true)} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
-      )}
-    </div>
+      {
+        activeTab === 'studyPlans' && (
+          <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => setIsAddingStudyPlan(true)} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
+        )
+      }
+    </div >
   );
 };
 
