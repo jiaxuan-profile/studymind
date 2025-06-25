@@ -4,18 +4,7 @@ import { supabase } from '../services/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { StudyPlan, StudyTask } from '../types';
-import { 
-  ArrowLeft, 
-  CalendarDays, 
-  ListChecks, 
-  CheckCircle, 
-  Clock, 
-  Loader2,
-  AlertTriangle,
-  CheckSquare,
-  Square,
-  SquareCheck
-} from 'lucide-react';
+import { ArrowLeft, CalendarDays, ListChecks, CheckCircle, Clock, Loader2, AlertTriangle, CheckSquare, Square, CheckSquare as SquareCheck } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 
 const StudyPlanDetailPage: React.FC = () => {
