@@ -17,6 +17,7 @@ interface ExamDateFormProps {
 const ExamDateForm: React.FC<ExamDateFormProps> = ({
   initialExamDate,
   onExamDateAddedOrUpdated,
+  onCancel,
 }) => {
   const { user } = useAuth();
   const { addToast } = useToast();
