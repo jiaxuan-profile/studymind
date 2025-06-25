@@ -55,9 +55,9 @@ export interface NoteConceptPayload {
 export interface NoteConcept {
   note_id: string;
   concept_id: string;
-  relevance_score?: number; 
+  relevance_score?: number;
   mastery_level?: number;
-  created_at?: string; 
+  created_at?: string;
 }
 
 // Main data model for a Note-Concept
@@ -196,12 +196,12 @@ export interface Flashcard {
   backContent: string;
   difficulty: 'easy' | 'medium' | 'hard';
   masteryLevel: number;
-  dueDate: Date | null;
+  dueDate: Date;
   isNew: boolean;
-  lastShownAt?: Date | null;
   repetitionCount: number;
   easeFactor: number;
   intervalDays: number;
+  lastShownAt?: Date;
 }
 
 export interface FlashcardSession {
