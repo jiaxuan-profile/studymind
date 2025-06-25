@@ -56,15 +56,16 @@ StudyMind supports both formative and summative assessment strategies:
   - Personalizes the learning experience for each note
 
 ### 🎯 Smart Flashcards
-- **AI-Generated Flashcards**: Automatically created from your notes and concepts
-- **Spaced Repetition Algorithm**: Optimizes review intervals for maximum retention
-- **Adaptive Difficulty**: Focuses on your struggling concepts first
-- **Mastery Tracking**: Updates concept mastery levels based on your performance
-- **Interactive Interface**: Beautiful 3D card flip animations
-- **Self-Assessment**: Rate your knowledge as Easy, Medium, or Hard
-- **Session Statistics**: Track your progress and accuracy
-- **Customizable Filters**: Control which cards to study and in what order
-- **Struggling Concepts Focus**: Automatically targets areas where you need the most help
+- **AI-Generated Flashcards**: Automatically created from your notes and concepts.
+- **Integrated Spaced Repetition & Mastery**:
+  - Utilizes an SM-2 based spaced repetition algorithm to optimize review intervals for individual flashcards (managing `ease_factor`, `interval_days`, `repetition_count`, and `next_review_at`).
+  - **Simultaneously, user performance on flashcards provides a signal to update the overall `user_concept_mastery` for the associated concept.** This allows flashcard practice to contribute to the holistic understanding of a concept's mastery level alongside the Advanced Review System.
+- **Adaptive Difficulty**: The selection of due flashcards can prioritize concepts where overall mastery is lower.
+- **Interactive Interface**: Beautiful 3D card flip animations.
+- **Self-Assessment**: Rate your recall as Easy, Medium, or Hard after revealing the answer.
+- **Session Statistics**: Track your progress and accuracy within flashcard study sessions.
+- **Customizable Filters**: Control which cards to study (e.g., include new, focus on struggling concepts based on overall mastery).
+- **Struggling Concepts Focus**: Can automatically generate or prioritize flashcards for concepts identified as "struggling" by the central Concept Mastery System.
 
 ### 🎓 Advanced Review System
 - **Session-Based Learning**: Track progress across multiple study sessions
@@ -101,42 +102,42 @@ StudyMind supports both formative and summative assessment strategies:
 - Focus time analytics and productivity metrics
 
 ### 🎯 Concept Mastery System
+- **Unified Mastery Score**: A central `mastery_level` (0.0 to 1.0) and `confidence_score` (0.0 to 1.0) for each concept, influenced by interactions from *both* the Advanced Review System and Smart Flashcards.
 - **3-Tier Mastery Classification**:
-  - 🟢 Mastered (≥70%): Used as foundation for new questions.
-  - 🟡 Developing (30-70%): Targeted with focused practice.
-  - 🔴 Struggling (<30%): Flagged for remedial attention.
-- **Adaptive Question Weights**:
-  - Higher frequency of developing concept questions.
-  - Gradual reintroduction of struggling concepts.
-- **Visual Mastery Tracking**:
-  - Concept nodes sized and colored by mastery level.
-  - Border thickness indicates confidence level.
-  - Hover tooltips show exact mastery percentages.
-  - Mastery tiers clearly indicated with color coding.
+  - 🟢 Mastered (e.g., ≥70%): Indicates strong understanding.
+  - 🟡 Developing (e.g., 30-70%): Indicates partial understanding, requiring more focus.
+  - 🔴 Struggling (e.g., <30%): Indicates weak areas needing foundational reinforcement.
 - **Performance-Based Progression**:
-  - Mastery level (0.0 to 1.0) for each concept is updated after each relevant question in a review session.
-  - **Correct Answers**:
+  - Mastery and confidence scores are updated after relevant interactions:
+    - **Advanced Review System**: Updates based on question correctness, question difficulty, and user's perceived difficulty of the question (see detailed logic below).
+    - **Smart Flashcards**: Updates based on user's self-assessed recall (Easy, Medium, Hard). Flashcard interactions typically have a *moderated impact* on the overall mastery score compared to detailed review questions, reflecting their nature as quicker recall checks.
+      - **Example Flashcard Impact on Mastery:**
+        - Correct/Easy (Quality 5): Small positive increment (e.g., +0.05 to +0.1).
+        - Correct/Medium (Quality 3-4): Very small positive increment or no change.
+        - Incorrect/Hard (Quality 1-2): Small negative increment (e.g., -0.05 to -0.1).
+      - *(Confidence score may also be adjusted based on flashcard performance).*
+- **Advanced Review System - Detailed Mastery Updates**:
+  - **Correct Answers (Review Questions)**:
     - Easy questions: +0.1 mastery
     - Medium questions: +0.2 mastery
     - Hard questions: +0.3 mastery
-  - **Incorrect Answers (New Structure)**:
-    - Easy questions: -0.25 mastery (larger penalty for missing easier concepts)
-    - Medium questions: -0.2 mastery (moderate penalty)
-    - Hard questions: -0.15 mastery (smaller penalty for challenging concepts)
-  - **User Perception Adjustment**:
-    - If a user rates a question's difficulty differently than its actual difficulty, the mastery change is adjusted:
-      - **Correct & Easier than Expected**: Mastery gain is reduced (e.g., by 15-30%).
-      - **Correct & Harder than Expected**: Mastery gain is increased (e.g., by 15-30%).
-      - **Incorrect & Harder than Expected**: Mastery loss is reduced (e.g., by 10-40%).
-      - **Incorrect & Easier than Expected**: Mastery loss might be slightly increased (optional).
-    - This adjustment only applies if the user provides a difficulty rating for the question.
-- **Confidence Scoring**:
-  - Confidence score (0.0 to 1.0) for each concept tracks how well your self-assessment aligns with actual performance.
-  - Increases when your perceived difficulty of a question aligns with your performance (e.g., correct and found it easy/medium, or incorrect but knew it was hard).
-  - Decreases when there's a mismatch (e.g., correct but found it very hard, or incorrect but found it easy).
+  - **Incorrect Answers (Review Questions - New Structure)**:
+    - Easy questions: -0.25 mastery
+    - Medium questions: -0.2 mastery
+    - Hard questions: -0.15 mastery
+  - **User Perception Adjustment (Review Questions)**:
+    - If a user rates a review question's difficulty differently than its actual difficulty, the mastery change is adjusted (e.g., gain reduced if found easier than expected, gain increased if found harder). This applies only if the user provides a difficulty rating for the review question.
+- **Confidence Scoring (Review System Focus)**:
+  - Tracks alignment between self-assessment and actual performance on review questions.
+  - Increases when perceived difficulty aligns with performance.
+  - Decreases with mismatches.
+- **Visual Mastery Tracking**:
+  - Concept nodes in graphs sized and colored by their unified mastery level.
+  - Border thickness can indicate confidence level.
+  - Hover tooltips show exact mastery/confidence percentages.
 - **Mastery Persistence**:
-  - Concepts and their mastery/confidence scores remain in your knowledge graph even if associated notes are deleted.
-  - Long-term tracking of your growing expertise.
+  - Concepts and their unified mastery/confidence scores are retained.
+  - Long-term tracking of expertise.
   - **Coming Soon**: Mastery history and progression tracking.
   
 ### 🌙 Theme Support

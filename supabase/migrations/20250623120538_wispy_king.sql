@@ -279,6 +279,12 @@ BEGIN
       WHEN response_quality = 5 THEN LEAST(0.95, mastery_level + 0.1) -- Larger increase for perfect responses
       ELSE mastery_level
     END,
+    confidence_score = CASE
+      WHEN response_quality <= 2 THEN GREATEST(0.1, confidence_score - 0.05) -- Failed recall, lower confidence
+      WHEN response_quality = 3 THEN GREATEST(0.1, LEAST(0.9, confidence_score - 0.02)) -- Knew it, but medium, slight dip or small change
+      WHEN response_quality >= 4 THEN LEAST(0.9, confidence_score + 0.05) -- Recalled well, higher confidence
+      ELSE confidence_score 
+    END,
     last_reviewed_at = NOW(),
     review_count = review_count + 1
   FROM flashcard_concept
@@ -392,7 +398,7 @@ BEGIN
       ucm.mastery_level
     FROM user_concept_mastery ucm
     JOIN concepts c ON ucm.concept_id = c.id
-    WHERE ucm.user_id = 'c0d8ab1d-864d-4c26-951d-718765fffd56'
+    WHERE ucm.user_id = user_uuid
     AND ucm.mastery_level < 0.4
     ORDER BY ucm.mastery_level ASC
     LIMIT max_concepts
@@ -415,3 +421,7 @@ ALTER TABLE flashcard_responses ALTER COLUMN user_id SET DEFAULT auth.uid();
 -- Add the column if it doesn't exist
 ALTER TABLE flashcard_sessions
 ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+
+ALTER TABLE user_concept_mastery
+ADD COLUMN IF NOT EXISTS last_reviewed_at TIMESTAMPTZ,
+ADD COLUMN IF NOT EXISTS review_count INTEGER DEFAULT 0;

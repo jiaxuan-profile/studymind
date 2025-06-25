@@ -12,10 +12,9 @@ interface DueFlashcardRPCResponse {
   mastery_level: number;
   due_date: string | null; // ISO string
   is_new: boolean;
-  // These are not in your get_due_flashcards RETURNS TABLE but you map them
-  // repetition_count?: number;
-  // ease_factor?: number;
-  // interval_days?: number;
+  repetition_count: number;
+  ease_factor: number;
+  interval_days: number;
 }
 
 
@@ -42,11 +41,11 @@ export async function getDueFlashcards(
       backContent: card.back_content,
       difficulty: card.difficulty,
       masteryLevel: card.mastery_level,
-      dueDate: card.due_date ? new Date(card.due_date) : null,
+      dueDate: card.due_date ? new Date(card.due_date) : new Date(),
       isNew: card.is_new,
-      repetitionCount: 0, // Placeholder, see note
-      easeFactor: 2.5,    // Placeholder, see note
-      intervalDays: 1
+      repetitionCount: card.repetition_count,
+      easeFactor: card.ease_factor,
+      intervalDays: card.interval_days
     }));
   } catch (error) {
     console.error('Error fetching due flashcards:', error);
@@ -111,35 +110,44 @@ export async function recordFlashcardResponse(
   notes?: string
 ): Promise<void> {
   try {
-    const { data: { user }, error: userError } = await supabase.auth.getUser(); // Get current user
-    if (userError || !user) {
+    const { data: authUser, error: userError } = await supabase.auth.getUser();
+    if (userError || !authUser) {
       console.error('Error fetching user for response recording:', userError);
       throw new Error('User not authenticated or error fetching user.');
     }
+    const userId = authUser.user.id;
 
-    // First record the response
-    const { error: responseError } = await supabase
+    const { error: responseInsertError } = await supabase
       .from('flashcard_responses')
       .insert({
-        user_id: user.id,
+        user_id: userId,
         flashcard_id: flashcardId,
         session_id: sessionId,
         response_quality: responseQuality,
         response_time_ms: responseTimeMs,
-        notes: notes
+        notes: notes,
       });
 
-    if (responseError) throw responseError;
+    if (responseInsertError) {
+      console.error('Error inserting flashcard response:', responseInsertError);
+      throw responseInsertError;
+    }
 
     // Then update the flashcard using the spaced repetition algorithm
-    const { error: updateError } = await supabase.rpc('update_flashcard_after_review', {
+    const { error: rpcError } = await supabase.rpc('update_flashcard_after_review', {
       flashcard_uuid: flashcardId,
-      response_quality: responseQuality
+      response_quality: responseQuality,
+      user_uuid: userId,
     });
 
-    if (updateError) throw updateError;
+    if (rpcError) {
+      console.error('Error calling update_flashcard_after_review RPC:', rpcError);
+      throw rpcError;
+    }
+    console.log(`Flashcard ${flashcardId} response recorded. Quality: ${responseQuality}. Mastery potentially updated.`);
+
   } catch (error) {
-    console.error('Error recording flashcard response:', error);
+    console.error('Overall error in recordFlashcardResponse:', error);
     throw error;
   }
 }
