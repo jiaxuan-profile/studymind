@@ -1,12 +1,11 @@
-// src/components/planner/StudyPlanForm.tsx
 import React, { useState, useEffect } from 'react';
-import { Plus, Sparkles, CalendarDays, BookOpen, Loader2 } from 'lucide-react';
+import { Sparkles, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { supabase } from '../../services/supabase';
-import { ExamDate, Note } from '../../types'; // Assuming Note type is available
-import { useStore } from '../../store'; // Assuming useStore has notes and subjects
+import { ExamDate, Note } from '../../types';
+import { useStore } from '../../store';
 
 interface StudyPlanFormProps {
   onStudyPlanGenerated: () => void;
@@ -17,7 +16,7 @@ const StudyPlanForm: React.FC<StudyPlanFormProps> = ({ onStudyPlanGenerated, onC
   const { user } = useAuth();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
-  const { notes, subjects, loadSubjects } = useStore(); // Assuming notes and subjects are in store
+  const { notes, subjects, loadSubjects } = useStore();
 
   const [examDates, setExamDates] = useState<ExamDate[]>([]);
   const [selectedExamDateId, setSelectedExamDateId] = useState<string | null>(null);

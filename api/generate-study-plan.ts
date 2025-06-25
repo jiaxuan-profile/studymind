@@ -1,4 +1,3 @@
-// api/generate-study-plan.ts
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { Handler } from '@netlify/functions';
 import { createClient } from '@supabase/supabase-js';

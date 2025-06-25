@@ -1,7 +1,7 @@
 // src/pages/PlannerPage.tsx
 import React, { useState, useCallback } from 'react';
 import PageHeader from '../components/PageHeader';
-import ExamDateForm from '../components/planner/ExamDateForm'; // Will be created in next step
+import ExamDateForm from '../components/planner/ExamDateForm';
 import ExamDatesList from '../components/planner/ExamDatesList';
 import StudyPlanForm from '../components/planner/StudyPlanForm';
 import StudyPlansList from '../components/planner/StudyPlansList';
@@ -17,12 +17,13 @@ const PlannerPage: React.FC = () => {
 
   const handleExamDateAddedOrUpdated = useCallback(() => {
     setIsAddingNew(false);
-    setIsAddingStudyPlan(false);
+    setEditingExamDate(null);
     setRefreshList(prev => prev + 1);
   }, []);
 
   const handleStudyPlanAddedOrUpdated = useCallback(() => {
     // Logic to refresh study plans list if needed
+    setIsAddingStudyPlan(false);
     setRefreshList(prev => prev + 1);
   }, []);
 
@@ -35,7 +36,7 @@ const PlannerPage: React.FC = () => {
     setIsAddingNew(false);
     setEditingExamDate(null);
   }, []);
-
+  
   const handleCancelStudyPlanForm = useCallback(() => {
     setIsAddingStudyPlan(false);
   }, []);
@@ -45,20 +46,30 @@ const PlannerPage: React.FC = () => {
       <PageHeader
         title="Study Planner"
         subtitle="Organize your study schedule and track important deadlines."
-      />
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
-        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Add New Exam Date</h2>
-        {!isAddingNew && (
-          <button onClick={() => setIsAddingNew(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark">
-            <Plus className="h-5 w-5 mr-2" /> Add Exam Date
-          </button>
+      >
+        {!isAddingNew && !isAddingStudyPlan && (
+          <>
+            <button onClick={() => setIsAddingNew(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark">
+              <Plus className="h-5 w-5 mr-2" /> Add Exam Date
+            </button>
+            <button onClick={() => setIsAddingStudyPlan(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark">
+              <Sparkles className="h-5 w-5 mr-2" /> Generate Study Plan
+            </button>
+          </>
         )}
-      </div>
+      </PageHeader>
 
       {isAddingNew && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
           <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">{editingExamDate ? 'Edit Exam Date' : 'Add New Exam Date'}</h2>
           <ExamDateForm initialExamDate={editingExamDate} onExamDateAddedOrUpdated={handleExamDateAddedOrUpdated} onCancel={handleCancelForm} />
+        </div>
+      )}
+
+      {isAddingStudyPlan && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Generate New Study Plan</h2>
+          <StudyPlanForm onStudyPlanGenerated={handleStudyPlanAddedOrUpdated} onCancel={handleCancelStudyPlanForm} />
         </div>
       )}
 
@@ -86,39 +97,14 @@ const PlannerPage: React.FC = () => {
         </button>
       </div>
 
-      {!isAddingNew && !isAddingStudyPlan && (
-        <>
-          <button onClick={() => setIsAddingNew(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark">
-            <Plus className="h-5 w-5 mr-2" /> Add Exam Date
-          </button>
-          <button onClick={() => setIsAddingStudyPlan(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark">
-            <Sparkles className="h-5 w-5 mr-2" /> Generate Study Plan
-          </button>
-        </>
-      )}
-
-      {
-        isAddingStudyPlan && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Generate New Study Plan</h2>
-            <StudyPlanForm onStudyPlanGenerated={handleStudyPlanAddedOrUpdated} onCancel={handleCancelStudyPlanForm} />
-          </div>
-        )
-      }
-
       {/* Content based on active tab */}
-      {
-        activeTab === 'examDates' && (
-          <ExamDatesList key={`exam-dates-${refreshList}`} onEditExamDate={handleEditExamDate} onExamDateDeleted={handleExamDateAddedOrUpdated} onAddExamDate={() => setIsAddingNew(true)} />
-        )
-      }
-
-      {
-        activeTab === 'studyPlans' && (
-          <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => setIsAddingStudyPlan(true)} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
-        )
-      }
-    </div >
+      {activeTab === 'examDates' && (
+        <ExamDatesList key={`exam-dates-${refreshList}`} onEditExamDate={handleEditExamDate} onExamDateDeleted={handleExamDateAddedOrUpdated} onAddExamDate={() => setIsAddingNew(true)} />
+      )}
+      {activeTab === 'studyPlans' && (
+        <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => setIsAddingStudyPlan(true)} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
+      )}
+    </div>
   );
 };
 
