@@ -14,6 +14,7 @@ import ReviewPage from './pages/ReviewPage';
 import ReviewHistoryPage from './pages/ReviewHistoryPage';
 import ViewSessionPage from './pages/ViewSessionPage';
 import FlashcardsPage from './pages/FlashcardsPage';
+import PlannerPage from './pages/PlannerPage';
 import HelpSupportPage from './pages/HelpSupportPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
