@@ -298,3 +298,29 @@ export interface ExamDate {
   created_at: string;
   updated_at: string;
 }
+
+export interface StudyPlan {
+  id: string;
+  user_id: string;
+  exam_date_id?: string | null;
+  exam_date?: { id: string; name: string; date: string; } | null; // Joined exam date details
+  name: string;
+  generated_at: string;
+  status: 'draft' | 'active' | 'completed' | 'archived';
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StudyTask {
+  id: string;
+  study_plan_id: string;
+  user_id: string;
+  description: string;
+  due_date?: string | null;
+  concept_id?: string | null;
+  status: 'todo' | 'in_progress' | 'done' | 'skipped';
+  notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
