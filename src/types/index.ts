@@ -287,3 +287,14 @@ export const YEAR_LEVEL_OPTIONS = [
   { value: '3', label: 'Tertiary (College/University)' },
   { value: '4', label: 'Working Professional' }
 ] as const;
+
+export interface ExamDate {
+  id: string;
+  user_id: string;
+  name: string;
+  date: string; // Stored as 'YYYY-MM-DD' string
+  notes?: string | null;
+  subject_id?: number | null;
+  created_at: string;
+  updated_at: string;
+}
