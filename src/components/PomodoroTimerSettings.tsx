@@ -1,4 +1,3 @@
-// src/components/PomodoroTimerSettings.tsx
 import React from 'react';
 import {
   Clock,
@@ -6,7 +5,8 @@ import {
   VolumeX,
   ChevronUp,
   ChevronDown,
-  RotateCcw
+  RotateCcw,
+  Bell
 } from 'lucide-react';
 import { useStore } from '../store';
 
@@ -76,27 +76,90 @@ const PomodoroTimerSettings: React.FC = () => {
         ))}
       </div>
 
-      <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-        <div className="flex items-center space-x-2">
-          {pomodoroSettings.soundEnabled ? (
-            <Volume2 className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-          ) : (
-            <VolumeX className="h-5 w-5 text-gray-400 dark:text-gray-600" />
-          )}
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sound Notifications</span>
-        </div>
-        <button
-          onClick={() => updateSetting('soundEnabled', !pomodoroSettings.soundEnabled)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-            pomodoroSettings.soundEnabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
-          }`}
-        >
-          <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-200 transition-transform ${
-              pomodoroSettings.soundEnabled ? 'translate-x-6' : 'translate-x-1'
+      {/* Sound Settings */}
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-4">
+        <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 flex items-center">
+          <Bell className="h-4 w-4 mr-2 text-primary" />
+          Notification Settings
+        </h4>
+        
+        {/* Sound Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            {pomodoroSettings.soundEnabled ? (
+              <Volume2 className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+            ) : (
+              <VolumeX className="h-5 w-5 text-gray-400 dark:text-gray-600" />
+            )}
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sound Notifications</span>
+          </div>
+          <button
+            onClick={() => updateSetting('soundEnabled', !pomodoroSettings.soundEnabled)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+              pomodoroSettings.soundEnabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'
             }`}
-          />
-        </button>
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-200 transition-transform ${
+                pomodoroSettings.soundEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
+        
+        {/* Volume Slider - only shown if sound is enabled */}
+        {pomodoroSettings.soundEnabled && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Notification Volume
+              </label>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {pomodoroSettings.notificationVolume || 100}%
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Volume2 className="h-4 w-4 text-gray-400 dark:text-gray-500" />
+              <input
+                type="range"
+                min="0"
+                max="100"
+                step="5"
+                value={pomodoroSettings.notificationVolume || 100}
+                onChange={(e) => updateSetting('notificationVolume', parseInt(e.target.value))}
+                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Auto-close Overlay Setting */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Auto-close Completion Overlay
+            </label>
+            <span className="text-sm text-gray-500 dark:text-gray-400">
+              {((pomodoroSettings.autoCloseOverlayDelay || 10000) / 1000).toFixed(0)}s
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <input
+              type="range"
+              min="3000"
+              max="30000"
+              step="1000"
+              value={pomodoroSettings.autoCloseOverlayDelay || 10000}
+              onChange={(e) => updateSetting('autoCloseOverlayDelay', parseInt(e.target.value))}
+              className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+          <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <span>3s</span>
+            <span>15s</span>
+            <span>30s</span>
+          </div>
+        </div>
       </div>
 
       <div className="pt-4 border-t border-gray-200 dark:border-gray-700">

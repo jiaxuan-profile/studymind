@@ -345,18 +345,21 @@ export const useStore = create<State>((set, get) => ({
     }
   },
 
-  updateAppSettings: (updates) => set((state) => {
-    const currentSettings = state.appSettings;
+  updateAppSettings: (updates) => {
+    const currentSettings = get().appSettings;
     const newUpdates = typeof updates === 'function'
       ? updates(currentSettings)
       : updates;
 
     const mergedSettings = deepMerge(currentSettings, newUpdates);
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('appSettings', JSON.stringify(mergedSettings));
+    }
 
-    return {
-      appSettings: mergedSettings
-    };
-  }),
+    set({ appSettings: mergedSettings });
+  },
 }));
 
 if (typeof window !== 'undefined') {
