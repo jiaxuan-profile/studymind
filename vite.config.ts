@@ -65,6 +65,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace('/api/generate-flashcards', '/generate-flashcards'),
       },
+      '/api/generate-study-plan': {
+        target: 'https://study.studymindai.me/.netlify/functions',
+        changeOrigin: true,
+        rewrite: (path) => path.replace('/api/generate-study-plan', '/generate-study-plan'),
+      },
     },
   },
 });
