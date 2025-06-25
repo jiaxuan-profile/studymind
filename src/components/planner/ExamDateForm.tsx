@@ -176,6 +176,29 @@ const ExamDateForm: React.FC<ExamDateFormProps> = ({
           ))}
         </select>
       </div>
+      <button
+        type="submit"
+        className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        disabled={loading}
+      >
+        {loading ? (
+          <>
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+            {initialExamDate ? 'Updating...' : 'Adding...'}
+          </>
+        ) : (
+          <>
+            {initialExamDate ? (
+              'Update Exam Date'
+            ) : (
+              <>
+                <Plus className="h-5 w-5 mr-2" />
+                Add Exam Date
+              </>
+            )}
+          </>
+        )}
+      </button>
 
       {onCancel && (
         <button
