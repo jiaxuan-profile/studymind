@@ -15,6 +15,7 @@ import ReviewHistoryPage from './pages/ReviewHistoryPage';
 import ViewSessionPage from './pages/ViewSessionPage';
 import FlashcardsPage from './pages/FlashcardsPage';
 import PlannerPage from './pages/PlannerPage';
+import StudyPlanDetailPage from './pages/StudyPlanDetailPage';
 import HelpSupportPage from './pages/HelpSupportPage';
 import NotFoundPage from './pages/NotFoundPage';
 import LoginPage from './pages/LoginPage';
@@ -118,8 +119,9 @@ function AppRoutes() {
           <Route path="review" element={<ReviewPage />} />
           <Route path="history" element={<ReviewHistoryPage />} />
           <Route path="session/:sessionId" element={<ViewSessionPage />} />
-          <Route path="help" element={<HelpSupportPage />} />
           <Route path="planner" element={<PlannerPage />} />
+          <Route path="planner/plan/:studyPlanId" element={<StudyPlanDetailPage />} />
+          <Route path="help" element={<HelpSupportPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
