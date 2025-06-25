@@ -98,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           }
         >
           <GraduationCap className="mr-3 h-5 w-5" />
-          Assessment
+          Review
         </NavLink>
 
         <NavLink
@@ -110,7 +110,7 @@ const Sidebar: React.FC<SidebarProps> = ({ mobile, onClose }) => {
           }
         >
           <History className="mr-3 h-5 w-5" />
-          Assessment History
+          Review History
         </NavLink>
 
         {recentNotes.length > 0 && (
