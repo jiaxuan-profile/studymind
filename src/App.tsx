@@ -119,6 +119,7 @@ function AppRoutes() {
           <Route path="history" element={<ReviewHistoryPage />} />
           <Route path="session/:sessionId" element={<ViewSessionPage />} />
           <Route path="help" element={<HelpSupportPage />} />
+          <Route path="planner" element={<PlannerPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Routes>
