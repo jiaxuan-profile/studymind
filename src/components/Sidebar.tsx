@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle, History, Layers } from 'lucide-react';
+import { Book, BrainCircuit, Home, X, TextQuote as NotebookText, GraduationCap, Clock, HelpCircle, History, Layers, CalendarDays } from 'lucide-react';
 import { useStore } from '../store';
 
 interface SidebarProps {
