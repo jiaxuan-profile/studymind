@@ -76,6 +76,15 @@ StudyMind supports both formative and summative assessment strategies:
 - **Progress Analytics**: View completion rates and difficulty distributions
 - **Review History**: Access past sessions and track improvement over time
 
+### 📅 Study Planner
+- **Exam Date Management**: Track important exam dates and deadlines
+- **AI-Generated Study Plans**: Create personalized study plans based on your notes and exam dates
+- **Task Distribution**: Automatically distribute study tasks across the available time before exams
+- **Concept-Based Tasks**: Study tasks linked to specific concepts from your notes
+- **Progress Tracking**: Mark tasks as todo, in-progress, or completed
+- **Multiple Plans**: Create different study plans for different exams or subjects
+- **Customizable**: Edit generated plans to fit your personal study style
+
 ### ⏰ Pomodoro Focus Timer
 - **Integrated Focus Sessions**: Built-in Pomodoro timer to enhance study productivity
 - **Customizable Intervals**: Adjust work periods (1-120 minutes), short breaks (1-30 minutes), and long breaks (1-60 minutes)
@@ -193,7 +202,20 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - Flashcard sessions and response tracking
    - Automatic generation for struggling concepts
 
+10. **Study Planner** (`20250625143000_create_planner_tables.sql`)
+   - Exam dates tracking
+   - AI-generated study plans
+   - Task management for exam preparation
+
 ## Recent Updates
+
+### ✅ Study Planner
+- **Exam Date Management**: Track important exam dates and deadlines
+- **AI-Generated Study Plans**: Create personalized study plans based on your notes and exam dates
+- **Task Distribution**: Automatically distribute study tasks across the available time before exams
+- **Concept-Based Tasks**: Study tasks linked to specific concepts from your notes
+- **Progress Tracking**: Mark tasks as todo, in-progress, or completed
+- **Multiple Plans**: Create different study plans for different exams or subjects
 
 ### ✅ Smart Flashcards
 - **AI-Generated Flashcards**: Automatically created from your notes and concepts
