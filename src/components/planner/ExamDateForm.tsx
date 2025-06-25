@@ -10,6 +10,8 @@ import { Subject } from '../../types';
 
 interface ExamDateFormProps {
   onExamDateAdded?: () => void;
+   initialExamDate?: ExamDate | null; // New prop for editing
+ onExamDateAddedOrUpdated?: () => void;
 }
 
 const ExamDateForm: React.FC<ExamDateFormProps> = ({ onExamDateAdded }) => {
@@ -25,8 +27,78 @@ const ExamDateForm: React.FC<ExamDateFormProps> = ({ onExamDateAdded }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    if (initialExamDate) {
+      setName(initialExamDate.name);
+      setDate(initialExamDate.date);
+      setNotes(initialExamDate.notes || '');
+      setSubjectId(initialExamDate.subject_id || null);
+    }
+  }, [initialExamDate]);
+  
+  useEffect(() => {
     if (user && subjects.length === 0) {
       loadSubjects();
+
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+           .from('exam_dates')
+           .insert({
+             user_id: user.id,
+             name,
+             date,
+             notes,
+             subject_id: subjectId,
+           })
+           .select()
+           .single();
+
+        let result;
+
+        if (initialExamDate) {
+          // Update existing exam date
+           result = await supabase
+             .from('exam_dates')
+             .update({
+               name,
+               date,
+               notes,
+               subject_id: subjectId,
+             })
+             .eq('id', initialExamDate.id)
+             .eq('user_id', user.id)
+             .select()
+             .single();
+
+           addToast('Exam date updated successfully!', 'success');
+           addNotification(`Exam "${name}" updated.`, 'success', 'Planner');
+         } else {
+           // Insert new exam date
+           result = await supabase
+             .from('exam_dates')
+             .insert({
+               user_id: user.id,
+               name,
+               date,
+               notes,
+               subject_id: subjectId,
+             })
+             .select()
+             .single();
+
+           addToast('Exam date added successfully!', 'success');
+            addNotification(`Exam "${name}" on ${date} added.`, 'success', 'Planner');
+        }
+
+        if (error) throw error;
+
+        addToast('Exam date added successfully!', 'success');
+        addNotification(`Exam "${name}" on ${date} added.`, 'success', 'Planner');
+
+        if (result.error) throw result.error;
+        setName('');
+        setDate('');
+        setNotes('');
     }
   }, [user, subjects.length, loadSubjects]);
 
@@ -137,10 +209,10 @@ const ExamDateForm: React.FC<ExamDateFormProps> = ({ onExamDateAdded }) => {
             Adding...
           </>
         ) : (
-          <>
-            <Plus className="h-5 w-5 mr-2" />
-            Add Exam Date
-          </>
+               <>{initialExamDate ? 'Update Exam Date' : 'Add Exam Date'}
+       <Plus className="h-5 w-5 mr-2" />
+       Add Exam Date
+     </>
         )}
       </button>
     </form>
