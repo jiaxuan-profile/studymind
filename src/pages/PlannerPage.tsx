@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import PageHeader from '../components/PageHeader';
 import ExamDateForm from '../components/planner/ExamDateForm'; // Will be created in next step
 import ExamDatesList from '../components/planner/ExamDatesList';
+import StudyPlanForm from '../components/planner/StudyPlanForm';
 import StudyPlansList from '../components/planner/StudyPlansList';
 import { ExamDate } from '../types';
 import { Plus, CalendarDays, ListChecks } from 'lucide-react';
@@ -12,11 +13,12 @@ const PlannerPage: React.FC = () => {
   const [editingExamDate, setEditingExamDate] = useState<ExamDate | null>(null);
   const [refreshList, setRefreshList] = useState(0); // State to trigger list refresh
   const [activeTab, setActiveTab] = useState<'examDates' | 'studyPlans'>('examDates');
+  const [isAddingStudyPlan, setIsAddingStudyPlan] = useState(false);
 
   const handleExamDateAddedOrUpdated = useCallback(() => {
     setIsAddingNew(false);
-    setEditingExamDate(null);
-    setRefreshList(prev => prev + 1); // Increment to trigger useEffect in list
+    setIsAddingStudyPlan(false);
+    setRefreshList(prev => prev + 1);
   }, []);
 
   const handleStudyPlanAddedOrUpdated = useCallback(() => {
@@ -32,6 +34,10 @@ const PlannerPage: React.FC = () => {
   const handleCancelForm = useCallback(() => {
     setIsAddingNew(false);
     setEditingExamDate(null);
+  }, []);
+
+  const handleCancelStudyPlanForm = useCallback(() => {
+    setIsAddingStudyPlan(false);
   }, []);
 
   return (
@@ -80,13 +86,20 @@ const PlannerPage: React.FC = () => {
         </button>
       </div>
 
+      {isAddingStudyPlan && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-4">Generate New Study Plan</h2>
+          <StudyPlanForm onStudyPlanGenerated={handleStudyPlanAddedOrUpdated} onCancel={handleCancelStudyPlanForm} />
+        </div>
+      )}
+
       {/* Content based on active tab */}
       {activeTab === 'examDates' && (
         <ExamDatesList key={`exam-dates-${refreshList}`} onEditExamDate={handleEditExamDate} onExamDateDeleted={handleExamDateAddedOrUpdated} onAddExamDate={() => setIsAddingNew(true)} />
       )}
 
       {activeTab === 'studyPlans' && (
-        <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => { /* TODO: Implement study plan creation form */ }} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
+        <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => setIsAddingStudyPlan(true)} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
       )}
     </div>
   );
