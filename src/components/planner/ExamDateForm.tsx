@@ -1,20 +1,22 @@
 // src/components/planner/ExamDateForm.tsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus } from 'lucide-react'; // Calendar not used, can be removed if not needed elsewhere
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useStore } from '../../store';
 import { supabase } from '../../services/supabase';
-import { Subject } from '../../types';
+import { Subject, ExamDate } from '../../types';
 
 interface ExamDateFormProps {
-  onExamDateAdded?: () => void;
-   initialExamDate?: ExamDate | null; // New prop for editing
- onExamDateAddedOrUpdated?: () => void;
+  initialExamDate?: ExamDate | null;
+  onExamDateAddedOrUpdated?: () => void; // Consolidated callback
 }
 
-const ExamDateForm: React.FC<ExamDateFormProps> = ({ onExamDateAdded }) => {
+const ExamDateForm: React.FC<ExamDateFormProps> = ({
+  initialExamDate,
+  onExamDateAddedOrUpdated,
+}) => {
   const { user } = useAuth();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
@@ -26,119 +28,93 @@ const ExamDateForm: React.FC<ExamDateFormProps> = ({ onExamDateAdded }) => {
   const [subjectId, setSubjectId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Effect to populate form when initialExamDate is provided (for editing)
+  // or reset form if initialExamDate is cleared
   useEffect(() => {
     if (initialExamDate) {
       setName(initialExamDate.name);
-      setDate(initialExamDate.date);
+      // Ensure date is in YYYY-MM-DD format for input type="date"
+      // Supabase date might be 'YYYY-MM-DD' or ISO string 'YYYY-MM-DDTHH:mm:ssZ'
+      const dateOnly = initialExamDate.date.split('T')[0];
+      setDate(dateOnly);
       setNotes(initialExamDate.notes || '');
       setSubjectId(initialExamDate.subject_id || null);
+    } else {
+      // Reset form if initialExamDate is null/undefined (e.g., switching from edit to add mode)
+      setName('');
+      setDate('');
+      setNotes('');
+      setSubjectId(null);
     }
   }, [initialExamDate]);
-  
+
+  // Effect to load subjects if they haven't been loaded yet
   useEffect(() => {
     if (user && subjects.length === 0) {
-      loadSubjects();
-
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-           .from('exam_dates')
-           .insert({
-             user_id: user.id,
-             name,
-             date,
-             notes,
-             subject_id: subjectId,
-           })
-           .select()
-           .single();
-
-        let result;
-
-        if (initialExamDate) {
-          // Update existing exam date
-           result = await supabase
-             .from('exam_dates')
-             .update({
-               name,
-               date,
-               notes,
-               subject_id: subjectId,
-             })
-             .eq('id', initialExamDate.id)
-             .eq('user_id', user.id)
-             .select()
-             .single();
-
-           addToast('Exam date updated successfully!', 'success');
-           addNotification(`Exam "${name}" updated.`, 'success', 'Planner');
-         } else {
-           // Insert new exam date
-           result = await supabase
-             .from('exam_dates')
-             .insert({
-               user_id: user.id,
-               name,
-               date,
-               notes,
-               subject_id: subjectId,
-             })
-             .select()
-             .single();
-
-           addToast('Exam date added successfully!', 'success');
-            addNotification(`Exam "${name}" on ${date} added.`, 'success', 'Planner');
-        }
-
-        if (error) throw error;
-
-        addToast('Exam date added successfully!', 'success');
-        addNotification(`Exam "${name}" on ${date} added.`, 'success', 'Planner');
-
-        if (result.error) throw result.error;
-        setName('');
-        setDate('');
-        setNotes('');
+      loadSubjects(); // Assuming loadSubjects handles its own async state and errors
     }
   }, [user, subjects.length, loadSubjects]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
-      addToast('You must be logged in to add exam dates.', 'error');
+      addToast('You must be logged in to manage exam dates.', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('exam_dates')
-        .insert({
-          user_id: user.id,
-          name,
-          date,
-          notes,
-          subject_id: subjectId,
-        })
-        .select()
-        .single();
+      let supabasePromise;
+      const examData = {
+        user_id: user.id,
+        name,
+        date,
+        notes,
+        subject_id: subjectId,
+      };
+
+      if (initialExamDate) {
+        // Update existing exam date
+        supabasePromise = supabase
+          .from('exam_dates')
+          .update(examData) // user_id is part of examData, but the WHERE clause is crucial
+          .eq('id', initialExamDate.id)
+          .eq('user_id', user.id) // Ensure user can only update their own records
+          .select()
+          .single();
+      } else {
+        // Insert new exam date
+        supabasePromise = supabase
+          .from('exam_dates')
+          .insert(examData)
+          .select()
+          .single();
+      }
+
+      const { data, error } = await supabasePromise;
 
       if (error) throw error;
 
-      addToast('Exam date added successfully!', 'success');
-      addNotification(`Exam "${name}" on ${date} added.`, 'success', 'Planner');
-      
-      setName('');
-      setDate('');
-      setNotes('');
-      setSubjectId(null);
-      if (onExamDateAdded) {
-        onExamDateAdded();
+      if (initialExamDate) {
+        addToast('Exam date updated successfully!', 'success');
+        addNotification(`Exam "${name}" updated.`, 'success', 'Planner');
+      } else {
+        addToast('Exam date added successfully!', 'success');
+        addNotification(`Exam "${name}" on ${date} added.`, 'success', 'Planner');
+        // Reset form fields only when adding a new exam date
+        setName('');
+        setDate('');
+        setNotes('');
+        setSubjectId(null);
+      }
+
+      if (onExamDateAddedOrUpdated) {
+        onExamDateAddedOrUpdated();
       }
     } catch (error: any) {
-      console.error('Error adding exam date:', error);
-      addToast(`Failed to add exam date: ${error.message}`, 'error');
-      addNotification(`Failed to add exam "${name}".`, 'error', 'Planner');
+      console.error(`Error ${initialExamDate ? 'updating' : 'adding'} exam date:`, error);
+      addToast(`Failed to ${initialExamDate ? 'update' : 'add'} exam date: ${error.message}`, 'error');
+      addNotification(`Failed to ${initialExamDate ? 'update' : 'add'} exam "${name}".`, 'error', 'Planner');
     } finally {
       setLoading(false);
     }
@@ -206,13 +182,19 @@ const ExamDateForm: React.FC<ExamDateFormProps> = ({ onExamDateAdded }) => {
         {loading ? (
           <>
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            Adding...
+            {initialExamDate ? 'Updating...' : 'Adding...'}
           </>
         ) : (
-               <>{initialExamDate ? 'Update Exam Date' : 'Add Exam Date'}
-       <Plus className="h-5 w-5 mr-2" />
-       Add Exam Date
-     </>
+          <>
+            {initialExamDate ? (
+              'Update Exam Date'
+            ) : (
+              <>
+                <Plus className="h-5 w-5 mr-2" />
+                Add Exam Date
+              </>
+            )}
+          </>
         )}
       </button>
     </form>
