@@ -51,8 +51,7 @@ const PlannerPage: React.FC = () => {
          <ExamDateForm initialExamDate={editingExamDate} onExamDateAddedOrUpdated={handleExamDateAddedOrUpdated} onCancel={handleCancelForm} />
        </div>
      )}
-       
-      </div>
+
     </div>
   );
 };
