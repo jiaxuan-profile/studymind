@@ -22,7 +22,6 @@ interface PomodoroStats {
 type TimerState = 'work' | 'shortBreak' | 'longBreak';
 
 const PomodoroWidget: React.FC = () => {
-  const [canPlay, setCanPlay] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioReady, setAudioReady] = useState(false);
   const { appSettings } = useStore();
@@ -101,7 +100,7 @@ const PomodoroWidget: React.FC = () => {
   }, [currentState]);
 
   const playNotificationSound = useCallback(async () => {
-    if (!canPlay) return;
+    if (!pomodoroSettings.soundEnabled) return;
 
     try {
       let audioSrc = '';
@@ -120,7 +119,7 @@ const PomodoroWidget: React.FC = () => {
       const audio = new Audio(audioSrc);
       audio.currentTime = 0;
       audio.muted = false;
-      audio.volume = 1.0;
+      audio.volume = (pomodoroSettings.notificationVolume || 100) / 100;
 
       const playPromise = audio.play();
 
@@ -133,7 +132,7 @@ const PomodoroWidget: React.FC = () => {
     } catch (error) {
       console.error("Error playing notification sound:", error);
     }
-  }, [canPlay, currentState]);
+  }, [pomodoroSettings.soundEnabled, pomodoroSettings.notificationVolume, currentState]);
 
   useEffect(() => {
     if (timeLeft === 0 && audioReady) {
@@ -162,17 +161,12 @@ const PomodoroWidget: React.FC = () => {
 
   const startTimer = () => {
     setIsRunning(true);
-    setCanPlay(true);
-
-    if (audioRef.current) {
-      audioRef.current.volume = 1.0;
-    }
   };
 
   const handleTimerComplete = () => {
     setIsRunning(false);
 
-    if (canPlay) {
+    if (pomodoroSettings.soundEnabled) {
       playNotificationSound();
     }
 
@@ -561,7 +555,7 @@ const PomodoroWidget: React.FC = () => {
         isOpen={showCompletionOverlay}
         type={completionOverlayType}
         onClose={() => setShowCompletionOverlay(false)}
-        autoCloseDelay={10000} // Auto-close after 10 seconds
+        autoCloseDelay={pomodoroSettings.autoCloseOverlayDelay || 10000} // Use setting or default to 10 seconds
       />
     </div>
   );
