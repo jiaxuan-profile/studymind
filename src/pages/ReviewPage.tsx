@@ -63,7 +63,7 @@ const ReviewPage: React.FC = () => {
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const [loadingReviewProcess, setLoadingReviewProcess] = useState(false);
   const [isInitiatingReview, setIsInitiatingReview] = useState(false);
-  
+
   // For MCQ questions
   const [selectedOption, setSelectedOption] = useState<string | undefined>(undefined);
 
@@ -73,24 +73,25 @@ const ReviewPage: React.FC = () => {
   const {
     selectedNotes,
     selectedDifficulty,
-    selectedQuestionType,
-    selectedQuestionCount,
     generateNewQuestions,
     searchTerm,
     activeNoteSelectionTab,
     debouncedSearchTerm,
     setSelectedNotes,
     setSelectedDifficulty,
-    setSelectedQuestionType,
-    setSelectedQuestionCount,
     setGenerateNewQuestions,
     setSearchTerm,
     setActiveNoteSelectionTab,
     availableNotes,
     currentSelectedNotesDisplay,
     displayTotalQuestions,
+    selectedQuestionType: setupSelectedQuestionType,
+    setSelectedQuestionType: setupSetSelectedQuestionType,
+    selectedQuestionCount: setupSelectedQuestionCount,
+    setSelectedQuestionCount: setupSetSelectedQuestionCount,    
     handleNoteSelection,
     resetSetupSelections,
+    questionsMatchingFilters,
   } = useReviewSetup({ allNotesWithQuestions: notesWithQuestionsData });
 
   const {
@@ -152,9 +153,10 @@ const ReviewPage: React.FC = () => {
     notes: notes,
     subjects: subjects,
     selectedNotes,
-    notesWithQuestions: notesWithQuestionsData,
+    notesWithQuestions: questionsMatchingFilters,
     selectedDifficulty,
-    selectedQuestionCount,
+    selectedQuestionCount: setupSelectedQuestionCount,
+    selectedQuestionType: setupSelectedQuestionType,
     generateNewQuestions,
     sessionGeneratedName,
     setSessionGeneratedName,
@@ -278,21 +280,21 @@ const ReviewPage: React.FC = () => {
   useEffect(() => {
     if (currentStep === 'review' && currentQuestions.length > 0 && currentQuestionIndex < currentQuestions.length) {
       const existingAnswer = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
-      
+
       // Reset selected option for MCQ questions
       setSelectedOption(undefined);
-      
+
       if (existingAnswer) {
         // For MCQ questions, the answer is stored in userAnswer but represents the selected option
-        if (currentQuestions[currentQuestionIndex].question_type === 'mcq' && 
-            currentQuestions[currentQuestionIndex].options) {
+        if (currentQuestions[currentQuestionIndex].question_type === 'mcq' &&
+          currentQuestions[currentQuestionIndex].options) {
           setSelectedOption(existingAnswer.answer);
         } else {
           setUserAnswer(existingAnswer.answer);
         }
-        
+
         setIsAnswerSaved(true);
-        
+
         // Load AI feedback if it exists for this question
         if (existingAnswer.ai_response_text) {
           setAiReviewFeedback(existingAnswer.ai_response_text);
@@ -349,7 +351,7 @@ const ReviewPage: React.FC = () => {
         try {
           await generateQuestionsForNote(noteId, {
             difficulty: selectedDifficulty as any,
-            questionType: selectedQuestionType
+            questionType: setupSelectedQuestionType
           });
           addToast(`Generated questions for note ${notesWithQuestionsData.find(n => n.id === noteId)?.title || noteId}`, 'success');
         } catch (error) {
@@ -399,11 +401,11 @@ const ReviewPage: React.FC = () => {
     // For MCQ questions, check if an option is selected
     const currentQuestion = currentQuestions[currentQuestionIndex];
     const isMCQ = currentQuestion?.question_type === 'mcq' && currentQuestion?.options;
-    
+
     if (isMCQ ? (selectedOption && !isAnswerSaved) : (userAnswer.trim() && !isAnswerSaved)) {
       await saveAnswerHandler();
     }
-    
+
     if (direction === 'next' && currentQuestionIndex < currentQuestions.length - 1) {
       setCurrentQuestionIndex(prev => prev + 1);
     }
@@ -447,11 +449,11 @@ const ReviewPage: React.FC = () => {
 
   const currentQuestionForDisplay = currentQuestions[currentQuestionIndex];
   const aiFeedbackCompletedForCurrentQuestion = aiReviewFeedback !== null;
-  
+
   // Check if current question is MCQ
-  const isMCQ = currentQuestionForDisplay?.question_type === 'mcq' && 
-                currentQuestionForDisplay?.options && 
-                currentQuestionForDisplay.options.length > 0;
+  const isMCQ = currentQuestionForDisplay?.question_type === 'mcq' &&
+    currentQuestionForDisplay?.options &&
+    currentQuestionForDisplay.options.length > 0;
 
   // RENDER SELECT STEP
   if (currentStep === 'select') {
@@ -476,16 +478,16 @@ const ReviewPage: React.FC = () => {
           setGenerateNewQuestions={setGenerateNewQuestions}
           selectedDifficulty={selectedDifficulty}
           setSelectedDifficulty={setSelectedDifficulty}
-          selectedQuestionType={selectedQuestionType}
-          setSelectedQuestionType={setSelectedQuestionType}
+          selectedQuestionType={setupSelectedQuestionType}
+          setSelectedQuestionType={setupSetSelectedQuestionType}
           getQuestionTypeIcon={getQuestionTypeIcon}
           getQuestionTypeColor={getQuestionTypeColor}
           totalQuestions={displayTotalQuestions}
           onStartReview={handleInitiateReview}
           startReviewDisabled={startReviewDisabled}
           isGeneratingQuestions={isGeneratingQuestions || loadingReviewProcess}
-          selectedQuestionCount={selectedQuestionCount}
-          setSelectedQuestionCount={setSelectedQuestionCount}
+          selectedQuestionCount={setupSelectedQuestionCount}
+          setSelectedQuestionCount={setupSetSelectedQuestionCount}
           isReadOnlyDemo={isReadOnlyDemo}
         />
 
