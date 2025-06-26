@@ -1,8 +1,8 @@
 // src/hooks/useReviewSessionManagement.ts
 import { useCallback } from 'react';
 import { supabase } from '../services/supabase';
-import { User, Subject } from '../types'; // Assuming ReviewAnswer is not directly used here anymore
-import { CurrentQuestionType, ReviewUserAnswer, NoteWithQuestions as ReviewNoteWithQuestionsType } from '../types/reviewTypes';
+import { User, Subject } from '../types';
+import { CurrentQuestionType, ReviewUserAnswer, Question } from '../types/reviewTypes';
 
 interface UseReviewSessionManagementProps {
     user: User | null;
@@ -15,9 +15,10 @@ interface UseReviewSessionManagementProps {
     }>;
     subjects: Subject[];
     selectedNotes: string[];
-    notesWithQuestions: ReviewNoteWithQuestionsType[];
+    notesWithQuestions: Array<Question & { noteId: string; noteTitle: string }>;
     selectedDifficulty: 'easy' | 'medium' | 'hard' | 'all';
     selectedQuestionCount: '5' | '10' | 'all';
+    selectedQuestionType: 'short' | 'mcq' | 'open' | 'all';
     generateNewQuestions: boolean;
     sessionGeneratedName?: string;
     setSessionGeneratedName: React.Dispatch<React.SetStateAction<string>>;
@@ -46,24 +47,27 @@ interface UseReviewSessionManagementProps {
     currentSessionId: string | null;
     currentQuestionIndex: number;
     currentQuestion: CurrentQuestionType | undefined;
-    userAnswer: string; // Current text in the answer input field
-    userAnswers: ReviewUserAnswer[]; // Array of answers (text + rating)
+    userAnswer: string;
+    userAnswers: ReviewUserAnswer[];
     sessionDuration: number;
-    isAnswerSaved: boolean; // Indicates if the current userAnswer text has been persisted
+    isAnswerSaved: boolean;
     reviewedCount: number;
     sessionStats: { easy: number; medium: number; hard: number };
 }
 
 export const useReviewSessionManagement = (props: UseReviewSessionManagementProps) => {
     const {
-        user, notes, subjects, selectedNotes, notesWithQuestions, selectedDifficulty, selectedQuestionCount,
+        user, notes, subjects, selectedNotes,
+        notesWithQuestions: preFilteredQuestionsFromSetup,
+        selectedDifficulty, selectedQuestionCount,
+        selectedQuestionType,
         generateNewQuestions, isReadOnlyDemo, setSessionGeneratedName,
         setLoading, addToast, setCurrentSessionId, setSessionName, setSessionStartTime,
         setCurrentQuestions, setCurrentQuestionIndex, setReviewedCount, setSessionStats,
         setUserAnswers: pageSetUserAnswers,
         setIsReviewComplete, setCurrentStep, setAiReviewFeedback, setAiReviewIsCorrect, setIsSavingAnswer, setIsAiReviewing,
         currentSessionId, currentQuestionIndex, currentQuestion, userAnswer, userAnswers,
-        sessionDuration, isAnswerSaved, // isAnswerSaved is still a prop from ReviewPage
+        sessionDuration, isAnswerSaved,
         reviewedCount: pageReviewedCount, sessionStats: pageSessionStats,
         setIsAnswerSaved: pageSetIsAnswerSaved,
     } = props;
@@ -78,61 +82,38 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 return;
             }
 
-            // Get all questions from selected notes
-            const allQuestionsFromSelectedNotes = selectedNotes.flatMap(noteId => {
-                const note = notesWithQuestions.find(n => n.id === noteId);
-                if (!note) return [];
-                return note.questions.map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
-            });
-
-            // Filter questions based on difficulty and question type
-            const filteredQuestions = allQuestionsFromSelectedNotes.filter(q => {
-                const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
-                const typeMatches = q.question_type === selectedQuestionType || 
-                                   (q.question_type === undefined && selectedQuestionType === 'short'); // Default to 'short' if undefined
-                return difficultyMatches && typeMatches;
-            });
+            let questionsToConsider = [...preFilteredQuestionsFromSetup];
 
             // Separate questions into default (AI-generated) and non-default
-            const defaultQuestions = filteredQuestions.filter(q => q.is_default);
-            const nonDefaultQuestions = filteredQuestions.filter(q => !q.is_default);
+            const defaultQuestions = questionsToConsider.filter(q => q.is_default);
+            const nonDefaultQuestions = questionsToConsider.filter(q => !q.is_default);
 
-            // Determine final questions based on selectedQuestionCount and generateNewQuestions
             let finalQuestions: CurrentQuestionType[] = [];
 
             if (generateNewQuestions) {
-                // When generating new questions, prioritize default questions
                 if (selectedQuestionCount === '5') {
-                    // Take up to 5 default questions
                     finalQuestions = defaultQuestions.slice(0, 5);
                 } else if (selectedQuestionCount === '10') {
-                    // Take up to 10 questions, prioritizing default ones
                     finalQuestions = [
                         ...defaultQuestions.slice(0, 10),
                         ...nonDefaultQuestions.slice(0, Math.max(0, 10 - defaultQuestions.length))
                     ].slice(0, 10);
                 } else { // 'all'
-                    // Take all questions
                     finalQuestions = [...defaultQuestions, ...nonDefaultQuestions];
                 }
             } else {
-                // When not generating new questions, use all filtered questions
-                finalQuestions = filteredQuestions;
-                
-                // Apply count limit if specified
+                finalQuestions = [...questionsToConsider];
                 if (selectedQuestionCount === '5') {
                     finalQuestions = finalQuestions.slice(0, 5);
                 } else if (selectedQuestionCount === '10') {
                     finalQuestions = finalQuestions.slice(0, 10);
                 }
-                // For 'all', keep all questions
             }
 
-            // Shuffle the questions
             const shuffledQuestions = finalQuestions.sort(() => Math.random() - 0.5);
 
             if (shuffledQuestions.length === 0) {
-                addToast("No questions found for the selected criteria.", "warning");
+                addToast("No questions found after applying all selection criteria.", "warning");
                 props.setLoading(false);
                 return;
             }
@@ -201,18 +182,15 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 original_question_id: q.id,
                 ai_response_text: null,
                 is_correct: null,
-                question_type: q.question_type,
-                options: q.options
             }));
 
             const { data: insertedAnswers, error: answersInsertError } = await supabase
                 .from('review_answers')
                 .insert(placeholderAnswers)
                 .select('id, question_index');
-                
+
             if (answersInsertError) throw answersInsertError;
 
-            // Initialize userAnswers with the database-generated IDs
             const initialUserAnswers: ReviewUserAnswer[] = [];
             if (insertedAnswers) {
                 insertedAnswers.forEach(answer => {
@@ -232,7 +210,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             setCurrentQuestionIndex(0);
             setReviewedCount(0);
             setSessionStats({ easy: 0, medium: 0, hard: 0 });
-            pageSetUserAnswers(initialUserAnswers); // Initialize with IDs from database
+            pageSetUserAnswers(initialUserAnswers);
             setIsReviewComplete(false);
             setCurrentStep('review');
             setAiReviewFeedback(null);
@@ -245,9 +223,12 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             props.setLoading(false);
         }
     }, [
-        user, notes, subjects, selectedNotes, notesWithQuestions, selectedDifficulty, selectedQuestionCount, generateNewQuestions,
-        setSessionGeneratedName, // Removed isReadOnlyDemo as it's not used in this handler's logic path
-        props.setLoading, addToast, setCurrentSessionId, setSessionName, setSessionStartTime, // Use props.setLoading to avoid lint warning
+        user, notes, subjects, selectedNotes,
+        preFilteredQuestionsFromSetup,
+        selectedDifficulty, selectedQuestionCount, generateNewQuestions,
+        selectedQuestionType,
+        setSessionGeneratedName,
+        props.setLoading, addToast, setCurrentSessionId, setSessionName, setSessionStartTime,
         setCurrentQuestions, setCurrentQuestionIndex, setReviewedCount, setSessionStats,
         pageSetUserAnswers, setIsReviewComplete, setCurrentStep, setAiReviewFeedback,
     ]);
@@ -255,22 +236,20 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
     const saveAnswerHandler = useCallback(async () => {
         // For MCQ questions, check if we have a selected option
         const currentQ = currentQuestion;
-        const isMCQ = currentQ?.question_type === 'mcq' && 
-                currentQ?.options && 
-                currentQ.options.length > 0;
-        
+        const isMCQ = currentQ?.question_type === 'mcq' &&
+            currentQ?.options &&
+            currentQ.options.length > 0;
+
         // For MCQ, we need a selected option; for short answer, we need text
         const hasValidAnswer = isMCQ ? !!props.userAnswer : !!props.userAnswer.trim();
-        
+
         if (!hasValidAnswer || !currentSessionId) {
-            // Allow saving an empty answer in demo if user explicitly clicks save and the input is empty
-            // Or if they typed something and then cleared it.
-            if (isReadOnlyDemo && currentSessionId) { // Check currentSessionId for demo too to ensure we are in a session context
+            if (isReadOnlyDemo && currentSessionId) {
                 pageSetUserAnswers(prev => {
                     const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
                     const newAnswerData = {
                         questionIndex: currentQuestionIndex,
-                        answer: userAnswer.trim(), // Save the trimmed answer (could be empty)
+                        answer: userAnswer.trim(),
                         timestamp: new Date(),
                     };
                     if (existingIndex > -1) {
@@ -287,19 +266,19 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
         if (isReadOnlyDemo) {
             pageSetUserAnswers(prev => {
-               const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
-               const newAnswerData = {
-                   answer: userAnswer.trim(),
-                   timestamp: new Date(),
-               };
-               if (existingIndex > -1) {
-                   return prev.map((ans, idx) => idx === existingIndex ? { ...ans, ...newAnswerData } : ans);
-               }
-               return [...prev, { questionIndex: currentQuestionIndex, ...newAnswerData }];
-           });
-           pageSetIsAnswerSaved(true);
-           addToast('Answer saved (Demo Mode)', 'info');
-           return Promise.resolve();
+                const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
+                const newAnswerData = {
+                    answer: userAnswer.trim(),
+                    timestamp: new Date(),
+                };
+                if (existingIndex > -1) {
+                    return prev.map((ans, idx) => idx === existingIndex ? { ...ans, ...newAnswerData } : ans);
+                }
+                return [...prev, { questionIndex: currentQuestionIndex, ...newAnswerData }];
+            });
+            pageSetIsAnswerSaved(true);
+            addToast('Answer saved (Demo Mode)', 'info');
+            return Promise.resolve();
         }
 
         setIsSavingAnswer(true);
@@ -333,15 +312,12 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                             : ans
                     );
                 } else {
-                    // This case should ideally not happen if placeholders are always created.
-                    // But if it does, create a new entry.
                     return [
                         ...prev,
                         {
-                            id: currentAnswerRecord.id, // Use the ID from the found record
+                            id: currentAnswerRecord.id,
                             questionIndex: currentQuestionIndex,
                             ...newAnswerData,
-                            // difficulty_rating would be undefined here if not previously set
                         },
                     ];
                 }
@@ -355,7 +331,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         }
         return Promise.resolve();
     }, [
-        userAnswer, currentSessionId, isReadOnlyDemo, currentQuestionIndex, currentQuestion, // userAnswers is not strictly needed here as we find and update/create
+        userAnswer, currentSessionId, isReadOnlyDemo, currentQuestionIndex, currentQuestion,
         pageSetUserAnswers, pageSetIsAnswerSaved, addToast, setIsSavingAnswer, userAnswers, props.userAnswer
     ]);
 
@@ -474,16 +450,16 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
 
         // Check if there's an unsaved text answer in the input field compared to the latest in userAnswers state
         const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
-        
+
         // For MCQ questions, check if an option is selected but not saved
         const currentQ = currentQuestion;
         const isMCQ = currentQ?.question_type === 'mcq' && currentQ?.options;
-        
+
         // Determine if there's unsaved content based on question type
-        const isUnsavedText = isMCQ 
+        const isUnsavedText = isMCQ
             ? (userAnswer && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer))
             : (userAnswer.trim() && (!currentAnswerRecord || currentAnswerRecord.answer !== userAnswer.trim()));
-        
+
         // Also check if isAnswerSaved is false, indicating the last explicit save attempt might not have matched the current input
         if (isUnsavedText || !isAnswerSaved && (isMCQ ? userAnswer : userAnswer.trim())) {
             await saveAnswerHandler(); // Ensure the latest text answer is saved
@@ -525,7 +501,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         // For MCQ questions, check if an option is selected
         const currentQ = currentQuestion;
         const isMCQ = currentQ?.question_type === 'mcq' && currentQ?.options;
-        
+
         // Ensure an answer is saved before AI review, as AI needs the text
         if (!isAnswerSaved) {
             if (isMCQ && userAnswer) {
@@ -537,13 +513,13 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 return;
             }
         }
-        
+
         // Check if we have a valid answer to review
         if (isMCQ ? !userAnswer : !userAnswer.trim()) {
             addToast('Please enter and save an answer before requesting AI feedback.', 'warning');
             return;
         }
-        
+
         if (!currentQuestion) {
             addToast('No current question to review.', 'error');
             return;
@@ -559,7 +535,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
         if (isReadOnlyDemo) {
             setAiReviewFeedback("AI feedback is not available in demo mode.");
             setAiReviewIsCorrect(null);
-            
+
             // Update local state with AI feedback for demo mode
             pageSetUserAnswers(prev => {
                 const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
@@ -574,7 +550,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 }
                 return prev;
             });
-            
+
             addToast("AI Review (Demo Mode)", "info");
             return;
         }
@@ -603,18 +579,18 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 },
                 body: JSON.stringify(payload)
             });
-            
+
             if (!response.ok) {
                 const errorText = await response.text();
                 throw new Error(`Failed to get AI feedback: ${errorText}`);
             }
-          
+
             const data = await response.json();
             if (data.feedbacks && data.feedbacks.length > 0) {
                 const feedbackItem = data.feedbacks[0];
                 setAiReviewFeedback(feedbackItem.feedback);
                 setAiReviewIsCorrect(feedbackItem.isCorrect);
-                
+
                 // Update local state with AI feedback
                 pageSetUserAnswers(prev => {
                     const existingIndex = prev.findIndex(a => a.questionIndex === currentQuestionIndex);
@@ -629,7 +605,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                     }
                     return prev;
                 });
-                
+
                 addToast('AI feedback received!', 'success');
             } else {
                 throw new Error('No feedback received from AI');
