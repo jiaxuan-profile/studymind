@@ -143,9 +143,9 @@ const SessionPreviewPanel: React.FC<SessionPreviewPanelProps> = ({
               </p>
             )}
 
-            {selectedQuestionType !== 'short' && (
+            {selectedQuestionType === 'open' && (
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-                Only short answer questions are currently available
+                Open-ended questions are coming soon
               </p>
             )}
           </div>
