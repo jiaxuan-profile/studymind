@@ -84,6 +84,11 @@ StudyMind supports both formative and summative assessment strategies:
 - **Progress Tracking**: Mark tasks as todo, in-progress, or completed
 - **Multiple Plans**: Create different study plans for different exams or subjects
 - **Customizable**: Edit generated plans to fit your personal study style
+- **Calendar View**: Visualize your study schedule in day, week, or month format
+  - See all your exams and tasks in a comprehensive calendar
+  - Color-coded events for easy identification (exams, tasks by status)
+  - Multiple view options (month, week, day, agenda)
+  - Quick navigation between dates and views
 
 ### ⏰ Pomodoro Focus Timer
 - **Integrated Focus Sessions**: Built-in Pomodoro timer to enhance study productivity
@@ -208,6 +213,13 @@ All database migrations are located in the `supabase/migrations/` folder. Execut
    - Task management for exam preparation
 
 ## Recent Updates
+
+### ✅ Calendar View for Study Planner
+- **Visual Schedule**: See all your exams and study tasks in a comprehensive calendar
+- **Multiple Views**: Switch between month, week, day, and agenda views
+- **Color-Coding**: Easily identify exams and tasks by status with intuitive colors
+- **Interactive Interface**: Click on events to see details and navigate between dates
+- **Seamless Integration**: Works alongside existing exam dates and study plans
 
 ### ✅ Study Planner
 - **Exam Date Management**: Track important exam dates and deadlines
@@ -375,3 +387,4 @@ The project is configured for deployment on Netlify with serverless functions fo
 - **Deployment**: Netlify with serverless functions
 - **File Processing**: PDF.js, Mammoth.js for document parsing
 - **Notifications**: Custom toast and notification system
+- **Calendar**: React Big Calendar for study planning visualization
