@@ -5,12 +5,14 @@ interface DifficultyRatingProps {
   onRateDifficulty: (difficulty: 'easy' | 'medium' | 'hard') => void;
   selectedRating?: 'easy' | 'medium' | 'hard' | null;
   isReadOnly?: boolean;
+  isReadOnlyDemo?: boolean;
 }
 
 const DifficultyRating: React.FC<DifficultyRatingProps> = ({
   onRateDifficulty,
   selectedRating,
   isReadOnly,
+  isReadOnlyDemo,
 }) => {
   const getButtonStyles = (difficulty: 'easy' | 'medium' | 'hard') => {
     const isSelected = selectedRating === difficulty;
@@ -128,7 +130,7 @@ const DifficultyRating: React.FC<DifficultyRatingProps> = ({
           )}
         </button>
       </div>
-      {isReadOnly && (
+      {isReadOnlyDemo && (
          <p className="mt-3 text-xs text-center text-orange-600 dark:text-orange-400">
             Rating is locked in demo mode.
         </p>
