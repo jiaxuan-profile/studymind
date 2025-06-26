@@ -1,40 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Views, momentLocalizer } from 'react-big-calendar';
-import dayjs from 'dayjs';
+import moment from 'moment';
 import { supabase } from '../../services/supabase';
 import { useToast } from '../../contexts/ToastContext';
 import { useDemoMode } from '../../contexts/DemoModeContext';
 import { Loader2, Calendar as CalendarIcon, BookOpen, ListChecks } from 'lucide-react';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 
-// Create a dayjs localizer for React Big Calendar
-const dayjsLocalizer = {
-  format: (value: Date, format: string) => {
-    return dayjs(value).format(format);
-  },
-  formats: {
-    dateFormat: 'DD',
-    dayFormat: 'DD ddd',
-    monthHeaderFormat: 'MMMM YYYY',
-    dayHeaderFormat: 'dddd MMM DD',
-    dayRangeHeaderFormat: ({ start, end }: { start: Date, end: Date }) => 
-      `${dayjs(start).format('MMMM DD')} - ${dayjs(end).format('MMMM DD, YYYY')}`,
-    timeGutterFormat: 'HH:mm',
-    agendaDateFormat: 'ddd MMM DD',
-    agendaTimeFormat: 'HH:mm',
-    agendaTimeRangeFormat: ({ start, end }: { start: Date, end: Date }) => 
-      `${dayjs(start).format('HH:mm')} - ${dayjs(end).format('HH:mm')}`,
-  },
-  startOfWeek: () => {
-    return dayjs().startOf('week').toDate();
-  },
-  firstOfWeek: () => {
-    return dayjs().startOf('week').day();
-  },
-  parse: (value: string, format: string) => {
-    return dayjs(value, format).toDate();
-  }
-};
+// Create a moment localizer for React Big Calendar
+const localizer = momentLocalizer(moment);
 
 // Define event types
 interface CalendarEvent {
@@ -236,40 +210,40 @@ const StudyCalendar: React.FC = () => {
         <div className="flex space-x-2">
           <button
             onClick={() => onView('month')}
-            className={`px-3 py-1.5 border rounded-md text-sm font-medium ${
+            className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
               view === 'month'
-                ? 'border-primary bg-primary text-white'
-                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
+                : 'border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-600 hover:bg-gray-50 dark:hover:bg-gray-500 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Month
           </button>
           <button
             onClick={() => onView('week')}
-            className={`px-3 py-1.5 border rounded-md text-sm font-medium ${
+            className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
               view === 'week'
-                ? 'border-primary bg-primary text-white'
-                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
+                : 'border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-600 hover:bg-gray-50 dark:hover:bg-gray-500 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Week
           </button>
           <button
             onClick={() => onView('day')}
-            className={`px-3 py-1.5 border rounded-md text-sm font-medium ${
+            className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
               view === 'day'
-                ? 'border-primary bg-primary text-white'
-                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
+                : 'border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-600 hover:bg-gray-50 dark:hover:bg-gray-500 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Day
           </button>
           <button
             onClick={() => onView('agenda')}
-            className={`px-3 py-1.5 border rounded-md text-sm font-medium ${
+            className={`px-3 py-1.5 border rounded-md text-sm font-medium transition-colors ${
               view === 'agenda'
-                ? 'border-primary bg-primary text-white'
-                : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                ? 'border-blue-500 bg-blue-500 text-white shadow-sm'
+                : 'border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-600 hover:bg-gray-50 dark:hover:bg-gray-500 hover:text-gray-900 dark:hover:text-white'
             }`}
           >
             Agenda
@@ -301,7 +275,7 @@ const StudyCalendar: React.FC = () => {
     }
     
     if (event.type === 'exam') {
-      addToast(`Exam: ${event.title} on ${dayjs(event.start).format('MMMM D, YYYY')}`, 'info');
+      addToast(`Exam: ${event.title} on ${moment(event.start).format('MMMM D, YYYY')}`, 'info');
     } else {
       const status = event.status || 'todo';
       const statusText = status.charAt(0).toUpperCase() + status.slice(1);
@@ -344,8 +318,79 @@ const StudyCalendar: React.FC = () => {
       </div>
       
       <div className="h-[600px] calendar-container">
+        <style>
+          {`
+            /* Dark theme calendar grid adjustments */
+            .dark .rbc-calendar {
+              background-color: transparent;
+            }
+            .dark .rbc-month-view,
+            .dark .rbc-time-view {
+              border-color: #374151 !important; /* gray-700 */
+            }
+            .dark .rbc-month-row,
+            .dark .rbc-day-bg,
+            .dark .rbc-time-content,
+            .dark .rbc-time-header-content,
+            .dark .rbc-time-header-cell,
+            .dark .rbc-timeslot-group,
+            .dark .rbc-time-slot {
+              border-color: #374151 !important; /* gray-700 */
+            }
+            .dark .rbc-day-bg.rbc-off-range-bg {
+              background-color: #1f2937 !important; /* gray-800 */
+            }
+            .dark .rbc-day-bg {
+              background-color: #111827 !important; /* gray-900 */
+            }
+            .dark .rbc-today {
+              background-color: #1e40af !important; /* blue-800 */
+              background-color: rgba(30, 64, 175, 0.1) !important;
+            }
+            .dark .rbc-header {
+              border-color: #374151 !important; /* gray-700 */
+              background-color: #1f2937 !important; /* gray-800 */
+              color: #f3f4f6 !important; /* gray-100 */
+            }
+            .dark .rbc-date-cell {
+              color: #d1d5db !important; /* gray-300 */
+            }
+            .dark .rbc-off-range {
+              color: #6b7280 !important; /* gray-500 */
+            }
+            .dark .rbc-time-header-gutter,
+            .dark .rbc-time-gutter {
+              background-color: #1f2937 !important; /* gray-800 */
+              border-color: #374151 !important; /* gray-700 */
+            }
+            .dark .rbc-time-header-cell {
+              color: #f3f4f6 !important; /* gray-100 */
+            }
+            .dark .rbc-label {
+              color: #9ca3af !important; /* gray-400 */
+            }
+            .dark .rbc-time-slot {
+              color: #9ca3af !important; /* gray-400 */
+            }
+            /* Agenda view dark theme */
+            .dark .rbc-agenda-view table {
+              background-color: transparent !important;
+              border-color: #374151 !important; /* gray-700 */
+            }
+            .dark .rbc-agenda-view tbody > tr {
+              border-color: #374151 !important; /* gray-700 */
+            }
+            .dark .rbc-agenda-view tbody > tr > td {
+              color: #d1d5db !important; /* gray-300 */
+              border-color: #374151 !important; /* gray-700 */
+            }
+            .dark .rbc-agenda-date-cell {
+              color: #f3f4f6 !important; /* gray-100 */
+            }
+          `}
+        </style>
         <Calendar
-          localizer={dayjsLocalizer as any}
+          localizer={localizer}
           events={events}
           startAccessor="start"
           endAccessor="end"
