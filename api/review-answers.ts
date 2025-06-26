@@ -179,7 +179,7 @@ const handler: Handler = async (event) => {
     // Fetch the full review_answers records using the review answer IDs
     const { data: reviewAnswersData, error: reviewAnswersError } = await supabase
       .from('review_answers')
-      .select('id, question_text, original_question_id, difficulty_rating, connects, hint, mastery_context, original_difficulty, question_type')
+      .select('id, question_text, original_question_id, difficulty_rating, connects, hint, mastery_context, original_difficulty')
       .in('id', reviewAnswerIds);
       
     if (reviewAnswersError) throw new Error(`Could not fetch review answers: ${reviewAnswersError.message}`);
@@ -238,7 +238,9 @@ const handler: Handler = async (event) => {
           : null;
           
         // Check if this is an MCQ question
-        const isMCQ = originalQuestion?.question_type === 'mcq' || reviewAnswer.question_type === 'mcq';
+        const isMCQ = originalQuestion?.question_type === 'mcq' && 
+                originalQuestion?.options && 
+                originalQuestion?.options.length > 0;
         const mcqOptions = originalQuestion?.options || [];
         const correctAnswer = originalQuestion?.answer || 'N/A';
         
@@ -273,7 +275,7 @@ const handler: Handler = async (event) => {
 
     const { data: userRatedAnswersData } = await supabase
       .from('review_answers')
-      .select('id, difficulty_rating, original_difficulty, question_type')
+      .select('id, difficulty_rating, original_difficulty')
       .eq('user_id', user.id)
       .in('id', reviewAnswerIds);
 
