@@ -5,32 +5,40 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { supabase } from '../../services/supabase';
-import { StudyPlan } from '../../types'; // Assuming StudyPlan type will be defined soon
+import { StudyPlan } from '../../types';
 import StudyPlanCard from './StudyPlanCard';
 import Dialog from '../Dialog';
+import { useDemoMode } from '../../contexts/DemoModeContext';
 
 interface StudyPlansListProps {
   onAddStudyPlan: () => void;
   onStudyPlanDeleted: () => void;
+  // Consider adding onEditStudyPlan if study plans become editable
 }
 
 const StudyPlansList: React.FC<StudyPlansListProps> = ({ onAddStudyPlan, onStudyPlanDeleted }) => {
   const { user } = useAuth();
   const { addToast } = useToast();
   const { addNotification } = useNotifications();
+  const { isReadOnlyDemo } = useDemoMode();
 
   const [studyPlans, setStudyPlans] = useState<StudyPlan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [planIdToDelete, setPlanIdToDelete] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchStudyPlans();
+    } else {
+      setLoading(false);
+      setStudyPlans([]);
     }
   }, [user]);
 
   const fetchStudyPlans = async () => {
+    if (!user) return;
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -39,7 +47,7 @@ const StudyPlansList: React.FC<StudyPlansListProps> = ({ onAddStudyPlan, onStudy
           *,
           exam_date:exam_dates(id, name, date)
         `)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -52,46 +60,62 @@ const StudyPlansList: React.FC<StudyPlansListProps> = ({ onAddStudyPlan, onStudy
     }
   };
 
-  const handleDeleteClick = (id: string) => {
-    setDeletingId(id);
+  const handleDeleteItemClick = (id: string) => {
+    if (isReadOnlyDemo) {
+      addToast('Delete operation is not available in demo mode.', 'warning');
+      return;
+    }
+    setPlanIdToDelete(id);
     setShowDeleteDialog(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!deletingId) return;
+    if (!planIdToDelete || !user) return;
 
+    if (isReadOnlyDemo) {
+      addToast('Delete operation is not available in demo mode.', 'warning');
+      setShowDeleteDialog(false);
+      setPlanIdToDelete(null);
+      return;
+    }
+
+    setIsConfirmingDelete(true);
     try {
       const { error } = await supabase
         .from('study_plans')
         .delete()
-        .eq('id', deletingId)
-        .eq('user_id', user?.id);
+        .eq('id', planIdToDelete)
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
       addToast('Study plan deleted successfully!', 'success');
       addNotification('Study plan deleted.', 'info', 'Planner');
-      setStudyPlans(prev => prev.filter(plan => plan.id !== deletingId));
+      setStudyPlans(prev => prev.filter(plan => plan.id !== planIdToDelete));
       onStudyPlanDeleted();
     } catch (error: any) {
       console.error('Error deleting study plan:', error);
       addToast(`Failed to delete study plan: ${error.message}`, 'error');
       addNotification('Failed to delete study plan.', 'error', 'Planner');
     } finally {
-      setDeletingId(null);
+      setIsConfirmingDelete(false);
+      setPlanIdToDelete(null);
       setShowDeleteDialog(false);
     }
   };
 
   const handleDeleteCancel = () => {
-    setDeletingId(null);
+    setPlanIdToDelete(null);
     setShowDeleteDialog(false);
   };
 
-  const handleViewDetails = (studyPlan: StudyPlan) => {
-    // Implement navigation to a detailed study plan view page
-    addToast(`Viewing details for study plan: ${studyPlan.name}`, 'info');
-    console.log('View details for:', studyPlan);
+  const handleAddFirstStudyPlanClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (isReadOnlyDemo) {
+      addToast('Creating study plans is not available in demo mode.', 'warning');
+      return;
+    }
+    onAddStudyPlan();
   };
 
   if (loading) {
@@ -104,44 +128,44 @@ const StudyPlansList: React.FC<StudyPlansListProps> = ({ onAddStudyPlan, onStudy
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {studyPlans.length === 0 ? (
-        <div className="text-center py-8 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-600">
-          <ListChecks className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Study Plans Created Yet</h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Generate a study plan to organize your learning.
+        <div className="text-center py-12 bg-white dark:bg-gray-800/50 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <ListChecks className="h-16 w-16 text-gray-400 dark:text-gray-500 mx-auto mb-6" />
+          <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">No Study Plans Yet</h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
+            Generate your first personalized study plan to get organized and stay on track with your learning goals.
           </p>
           <button
-            onClick={onAddStudyPlan}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
+            onClick={handleAddFirstStudyPlanClick}
+            disabled={isReadOnlyDemo}
+            className="inline-flex items-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-base font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus className="h-5 w-5 mr-2" />
             Create First Study Plan
           </button>
         </div>
       ) : (
-        <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 list-none">
           {studyPlans.map(plan => (
             <StudyPlanCard
               key={plan.id}
               studyPlan={plan}
-              onViewDetails={handleViewDetails}
-              onDelete={handleDeleteClick}
+              onDelete={() => handleDeleteItemClick(plan.id)}
             />
           ))}
-        </ul>
+        </div>
       )}
 
       <Dialog
         isOpen={showDeleteDialog}
         onClose={handleDeleteCancel}
         title="Delete Study Plan"
-        message="Are you sure you want to delete this study plan? This action cannot be undone and will also delete all associated tasks."
+        message="Are you sure you want to delete this study plan? This action cannot be undone and will also delete all associated tasks and progress."
         onConfirm={handleDeleteConfirm}
-        confirmText={deletingId ? 'Deleting...' : 'Delete'}
+        confirmText={isConfirmingDelete ? 'Deleting...' : 'Delete'}
         cancelText="Cancel"
-        loading={!!deletingId}
+        loading={isConfirmingDelete}
         variant="danger"
       />
     </div>

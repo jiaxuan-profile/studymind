@@ -7,11 +7,16 @@ import StudyPlanForm from '../components/planner/StudyPlanForm';
 import StudyPlansList from '../components/planner/StudyPlansList';
 import { ExamDate } from '../types';
 import { Plus, CalendarDays, ListChecks, Sparkles } from 'lucide-react';
+import { useToast } from '../contexts/ToastContext';
+import { useDemoMode } from '../contexts/DemoModeContext';
+import DemoModeNotice from '../components/DemoModeNotice';
 
 const PlannerPage: React.FC = () => {
+  const { isReadOnlyDemo } = useDemoMode();
+  const { addToast } = useToast();
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingExamDate, setEditingExamDate] = useState<ExamDate | null>(null);
-  const [refreshList, setRefreshList] = useState(0); // State to trigger list refresh
+  const [refreshList, setRefreshList] = useState(0);
   const [activeTab, setActiveTab] = useState<'examDates' | 'studyPlans'>('examDates');
   const [isAddingStudyPlan, setIsAddingStudyPlan] = useState(false);
 
@@ -22,12 +27,16 @@ const PlannerPage: React.FC = () => {
   }, []);
 
   const handleStudyPlanAddedOrUpdated = useCallback(() => {
-    // Logic to refresh study plans list if needed
     setIsAddingStudyPlan(false);
     setRefreshList(prev => prev + 1);
   }, []);
 
   const handleEditExamDate = useCallback((examDate: ExamDate) => {
+    if (isReadOnlyDemo) {
+      addToast('Edit operation is not available in demo mode.', 'warning');
+      return;
+    }
+
     setEditingExamDate(examDate);
     setIsAddingNew(true); // Open form in edit mode
   }, []);
@@ -36,7 +45,7 @@ const PlannerPage: React.FC = () => {
     setIsAddingNew(false);
     setEditingExamDate(null);
   }, []);
-  
+
   const handleCancelStudyPlanForm = useCallback(() => {
     setIsAddingStudyPlan(false);
   }, []);
@@ -49,15 +58,25 @@ const PlannerPage: React.FC = () => {
       >
         {!isAddingNew && !isAddingStudyPlan && (
           <>
-            <button onClick={() => setIsAddingNew(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark">
+            <button
+              onClick={() => setIsAddingNew(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark"
+              disabled={isReadOnlyDemo}
+            >
               <Plus className="h-5 w-5 mr-2" /> Add Exam Date
             </button>
-            <button onClick={() => setIsAddingStudyPlan(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark">
+            <button
+              onClick={() => setIsAddingStudyPlan(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-secondary-dark"
+              disabled={isReadOnlyDemo}
+            >
               <Sparkles className="h-5 w-5 mr-2" /> Generate Study Plan
             </button>
           </>
         )}
       </PageHeader>
+
+      <DemoModeNotice className="mb-6" />
 
       {isAddingNew && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">

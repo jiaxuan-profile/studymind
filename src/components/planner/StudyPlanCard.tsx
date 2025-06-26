@@ -6,13 +6,12 @@ import { StudyPlan } from '../../types';
 
 interface StudyPlanCardProps {
   studyPlan: StudyPlan;
-  onViewDetails: (studyPlan: StudyPlan) => void;
   onDelete: (studyPlanId: string) => void;
 }
 
-const StudyPlanCard: React.FC<StudyPlanCardProps> = ({ studyPlan, onViewDetails, onDelete }) => {
+const StudyPlanCard: React.FC<StudyPlanCardProps> = ({ studyPlan, onDelete }) => {
   const navigate = useNavigate();
-  
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   };
@@ -26,15 +25,14 @@ const StudyPlanCard: React.FC<StudyPlanCardProps> = ({ studyPlan, onViewDetails,
       <div className="p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{studyPlan.name}</h3>
-          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-            studyPlan.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${studyPlan.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
             studyPlan.status === 'draft' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-          }`}>
+              'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+            }`}>
             {studyPlan.status}
           </span>
         </div>
-        
+
         {studyPlan.exam_date && (
           <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center mb-2">
             <CalendarDays className="h-4 w-4 mr-1 text-primary" />

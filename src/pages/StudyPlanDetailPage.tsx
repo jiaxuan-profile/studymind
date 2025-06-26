@@ -6,12 +6,15 @@ import { useToast } from '../contexts/ToastContext';
 import { StudyPlan, StudyTask } from '../types';
 import { ArrowLeft, CalendarDays, ListChecks, CheckCircle, Clock, Loader2, AlertTriangle, CheckSquare, Square, CheckSquare as SquareCheck } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import { useDemoMode } from '../contexts/DemoModeContext';
+import DemoModeNotice from '../components/DemoModeNotice';
 
 const StudyPlanDetailPage: React.FC = () => {
   const { studyPlanId } = useParams<{ studyPlanId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToast } = useToast();
+  const { isReadOnlyDemo } = useDemoMode();
 
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
   const [tasks, setTasks] = useState<StudyTask[]>([]);
@@ -69,6 +72,10 @@ const StudyPlanDetailPage: React.FC = () => {
   };
 
   const handleUpdateTaskStatus = async (taskId: string, newStatus: 'todo' | 'in_progress' | 'done' | 'skipped') => {
+    if (isReadOnlyDemo) {
+      addToast('Update operation is not available in demo mode.', 'warning');
+      return;
+    }
     setUpdatingTaskId(taskId);
     try {
       const { error } = await supabase
@@ -80,7 +87,7 @@ const StudyPlanDetailPage: React.FC = () => {
       if (error) throw error;
 
       // Update local state
-      setTasks(prev => prev.map(task => 
+      setTasks(prev => prev.map(task =>
         task.id === taskId ? { ...task, status: newStatus } : task
       ));
 
@@ -95,11 +102,11 @@ const StudyPlanDetailPage: React.FC = () => {
 
   const getStatusIcon = (status: string, taskId: string) => {
     const isUpdating = updatingTaskId === taskId;
-    
+
     if (isUpdating) {
       return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
     }
-    
+
     switch (status) {
       case 'todo':
         return <Square className="h-5 w-5 text-gray-400" />;
@@ -131,10 +138,10 @@ const StudyPlanDetailPage: React.FC = () => {
 
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return 'No date set';
-    return new Date(dateString).toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
   };
 
@@ -178,7 +185,7 @@ const StudyPlanDetailPage: React.FC = () => {
     <div className="fade-in">
       <PageHeader
         title={studyPlan.name}
-        subtitle={studyPlan.exam_date 
+        subtitle={studyPlan.exam_date
           ? `Preparing for ${studyPlan.exam_date.name} on ${formatDate(studyPlan.exam_date.date)}`
           : `Created on ${formatDate(studyPlan.created_at)}`
         }
@@ -192,17 +199,18 @@ const StudyPlanDetailPage: React.FC = () => {
         </button>
       </PageHeader>
 
+      <DemoModeNotice className="mb-6" />
+
       {/* Study Plan Overview */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4">
           <div className="mb-4 md:mb-0">
             <div className="flex items-center">
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                studyPlan.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${studyPlan.status === 'active' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
                 studyPlan.status === 'draft' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                studyPlan.status === 'completed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
-                'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-              }`}>
+                  studyPlan.status === 'completed' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                }`}>
                 {studyPlan.status}
               </span>
               <span className="ml-4 text-sm text-gray-600 dark:text-gray-400 flex items-center">
@@ -222,8 +230,8 @@ const StudyPlanDetailPage: React.FC = () => {
               </span>
             </div>
             <div className="w-full md:w-64 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
-              <div 
-                className="bg-green-500 h-2.5 rounded-full" 
+              <div
+                className="bg-green-500 h-2.5 rounded-full"
                 style={{ width: `${calculateProgress()}%` }}
               ></div>
             </div>
@@ -249,7 +257,7 @@ const StudyPlanDetailPage: React.FC = () => {
             {tasks.map(task => (
               <li key={task.id} className="p-4 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                 <div className="flex items-start">
-                  <button 
+                  <button
                     className="mt-1 mr-3 flex-shrink-0"
                     onClick={() => handleUpdateTaskStatus(task.id, getNextStatus(task.status))}
                     disabled={!!updatingTaskId}
@@ -258,16 +266,15 @@ const StudyPlanDetailPage: React.FC = () => {
                     {getStatusIcon(task.status, task.id)}
                   </button>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-base font-medium ${
-                      task.status === 'done' 
-                        ? 'text-gray-500 dark:text-gray-400 line-through' 
-                        : task.status === 'skipped'
+                    <p className={`text-base font-medium ${task.status === 'done'
+                      ? 'text-gray-500 dark:text-gray-400 line-through'
+                      : task.status === 'skipped'
                         ? 'text-gray-400 dark:text-gray-500'
                         : 'text-gray-900 dark:text-gray-100'
-                    }`}>
+                      }`}>
                       {task.description}
                     </p>
-                    
+
                     <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500 dark:text-gray-400">
                       {task.due_date && (
                         <span className="flex items-center">
@@ -275,14 +282,14 @@ const StudyPlanDetailPage: React.FC = () => {
                           Due: {formatDate(task.due_date)}
                         </span>
                       )}
-                      
+
                       {task.concept && (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
                           {task.concept.name}
                         </span>
                       )}
                     </div>
-                    
+
                     {task.notes && (
                       <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
                         {task.notes}
