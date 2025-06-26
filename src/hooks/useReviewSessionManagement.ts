@@ -336,55 +336,25 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
     ]);
 
     const handleDifficultyResponseHandler = useCallback(async (difficulty: 'easy' | 'medium' | 'hard') => {
-        if (!currentSessionId && !isReadOnlyDemo) {
+        const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
+        const aiFeedbackActuallyExists = !!currentAnswerRecord?.ai_response_text;
+
+        if (!isReadOnlyDemo && aiFeedbackActuallyExists) {
+            addToast('Rating is locked after AI review for this question.', 'info');
+            return;
+        }
+
+        if (isReadOnlyDemo) {
+            addToast('Rating is locked in demo mode.', 'warning');
+            return;
+        }
+
+        if (!currentSessionId) {
             addToast("Session ID not found. Cannot save rating. Please try restarting the session.", 'error');
             return;
         }
 
-        const currentAnswerRecord = userAnswers.find(a => a.questionIndex === currentQuestionIndex);
         const previouslyRated = currentAnswerRecord?.difficulty_rating;
-
-        if (isReadOnlyDemo) {
-            pageSetUserAnswers(prevAnswers => {
-                const existingAnswerIndex = prevAnswers.findIndex(a => a.questionIndex === currentQuestionIndex);
-                if (existingAnswerIndex > -1) {
-                    // Entry exists, update its difficulty_rating
-                    const updatedAnswers = [...prevAnswers];
-                    updatedAnswers[existingAnswerIndex] = {
-                        ...updatedAnswers[existingAnswerIndex], // Preserve existing answer, timestamp
-                        difficulty_rating: difficulty,
-                    };
-                    return updatedAnswers;
-                } else {
-                    // Entry doesn't exist, create it with the rating and current userAnswer
-                    return [
-                        ...prevAnswers,
-                        {
-                            questionIndex: currentQuestionIndex,
-                            answer: userAnswer, // Capture current input field value
-                            // timestamp will be set if/when saveAnswerHandler is called
-                            difficulty_rating: difficulty,
-                        },
-                    ];
-                }
-            });
-
-            if (difficulty !== previouslyRated) {
-                setSessionStats(prev => {
-                    const newStats = { ...prev };
-                    newStats[difficulty] = (newStats[difficulty] || 0) + 1;
-                    if (previouslyRated) {
-                        newStats[previouslyRated] = Math.max(0, (newStats[previouslyRated] || 0) - 1);
-                    }
-                    return newStats;
-                });
-                if (!previouslyRated) {
-                    setReviewedCount(prev => prev + 1);
-                }
-            }
-            addToast(`Rated as ${difficulty} (Demo Mode)`, 'info');
-            return;
-        }
 
         // Live mode
         try {
