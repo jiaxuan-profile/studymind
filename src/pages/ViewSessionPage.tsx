@@ -82,7 +82,15 @@ const ViewSessionPage: React.FC = () => {
           .single(),
         supabase
           .from('review_answers')
-          .select('*')
+          .select(`
+            *,
+            original_question:original_question_id (
+              id,
+              question_type,
+              options,
+              answer
+            )
+          `)
           .eq('session_id', sessionId)
           .order('question_index', { ascending: true })
       ]);
@@ -91,7 +99,19 @@ const ViewSessionPage: React.FC = () => {
       if (answersResult.error) throw answersResult.error;
 
       setSession(sessionResult.data as ReviewSession);
-      setAnswers(answersResult.data as ReviewAnswer[]);
+      
+      // Process the answers to include MCQ data from original questions
+      const processedAnswers = answersResult.data.map((answer: any) => {
+        return {
+          ...answer,
+          // Include MCQ-specific fields from the original question
+          question_type: answer.original_question?.question_type || 'short',
+          options: answer.original_question?.options || null,
+          answer: answer.original_question?.answer || null
+        };
+      });
+      
+      setAnswers(processedAnswers as ReviewAnswer[]);
 
     } catch (error) {
       console.error('Error loading session data:', error);

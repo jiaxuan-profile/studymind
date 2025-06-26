@@ -62,13 +62,21 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
 
             const { data: sessionAnswers, error: answersError } = await supabase
                 .from('review_answers')
-                .select('*, original_question_id')
+                .select(`
+                    *,
+                    original_question:original_question_id (
+                        id,
+                        question_type,
+                        options,
+                        answer
+                    )
+                `)
                 .eq('session_id', session.id)
                 .order('question_index', { ascending: true });
 
             if (answersError) throw answersError;
 
-            const questionsToRetry: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
+            const questionsToRetry: CurrentQuestionType[] = (sessionAnswers as any[]).map(answer => ({
                 id: answer.original_question_id || `${new Date().getTime()}-${answer.question_index}-${Math.random()}`,
                 question: answer.question_text,
                 hint: answer.hint,
@@ -77,6 +85,10 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
                 mastery_context: answer.mastery_context,
                 noteId: answer.note_id,
                 noteTitle: answer.note_title,
+                // Include MCQ-specific fields from the original question
+                question_type: answer.original_question?.question_type || 'short',
+                options: answer.original_question?.options || [],
+                answer: answer.original_question?.answer || undefined
             }));
 
             if (questionsToRetry.length === 0) {
@@ -115,7 +127,9 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
                 original_difficulty: q.difficulty,
                 original_question_id: q.id,
                 ai_response_text: null,
-                is_correct: null
+                is_correct: null,
+                question_type: q.question_type,
+                options: q.options
             }));
 
             const { data: insertedAnswers, error: answersInsertError } = await supabase

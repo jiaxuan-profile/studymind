@@ -136,15 +136,24 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
             const { data: { user: authUser } } = await supabase.auth.getUser();
             if (!authUser) throw new Error('User not authenticated');
 
+            // Enhanced query to fetch review answers with original question details
             const { data: sessionAnswers, error: answersError } = await supabase
                 .from('review_answers')
-                .select('*, original_question_id')
+                .select(`
+                    *,
+                    original_question:original_question_id (
+                        id,
+                        question_type,
+                        options,
+                        answer
+                    )
+                `)
                 .eq('session_id', internalInProgressSession.id)
                 .order('question_index', { ascending: true });
 
             if (answersError) throw answersError;
 
-            const reconstructedQuestions: CurrentQuestionType[] = (sessionAnswers as ReviewAnswer[]).map(answer => ({
+            const reconstructedQuestions: CurrentQuestionType[] = (sessionAnswers as any[]).map(answer => ({
                 id: answer.original_question_id || `${answer.session_id}-${answer.question_index}`, 
                 question: answer.question_text,
                 hint: answer.hint,
@@ -153,9 +162,13 @@ export const useReviewSessionResume = (props: UseReviewSessionResumeProps) => {
                 mastery_context: answer.mastery_context,
                 noteId: answer.note_id,
                 noteTitle: answer.note_title,
+                // Include MCQ-specific fields from the original question
+                question_type: answer.original_question?.question_type || 'short',
+                options: answer.original_question?.options || [],
+                answer: answer.original_question?.answer || undefined
             }));
 
-            const reconstructedUserAnswers: ReviewUserAnswer[] = (sessionAnswers as ReviewAnswer[])
+            const reconstructedUserAnswers: ReviewUserAnswer[] = (sessionAnswers as any[])
                 .map(answer => ({
                     id: answer.id, // Include the review_answers.id
                     questionIndex: answer.question_index,
