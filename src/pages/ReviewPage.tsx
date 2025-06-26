@@ -88,7 +88,7 @@ const ReviewPage: React.FC = () => {
     selectedQuestionType: setupSelectedQuestionType,
     setSelectedQuestionType: setupSetSelectedQuestionType,
     selectedQuestionCount: setupSelectedQuestionCount,
-    setSelectedQuestionCount: setupSetSelectedQuestionCount,    
+    setSelectedQuestionCount: setupSetSelectedQuestionCount,
     handleNoteSelection,
     resetSetupSelections,
     questionsMatchingFilters,
