@@ -200,7 +200,8 @@ const ActiveReviewScreen: React.FC<ActiveReviewScreenProps> = (props) => {
             <DifficultyRating
               onRateDifficulty={onRateDifficulty}
               selectedRating={selectedRating}
-              isReadOnly={aiFeedbackCompleted || isReadOnlyDemo}
+              isReadOnly={aiFeedbackCompleted}
+              isReadOnlyDemo={isReadOnlyDemo}
             />
           </div>
         </div>
