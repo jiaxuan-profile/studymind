@@ -41,11 +41,14 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     return selectedNotes.reduce((total, noteId) => {
       const note = allNotesWithQuestions.find(n => n.id === noteId);
       if (!note) return total;
-      return total + note.questions.filter(q =>
-        selectedDifficulty === 'all' || q.difficulty === selectedDifficulty
-      ).length;
+      return total + note.questions.filter(q => {
+        const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
+        const typeMatches = q.question_type === selectedQuestionType || 
+                           (q.question_type === undefined && selectedQuestionType === 'short'); // Default to 'short' if undefined
+        return difficultyMatches && typeMatches;
+      }).length;
     }, 0);
-  }, [selectedNotes, allNotesWithQuestions, selectedDifficulty, generateNewQuestions]);
+  }, [selectedNotes, allNotesWithQuestions, selectedDifficulty, selectedQuestionType, generateNewQuestions]);
 
   const handleNoteSelection = (noteId: string) => {
     setSelectedNotes(prev =>
