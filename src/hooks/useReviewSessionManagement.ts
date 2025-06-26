@@ -78,36 +78,61 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 return;
             }
 
-            const questionsToReview: CurrentQuestionType[] = selectedNotes.flatMap(noteId => {
+            // Get all questions from selected notes
+            const allQuestionsFromSelectedNotes = selectedNotes.flatMap(noteId => {
                 const note = notesWithQuestions.find(n => n.id === noteId);
                 if (!note) return [];
-                return note.questions
-                    .filter(q => {
-                        const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
-                        const defaultMatches = generateNewQuestions
-                            ? (selectedQuestionCount === '5' ? !q.is_default : true)
-                            : true;
-                        return difficultyMatches && defaultMatches;
-                    })
-                    .map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
+                return note.questions.map(q => ({ ...q, noteId: note.id, noteTitle: note.title }));
             });
 
-            const shuffledQuestions = questionsToReview.sort(() => Math.random() - 0.5);
+            // Filter questions based on difficulty and question type
+            const filteredQuestions = allQuestionsFromSelectedNotes.filter(q => {
+                const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
+                const typeMatches = q.question_type === selectedQuestionType || 
+                                   (q.question_type === undefined && selectedQuestionType === 'short'); // Default to 'short' if undefined
+                return difficultyMatches && typeMatches;
+            });
+
+            // Separate questions into default (AI-generated) and non-default
+            const defaultQuestions = filteredQuestions.filter(q => q.is_default);
+            const nonDefaultQuestions = filteredQuestions.filter(q => !q.is_default);
+
+            // Determine final questions based on selectedQuestionCount and generateNewQuestions
+            let finalQuestions: CurrentQuestionType[] = [];
+
+            if (generateNewQuestions) {
+                // When generating new questions, prioritize default questions
+                if (selectedQuestionCount === '5') {
+                    // Take up to 5 default questions
+                    finalQuestions = defaultQuestions.slice(0, 5);
+                } else if (selectedQuestionCount === '10') {
+                    // Take up to 10 questions, prioritizing default ones
+                    finalQuestions = [
+                        ...defaultQuestions.slice(0, 10),
+                        ...nonDefaultQuestions.slice(0, Math.max(0, 10 - defaultQuestions.length))
+                    ].slice(0, 10);
+                } else { // 'all'
+                    // Take all questions
+                    finalQuestions = [...defaultQuestions, ...nonDefaultQuestions];
+                }
+            } else {
+                // When not generating new questions, use all filtered questions
+                finalQuestions = filteredQuestions;
+                
+                // Apply count limit if specified
+                if (selectedQuestionCount === '5') {
+                    finalQuestions = finalQuestions.slice(0, 5);
+                } else if (selectedQuestionCount === '10') {
+                    finalQuestions = finalQuestions.slice(0, 10);
+                }
+                // For 'all', keep all questions
+            }
+
+            // Shuffle the questions
+            const shuffledQuestions = finalQuestions.sort(() => Math.random() - 0.5);
 
             if (shuffledQuestions.length === 0) {
                 addToast("No questions found for the selected criteria.", "warning");
-                props.setLoading(false);
-                return;
-            }
-
-            let finalQuestions = shuffledQuestions;
-            if (selectedQuestionCount !== 'all') {
-                const count = parseInt(selectedQuestionCount);
-                finalQuestions = shuffledQuestions.slice(0, Math.min(count, shuffledQuestions.length));
-            }
-
-            if (finalQuestions.length === 0) {
-                addToast("Not enough questions after filtering by count.", "warning");
                 props.setLoading(false);
                 return;
             }
@@ -153,7 +178,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 session_name: newSessionName,
                 selected_notes: selectedNotes,
                 selected_difficulty: selectedDifficulty,
-                total_questions: finalQuestions.length,
+                total_questions: shuffledQuestions.length,
                 session_status: 'in_progress',
             }).select().single();
 
@@ -161,7 +186,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             if (!sessionData) throw new Error("Failed to create session.");
             const newSessionIdVal = sessionData.id;
 
-            const placeholderAnswers = finalQuestions.map((q, index) => ({
+            const placeholderAnswers = shuffledQuestions.map((q, index) => ({
                 session_id: newSessionIdVal,
                 question_index: index,
                 user_id: user.id,
@@ -175,7 +200,9 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
                 original_difficulty: q.difficulty,
                 original_question_id: q.id,
                 ai_response_text: null,
-                is_correct: null
+                is_correct: null,
+                question_type: q.question_type,
+                options: q.options
             }));
 
             const { data: insertedAnswers, error: answersInsertError } = await supabase
@@ -201,7 +228,7 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
             setCurrentSessionId(newSessionIdVal);
             setSessionName(newSessionName);
             setSessionStartTime(new Date());
-            setCurrentQuestions(finalQuestions);
+            setCurrentQuestions(shuffledQuestions);
             setCurrentQuestionIndex(0);
             setReviewedCount(0);
             setSessionStats({ easy: 0, medium: 0, hard: 0 });
@@ -228,7 +255,9 @@ export const useReviewSessionManagement = (props: UseReviewSessionManagementProp
     const saveAnswerHandler = useCallback(async () => {
         // For MCQ questions, check if we have a selected option
         const currentQ = currentQuestion;
-        const isMCQ = currentQ?.question_type === 'mcq' && currentQ?.options;
+        const isMCQ = currentQ?.question_type === 'mcq' && 
+                currentQ?.options && 
+                currentQ.options.length > 0;
         
         // For MCQ, we need a selected option; for short answer, we need text
         const hasValidAnswer = isMCQ ? !!props.userAnswer : !!props.userAnswer.trim();
