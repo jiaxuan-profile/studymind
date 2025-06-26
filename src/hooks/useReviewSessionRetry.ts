@@ -128,8 +128,6 @@ export const useReviewSessionRetry = (props: UseReviewSessionRetryProps) => {
                 original_question_id: q.id,
                 ai_response_text: null,
                 is_correct: null,
-                question_type: q.question_type,
-                options: q.options
             }));
 
             const { data: insertedAnswers, error: answersInsertError } = await supabase
