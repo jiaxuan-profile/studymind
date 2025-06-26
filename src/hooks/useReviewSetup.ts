@@ -1,65 +1,87 @@
 // src/hooks/useReviewSetup.ts
-import { useState, useMemo } from 'react';
-import { NoteWithQuestions } from '../types/reviewTypes';
+import { useState, useMemo, useEffect } from 'react';
+import { NoteWithQuestions, Question } from '../types/reviewTypes';
 import { QuestionType } from '../utils/reviewUtils';
-import { useDebounce } from './useDebounce'; 
+import { useDebounce } from './useDebounce';
+
 interface UseReviewSetupProps {
   allNotesWithQuestions: NoteWithQuestions[];
 }
+
+type QuestionType = 'short' | 'mcq' | 'long' | 'all';
 
 export const useReviewSetup = (props: UseReviewSetupProps) => {
   const { allNotesWithQuestions } = props;
 
   const [selectedNotes, setSelectedNotes] = useState<string[]>([]);
   const [selectedDifficulty, setSelectedDifficulty] = useState<'easy' | 'medium' | 'hard' | 'all'>('all');
-  const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>('short');
+  const [selectedQuestionType, setSelectedQuestionType] = useState<QuestionType>('all');
   const [selectedQuestionCount, setSelectedQuestionCount] = useState<'5' | '10' | 'all'>('all');
-  
   const [generateNewQuestions, setGenerateNewQuestions] = useState(false);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeNoteSelectionTab, setActiveNoteSelectionTab] = useState<'available' | 'selected'>('available');
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  const availableNotes = useMemo(() => {
-    return allNotesWithQuestions.filter(note => {
-      const matchesSearch = debouncedSearchTerm === '' ||
-        note.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
-        note.tags.some(tag => tag.toLowerCase().includes(debouncedSearchTerm.toLowerCase()));
-      const notAlreadySelected = !selectedNotes.includes(note.id);
-      return matchesSearch && notAlreadySelected;
-    });
-  }, [allNotesWithQuestions, debouncedSearchTerm, selectedNotes]);
+  const { questionsMatchingFilters, displayTotalQuestions } = useMemo(() => {
+    if (!allNotesWithQuestions || selectedNotes.length === 0) {
+      return { questionsMatchingFilters: [], displayTotalQuestions: 0 };
+    }
 
-  const currentSelectedNotesDisplay = useMemo(() => {
-    return allNotesWithQuestions.filter(note => selectedNotes.includes(note.id));
+    const allQuestionsFromSelectedRawNotes = selectedNotes.flatMap(noteId => {
+      const note = allNotesWithQuestions.find(n => n.id === noteId);
+      return note ? note.questions.map(q => ({ ...q, noteId: note.id, noteTitle: note.title })) : [];
+    });
+
+    const filteredByCriteria = allQuestionsFromSelectedRawNotes.filter(q => {
+      const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
+
+      // Ensure q.question_type is normalized if necessary
+      // Your CurrentQuestionType probably has 'short_answer', 'multiple_choice' etc.
+      // Your selectedQuestionType from UI is 'short', 'mcq'
+      // Example normalization (adjust based on your actual types):
+      let dbQuestionType = q.question_type;
+      if (q.question_type === 'short_answer') dbQuestionType = 'short';
+      if (q.question_type === 'multiple_choice') dbQuestionType = 'mcq';
+      // Add more mappings if 'open' or other types exist in DB
+
+      const typeMatches = selectedQuestionType === 'all' ||
+        dbQuestionType === selectedQuestionType ||
+        (dbQuestionType === undefined && selectedQuestionType === 'short'); // Handle undefined from DB
+
+      return difficultyMatches && typeMatches;
+    });
+
+    // displayTotalQuestions for the setup screen should reflect questions matching the filters,
+    // *before* applying generateNewQuestions or selectedQuestionCount limits, as those are part
+    // of the session generation, not the preview of available questions.
+    return {
+      questionsMatchingFilters: filteredByCriteria, // These are the questions to pick from
+      displayTotalQuestions: filteredByCriteria.length
+    };
+
+  }, [allNotesWithQuestions, selectedNotes, selectedDifficulty, selectedQuestionType]);
+
+  const availableNotes = useMemo(() => {
+    return allNotesWithQuestions.filter(note => !selectedNotes.includes(note.id));
   }, [allNotesWithQuestions, selectedNotes]);
 
-  const displayTotalQuestions = useMemo(() => {
-    if (generateNewQuestions) {
-    }
-    return selectedNotes.reduce((total, noteId) => {
-      const note = allNotesWithQuestions.find(n => n.id === noteId);
-      if (!note) return total;
-      return total + note.questions.filter(q => {
-        const difficultyMatches = selectedDifficulty === 'all' || q.difficulty === selectedDifficulty;
-        const typeMatches = q.question_type === selectedQuestionType || 
-                           (q.question_type === undefined && selectedQuestionType === 'short'); // Default to 'short' if undefined
-        return difficultyMatches && typeMatches;
-      }).length;
-    }, 0);
-  }, [selectedNotes, allNotesWithQuestions, selectedDifficulty, selectedQuestionType, generateNewQuestions]);
+  const currentSelectedNotesDisplay = useMemo(() => {
+    return selectedNotes
+      .map(id => allNotesWithQuestions.find(note => note.id === id))
+      .filter((n): n is NoteWithQuestions => n !== null);
+  }, [allNotesWithQuestions, selectedNotes]);
 
   const handleNoteSelection = (noteId: string) => {
     setSelectedNotes(prev =>
       prev.includes(noteId) ? prev.filter(id => id !== noteId) : [...prev, noteId]
     );
   };
-  
+
   const resetSetupSelections = () => {
     setSelectedNotes([]);
     setSelectedDifficulty('all');
-    setSelectedQuestionType('short');
+    setSelectedQuestionType('all');
     setSelectedQuestionCount('all');
     setGenerateNewQuestions(false);
     setSearchTerm('');
@@ -74,8 +96,8 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     selectedQuestionCount,
     generateNewQuestions,
     searchTerm,
-    activeNoteSelectionTab,
     debouncedSearchTerm,
+    activeNoteSelectionTab,
     // Setters
     setSelectedNotes, // Expose if needed for select all/none, etc.
     setSelectedDifficulty,
@@ -88,6 +110,7 @@ export const useReviewSetup = (props: UseReviewSetupProps) => {
     availableNotes,
     currentSelectedNotesDisplay,
     displayTotalQuestions,
+    questionsMatchingFilters,
     // Handlers
     handleNoteSelection,
     resetSetupSelections, // Method to reset these specific states
