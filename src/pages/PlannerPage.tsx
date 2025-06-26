@@ -5,8 +5,9 @@ import ExamDateForm from '../components/planner/ExamDateForm';
 import ExamDatesList from '../components/planner/ExamDatesList';
 import StudyPlanForm from '../components/planner/StudyPlanForm';
 import StudyPlansList from '../components/planner/StudyPlansList';
+import StudyCalendar from '../components/planner/StudyCalendar';
 import { ExamDate } from '../types';
-import { Plus, CalendarDays, ListChecks, Sparkles } from 'lucide-react';
+import { Plus, CalendarDays, ListChecks, Sparkles, Calendar } from 'lucide-react';
 import { useToast } from '../contexts/ToastContext';
 import { useDemoMode } from '../contexts/DemoModeContext';
 import DemoModeNotice from '../components/DemoModeNotice';
@@ -17,7 +18,7 @@ const PlannerPage: React.FC = () => {
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [editingExamDate, setEditingExamDate] = useState<ExamDate | null>(null);
   const [refreshList, setRefreshList] = useState(0);
-  const [activeTab, setActiveTab] = useState<'examDates' | 'studyPlans'>('examDates');
+  const [activeTab, setActiveTab] = useState<'examDates' | 'studyPlans' | 'calendar'>('examDates');
   const [isAddingStudyPlan, setIsAddingStudyPlan] = useState(false);
 
   const handleExamDateAddedOrUpdated = useCallback(() => {
@@ -39,7 +40,7 @@ const PlannerPage: React.FC = () => {
 
     setEditingExamDate(examDate);
     setIsAddingNew(true); // Open form in edit mode
-  }, []);
+  }, [isReadOnlyDemo, addToast]);
 
   const handleCancelForm = useCallback(() => {
     setIsAddingNew(false);
@@ -92,7 +93,7 @@ const PlannerPage: React.FC = () => {
         </div>
       )}
 
-      {/* Tabs for Exam Dates and Study Plans */}
+      {/* Tabs for Exam Dates, Study Plans, and Calendar */}
       <div className="flex bg-gray-100 dark:bg-gray-800 rounded-lg p-1 mb-6">
         <button
           onClick={() => setActiveTab('examDates')}
@@ -114,6 +115,16 @@ const PlannerPage: React.FC = () => {
           <ListChecks className="h-4 w-4 mr-2" />
           Study Plans
         </button>
+        <button
+          onClick={() => setActiveTab('calendar')}
+          className={`flex-1 flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'calendar'
+            ? 'bg-white dark:bg-gray-700 text-primary dark:text-primary-light shadow-sm'
+            : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+            }`}
+        >
+          <Calendar className="h-4 w-4 mr-2" />
+          Calendar
+        </button>
       </div>
 
       {/* Content based on active tab */}
@@ -122,6 +133,9 @@ const PlannerPage: React.FC = () => {
       )}
       {activeTab === 'studyPlans' && (
         <StudyPlansList key={`study-plans-${refreshList}`} onAddStudyPlan={() => setIsAddingStudyPlan(true)} onStudyPlanDeleted={handleStudyPlanAddedOrUpdated} />
+      )}
+      {activeTab === 'calendar' && (
+        <StudyCalendar key={`calendar-${refreshList}`} />
       )}
     </div>
   );

@@ -165,6 +165,9 @@ export interface ReviewAnswer {
   original_question_id?: string | null;
   ai_response_text?: string | null;
   is_correct?: boolean | null;
+  question_type?: 'short' | 'mcq' | 'open';
+  options?: string[] | null;
+  answer?: string | null;
 }
 
 // Data model for a review session.
@@ -319,8 +322,21 @@ export interface StudyTask {
   description: string;
   due_date?: string | null;
   concept_id?: string | null;
+  concept?: { id: string; name: string; definition: string; } | null; // Joined concept details
   status: 'todo' | 'in_progress' | 'done' | 'skipped';
   notes?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+// Calendar event interface
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  type: 'exam' | 'task';
+  status?: 'todo' | 'in_progress' | 'done' | 'skipped';
+  resource?: any;
 }
