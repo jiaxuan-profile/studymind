@@ -1,17 +1,17 @@
 import type { Handler } from '@netlify/functions';
-import { pipeline } from '@xenova/transformers';
+import * as transformers from '@xenova/transformers';
+
+// Set cache directory for transformers.js
+if (typeof process !== 'undefined' && process.env) {
+  process.env.TRANSFORMERS_CACHE = '/tmp/transformers';
+}
 
 export const handler: Handler = async (event, context) => {
   const headers = {
-    'Access-Control-Allow-Origin': 'https://*.studymindai.me',
+    'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Content-Type': 'application/json'
   };
-
-  // For local development, allow localhost
-  if (process.env.NODE_ENV === 'development') {
-    headers['Access-Control-Allow-Origin'] = '*';
-  }
 
   if (event.httpMethod !== 'POST') {
     console.warn("SERVERLESS: Method not allowed. Responding with 405.");
@@ -66,20 +66,24 @@ export const handler: Handler = async (event, context) => {
 
     console.log(`SERVERLESS: Successfully parsed 'text' (length: ${text.length}) and 'title' (length: ${title.length}) from body.`);
 
-    // Use a smaller, faster model for embeddings
-    // This model produces 384-dimensional embeddings, which we'll resize to match our DB schema
-    console.log("SERVERLESS: Loading local embedding model...");
-    const embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
+    // Get the model name from environment variables or use default
+    const modelName = process.env.LOCAL_EMBEDDING_MODEL || 'Xenova/all-MiniLM-L6-v2';
+    console.log(`SERVERLESS: Using local embedding model: ${modelName}`);
+
+    // Create a pipeline for feature extraction
+    const { pipeline } = transformers;
+    console.log("SERVERLESS: Creating feature extraction pipeline...");
+    const extractor = await pipeline('feature-extraction', modelName);
     
     console.log("SERVERLESS: Generating embeddings...");
     // Generate embeddings for the text
-    const result = await embeddingPipeline(text.trim(), {
+    const output = await extractor(text.trim(), {
       pooling: 'mean',
       normalize: true
     });
     
     // Extract the embedding from the result
-    const embedding = Array.from(result.data);
+    const embedding = Array.from(output.data);
     
     // Resize to 768 dimensions to match the database schema
     // We'll use a simple approach: repeat the vector and then truncate
@@ -134,7 +138,7 @@ export const handler: Handler = async (event, context) => {
     // Handle specific error types
     if (error.message) {
       if (error.message.includes('model') || error.message.includes('pipeline')) {
-        errorMessage = "Error loading embedding model.";
+        errorMessage = "Error loading embedding model: " + error.message;
       } else {
         errorMessage = error.message;
       }
