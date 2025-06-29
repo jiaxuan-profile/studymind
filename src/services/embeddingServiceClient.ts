@@ -57,7 +57,7 @@ export async function generateEmbeddingOnClient(text: string, title: string): Pr
       throw new Error("Invalid or missing embedding in API response.");
     }
 
-    console.log('Embedding Service: Successfully generated embedding with dimensions:', responseData.dimensions);
+    console.log('Embedding Service: Successfully generated real embedding.');
     return responseData.embedding;
 
   } catch (error) {

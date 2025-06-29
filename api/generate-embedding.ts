@@ -1,17 +1,7 @@
+import { GoogleGenerativeAI, TaskType, Content } from "@google/generative-ai";
 import type { Handler } from '@netlify/functions';
-import * as transformers from '@xenova/transformers';
-
-// Set cache directory for transformers.js
-if (typeof process !== 'undefined' && process.env) {
-  process.env.TRANSFORMERS_CACHE = '/tmp/transformers';
-}
 
 export const handler: Handler = async (event, context) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json'
-  };
 
   if (event.httpMethod !== 'POST') {
     console.warn("SERVERLESS: Method not allowed. Responding with 405.");
@@ -26,7 +16,20 @@ export const handler: Handler = async (event, context) => {
   }
 
   try {
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      console.error("SERVERLESS: CRITICAL - GEMINI_API_KEY is NOT SET in environment variables.");
+      return {
+        statusCode: 500,
+        body: JSON.stringify({
+          error: "Server configuration error: GEMINI_API_KEY is not configured."
+        })
+      };
+    }
+
     const requestBody = JSON.parse(event.body || '{}');
+
     const { text, title } = requestBody;
 
     // Input validation with more specific checks
@@ -66,40 +69,32 @@ export const handler: Handler = async (event, context) => {
 
     console.log(`SERVERLESS: Successfully parsed 'text' (length: ${text.length}) and 'title' (length: ${title.length}) from body.`);
 
-    // Get the model name from environment variables or use default
-    const modelName = process.env.LOCAL_EMBEDDING_MODEL || 'Xenova/all-MiniLM-L6-v2';
-    console.log(`SERVERLESS: Using local embedding model: ${modelName}`);
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const embeddingModel = "models/embedding-001";
 
-    // Create a pipeline for feature extraction
-    const { pipeline } = transformers;
-    console.log("SERVERLESS: Creating feature extraction pipeline...");
-    const extractor = await pipeline('feature-extraction', modelName);
+    const contentRequest: Content = {
+      parts: [{ text: text.trim() }], // Trim whitespace
+      role: "user"
+    };
     
-    console.log("SERVERLESS: Generating embeddings...");
-    // Generate embeddings for the text
-    const output = await extractor(text.trim(), {
-      pooling: 'mean',
-      normalize: true
+    const result = await genAI.getGenerativeModel({ model: embeddingModel }).embedContent({
+      content: contentRequest,
+      taskType: TaskType.RETRIEVAL_DOCUMENT,
+      title: title.trim()
     });
     
-    // Extract the embedding from the result
-    const embedding = Array.from(output.data);
-    
-    // Resize to 768 dimensions to match the database schema
-    // We'll use a simple approach: repeat the vector and then truncate
-    let resizedEmbedding;
-    if (embedding.length < 768) {
-      // Repeat the vector until we have enough dimensions
-      const repetitions = Math.ceil(768 / embedding.length);
-      resizedEmbedding = Array(repetitions).fill(embedding).flat().slice(0, 768);
-    } else if (embedding.length > 768) {
-      // Truncate to 768 dimensions
-      resizedEmbedding = embedding.slice(0, 768);
-    } else {
-      resizedEmbedding = embedding;
+    if (!result || !result.embedding || !result.embedding.values || result.embedding.values.length === 0) {
+      console.error('SERVERLESS: Embedding, embedding.values, or values array is undefined or empty in the API result.');
+      console.error('SERVERLESS: Full API result object:', JSON.stringify(result, null, 2));
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Failed to generate valid embedding values from API' 
+        })
+      };
     }
 
-    console.log(`SERVERLESS: Successfully generated embedding with ${resizedEmbedding.length} dimensions. Responding with 200 OK.`);
+    console.log(`SERVERLESS: Successfully generated embedding with ${result.embedding.values.length} dimensions. Responding with 200 OK.`);
 
     return {
       statusCode: 200,
@@ -108,8 +103,8 @@ export const handler: Handler = async (event, context) => {
         'Cache-Control': 'no-cache'
       },
       body: JSON.stringify({ 
-        embedding: resizedEmbedding,
-        dimensions: resizedEmbedding.length,
+        embedding: result.embedding.values,
+        dimensions: result.embedding.values.length,
         title: title.trim(),
         textLength: text.length
       })
@@ -130,6 +125,10 @@ export const handler: Handler = async (event, context) => {
       console.error('SERVERLESS Error Cause:', error.cause);
     }
     
+    if (error.response?.data) {
+      console.error('SERVERLESS External API Error Data:', JSON.stringify(error.response.data, null, 2));
+    }
+    
     console.error("-------------------- SERVERLESS ERROR END ----------------------");
 
     let errorMessage = "An unexpected error occurred while generating the embedding.";
@@ -137,10 +136,21 @@ export const handler: Handler = async (event, context) => {
 
     // Handle specific error types
     if (error.message) {
-      if (error.message.includes('model') || error.message.includes('pipeline')) {
-        errorMessage = "Error loading embedding model: " + error.message;
+      if (error.message.includes('API key')) {
+        errorMessage = "Invalid API key configuration.";
+        statusCode = 500; // Don't expose API key issues to client
+      } else if (error.message.includes('quota') || error.message.includes('limit')) {
+        errorMessage = "Service temporarily unavailable due to rate limits.";
+        statusCode = 429;
+      } else if (error.status === 400) {
+        errorMessage = "Invalid request format for embedding service.";
+        statusCode = 400;
       } else {
         errorMessage = error.message;
+        if (error.status) {
+          statusCode = error.status;
+          errorMessage = `[${error.status} ${error.statusText || ''}] ${error.message}`;
+        }
       }
     }
 
