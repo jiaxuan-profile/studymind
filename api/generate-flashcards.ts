@@ -11,6 +11,11 @@ export const handler: Handler = async (event, context) => {
     'Content-Type': 'application/json'
   };
 
+  // For local development, allow localhost
+  if (process.env.NODE_ENV === 'development') {
+    headers['Access-Control-Allow-Origin'] = '*';
+  }
+
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers };
   }
@@ -48,6 +53,19 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    // Check for required environment variables
+    const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+    const modelName = process.env.FLASHCARD_MODEL_NAME || 'openai/gpt-4o';
+    
+    if (!openrouterApiKey) {
+      console.error('OPENROUTER_API_KEY is not set in environment variables');
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server configuration error: OPENROUTER_API_KEY is not set' })
+      };
+    }
+
     // Initialize Supabase client with the user's token
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL!,
@@ -60,7 +78,7 @@ export const handler: Handler = async (event, context) => {
     // Initialize OpenAI client for OpenRouter
     const openai = new OpenAI({
       baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: process.env.OPENROUTER_API_KEY!,
+      apiKey: openrouterApiKey,
       defaultHeaders: {
         'HTTP-Referer': 'https://studymindai.me',
         'X-Title': 'StudyMind AI',
@@ -117,11 +135,15 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    console.log(`Found ${strugglingConcepts.length} struggling concepts to generate flashcards for`);
+
     // Process each struggling concept
     let totalFlashcardsGenerated = 0;
     for (const conceptData of strugglingConcepts) {
       const concept = conceptData.concepts;
       if (!concept) continue;
+
+      console.log(`Generating flashcards for concept: ${concept.name}`);
 
       // Generate flashcards using OpenRouter (OpenAI compatible API)
       const prompt = `
@@ -155,8 +177,9 @@ export const handler: Handler = async (event, context) => {
       `;
 
       try {
+        console.log(`Calling OpenRouter API with model: ${modelName}`);
         const completion = await openai.chat.completions.create({
-          model: 'openai/gpt-4o',
+          model: modelName,
           messages: [
             {
               role: 'system',
@@ -212,6 +235,7 @@ export const handler: Handler = async (event, context) => {
             continue;
           }
 
+          console.log(`Successfully inserted ${flashcardsToInsert.length} flashcards for concept: ${concept.name}`);
           totalFlashcardsGenerated += flashcardsToInsert.length;
         }
       } catch (aiError) {
