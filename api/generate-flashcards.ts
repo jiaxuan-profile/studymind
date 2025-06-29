@@ -1,14 +1,20 @@
 // api/generate-flashcards.ts
 
 import { createClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async (event, context) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://*.studymindai.me',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json'
   };
+
+  // For local development, allow localhost
+  if (process.env.NODE_ENV === 'development') {
+    headers['Access-Control-Allow-Origin'] = '*';
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers };
@@ -47,6 +53,21 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
+    // Check for required environment variables
+    const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+    const modelName = process.env.FLASHCARD_MODEL_NAME || 'openai/gpt-4o';
+    const siteUrl = process.env.SITE_URL || 'https://studymindai.me';
+    const siteName = process.env.SITE_NAME || 'StudyMind AI';
+    
+    if (!openrouterApiKey) {
+      console.error('OPENROUTER_API_KEY is not set in environment variables');
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server configuration error: OPENROUTER_API_KEY is not set' })
+      };
+    }
+
     // Initialize Supabase client with the user's token
     const supabase = createClient(
       process.env.VITE_SUPABASE_URL!,
@@ -56,22 +77,173 @@ export const handler: Handler = async (event, context) => {
       }
     );
 
-    // Call the RPC function to generate flashcards
-    const { data, error } = await supabase.rpc(
-      'generate_flashcards_for_struggling_concepts',
-      { max_concepts: maxConcepts }
-    );
+    // Initialize OpenAI client for OpenRouter
+    const openai = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: openrouterApiKey,
+      defaultHeaders: {
+        'HTTP-Referer': siteUrl,
+        'X-Title': siteName,
+      },
+    });
 
-    if (error) {
-      console.error('Error generating flashcards:', error);
+    // Get user's struggling concepts
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'User not authenticated' })
+      };
+    }
+
+    // Get struggling concepts (mastery < 0.4)
+    const { data: strugglingConcepts, error: conceptsError } = await supabase
+      .from('user_concept_mastery')
+      .select(`
+        concept_id,
+        mastery_level,
+        concepts:concept_id (
+          id,
+          name,
+          definition
+        )
+      `)
+      .eq('user_id', user.id)
+      .lt('mastery_level', 0.4)
+      .order('mastery_level', { ascending: true })
+      .limit(maxConcepts);
+
+    if (conceptsError) {
+      console.error('Error fetching struggling concepts:', conceptsError);
       return {
         statusCode: 500,
         headers,
         body: JSON.stringify({ 
-          error: 'Failed to generate flashcards', 
-          details: error.message 
+          error: 'Failed to fetch struggling concepts', 
+          details: conceptsError.message 
         })
       };
+    }
+
+    if (!strugglingConcepts || strugglingConcepts.length === 0) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ 
+          count: 0,
+          message: 'No struggling concepts found to generate flashcards for'
+        })
+      };
+    }
+
+    console.log(`Found ${strugglingConcepts.length} struggling concepts to generate flashcards for`);
+
+    // Process each struggling concept
+    let totalFlashcardsGenerated = 0;
+    for (const conceptData of strugglingConcepts) {
+      const concept = conceptData.concepts;
+      if (!concept) continue;
+
+      console.log(`Generating flashcards for concept: ${concept.name}`);
+
+      // Generate flashcards using OpenRouter (OpenAI compatible API)
+      const prompt = `
+        Generate 3 high-quality flashcards for the concept: "${concept.name}"
+        
+        Definition: ${concept.definition || "No definition available"}
+        
+        Create flashcards that test different aspects of understanding:
+        1. Basic recall/definition
+        2. Application or example
+        3. Deeper understanding or relationship to other concepts
+        
+        Format each flashcard as a JSON object with "front" and "back" properties.
+        Return an array of these objects.
+        
+        Example:
+        [
+          {
+            "front": "What is the definition of [concept]?",
+            "back": "Clear, concise definition."
+          },
+          {
+            "front": "Give an example of [concept] in practice.",
+            "back": "A practical example that demonstrates understanding."
+          },
+          {
+            "front": "How does [concept] relate to [related concept]?",
+            "back": "Explanation of the relationship or connection."
+          }
+        ]
+      `;
+
+      try {
+        console.log(`Calling OpenRouter API with model: ${modelName}`);
+        const completion = await openai.chat.completions.create({
+          model: modelName,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert educational content creator specializing in creating effective flashcards for learning.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
+        });
+
+        const responseContent = completion.choices[0].message.content;
+        if (!responseContent) {
+          console.error('Empty response from OpenRouter for concept:', concept.name);
+          continue;
+        }
+
+        // Parse the flashcards from the response
+        let flashcards;
+        try {
+          // Find JSON in the response (in case the model wraps it in text)
+          const jsonMatch = responseContent.match(/\[[\s\S]*\]/);
+          if (jsonMatch) {
+            flashcards = JSON.parse(jsonMatch[0]);
+          } else {
+            flashcards = JSON.parse(responseContent);
+          }
+        } catch (parseError) {
+          console.error('Error parsing flashcards JSON:', parseError);
+          console.error('Raw response:', responseContent);
+          continue;
+        }
+
+        // Insert flashcards into the database
+        if (Array.isArray(flashcards) && flashcards.length > 0) {
+          const flashcardsToInsert = flashcards.map((card, index) => ({
+            user_id: user.id,
+            concept_id: concept.id,
+            front_content: card.front,
+            back_content: card.back,
+            difficulty: index === 0 ? 'easy' : index === 1 ? 'medium' : 'hard'
+          }));
+
+          const { error: insertError } = await supabase
+            .from('flashcards')
+            .insert(flashcardsToInsert);
+
+          if (insertError) {
+            console.error('Error inserting flashcards:', insertError);
+            continue;
+          }
+
+          console.log(`Successfully inserted ${flashcardsToInsert.length} flashcards for concept: ${concept.name}`);
+          totalFlashcardsGenerated += flashcardsToInsert.length;
+        }
+      } catch (aiError) {
+        console.error('Error generating flashcards with OpenRouter:', aiError);
+        continue; // Continue with next concept even if this one fails
+      }
     }
 
     // Return the number of flashcards generated
@@ -79,8 +251,8 @@ export const handler: Handler = async (event, context) => {
       statusCode: 200,
       headers,
       body: JSON.stringify({ 
-        count: data || 0,
-        message: `Successfully generated ${data || 0} flashcards for struggling concepts`
+        count: totalFlashcardsGenerated,
+        message: `Successfully generated ${totalFlashcardsGenerated} flashcards for struggling concepts`
       })
     };
 

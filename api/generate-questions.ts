@@ -1,7 +1,7 @@
 // api/generate-questions.ts 
 
 import { createClient } from '@supabase/supabase-js';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import type { Handler } from '@netlify/functions';
 
 interface Question {
@@ -15,12 +15,6 @@ interface Question {
   question_type?: 'short' | 'mcq' | 'open';
 }
 
-interface ConceptWithMastery {
-  id: string;
-  name: string;
-  mastery_level: number;
-}
-
 function extractJSONFromMarkdown(text: string): string {
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
   return jsonMatch ? jsonMatch[1].trim() : text.trim();
@@ -28,10 +22,15 @@ function extractJSONFromMarkdown(text: string): string {
 
 const handler: Handler = async (event) => {
   const headers = {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': 'https://*.studymindai.me',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
     'Content-Type': 'application/json'
   };
+
+  // For local development, allow localhost
+  if (process.env.NODE_ENV === 'development') {
+    headers['Access-Control-Allow-Origin'] = '*';
+  }
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers };
@@ -50,8 +49,34 @@ const handler: Handler = async (event) => {
     if (!authHeader) {
       return { statusCode: 401, headers, body: JSON.stringify({ error: 'Missing Authorization header' }) };
     }
+
+    // Check for required environment variables
+    const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+    const modelName = process.env.GENERATE_QUESTIONS_MODEL_NAME || 'openai/gpt-4o';
+    const siteUrl = process.env.SITE_URL || 'https://studymindai.me';
+    const siteName = process.env.SITE_NAME || 'StudyMind AI';
+    
+    if (!openrouterApiKey) {
+      console.error('OPENROUTER_API_KEY is not set in environment variables');
+      return {
+        statusCode: 500,
+        headers,
+        body: JSON.stringify({ error: 'Server configuration error: OPENROUTER_API_KEY is not set' })
+      };
+    }
+
     const supabase = createClient(process.env.VITE_SUPABASE_URL!, process.env.VITE_SUPABASE_ANON_KEY!, {
       global: { headers: { Authorization: authHeader } }
+    });
+
+    // Initialize OpenAI client for OpenRouter
+    const openai = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: openrouterApiKey,
+      defaultHeaders: {
+        'HTTP-Referer': siteUrl,
+        'X-Title': siteName,
+      },
     });
 
     const { data: note, error: noteError } = await supabase
@@ -59,45 +84,41 @@ const handler: Handler = async (event) => {
       .select('title, content, user_id')
       .eq('id', noteId)
       .single();
-    if (noteError || !note) throw new Error(`Note not found or permission denied for id: ${noteId}.`);
+    if (noteError || !note) throw new Error(`Note with id ${noteId} not found or permission denied.`);
 
-    const { data: noteConceptsData, error: conceptsError } = await supabase
+    const { data: noteConceptsData, error: noteConceptsError } = await supabase
       .from('note_concepts')
-      .select('concepts ( id, name )')
+      .select('concepts(id, name)')
       .eq('note_id', noteId);
-
-    if (conceptsError) throw new Error(`Could not fetch concepts for note: ${conceptsError.message}`);
-
+    if (noteConceptsError) throw new Error('Could not fetch concepts for the note.');
+    
     const conceptsInThisNote = noteConceptsData?.map(nc => nc.concepts).filter(Boolean) || [];
-
     if (conceptsInThisNote.length === 0) {
-      return { statusCode: 200, headers, body: JSON.stringify({ questions: [], message: "No concepts found on this note to generate questions." }) };
+        return { statusCode: 200, headers, body: JSON.stringify({ questions: [], message: "No concepts found for this note to analyze gaps."}) };
     }
-    const conceptIdsInNote = conceptsInThisNote.map(c => c.id);
-
-    // Fetch the user's mastery for ONLY the concepts found in this note.
-    const { data: masteryData, error: masteryError } = await supabase
+    
+    const { data: masteryProfile, error: masteryError } = await supabase
       .from('user_concept_mastery')
       .select('concept_id, mastery_level')
-      .eq('user_id', note.user_id)
-      .in('concept_id', conceptIdsInNote);
+      .eq('user_id', note.user_id);
+    if (masteryError) throw new Error('Could not fetch user mastery profile.');
+    
+    const masteryMap = new Map(masteryProfile.map(item => [item.concept_id, item.mastery_level]));
 
-    if (masteryError) throw new Error(`Could not fetch mastery data: ${masteryError.message}`);
-
-    const masteryMap = new Map(masteryData?.map(item => [item.concept_id, item.mastery_level]) || []);
-
-    const conceptsForPrompt: ConceptWithMastery[] = conceptsInThisNote.map(concept => ({
-      id: concept.id,
-      name: concept.name,
+    const conceptsWithMastery = conceptsInThisNote.map(concept => ({
+      ...concept,
       mastery_level: masteryMap.get(concept.id) ?? 0.5
     }));
 
-    // Fetch the knowledge gaps separately
-    const { data: noteGaps, error: gapsError } = await supabase
-      .from('knowledge_gaps')
-      .select('concept, gap_type, reinforcement_strategy')
-      .eq('note_id', noteId);
-    if (gapsError) console.warn("Could not fetch knowledge gaps, proceeding without them.");
+    // Validate questionTypeFilter to ensure it matches the database constraint
+    let validatedQuestionType = 'short'; // Default value
+    if (questionTypeFilter) {
+      if (['short', 'mcq', 'open'].includes(questionTypeFilter)) {
+        validatedQuestionType = questionTypeFilter;
+      } else {
+        console.warn(`Invalid question type: ${questionTypeFilter}, defaulting to 'short'`);
+      }
+    }
 
     let questionTypeInstruction = "Generate short-answer questions that require a 1-3 sentence response.";
     let jsonFormatExample = `
@@ -107,7 +128,7 @@ const handler: Handler = async (event) => {
       "difficulty": "medium",
       "mastery_context": "Tests understanding of a core synchronization primitive."`;
 
-    if (questionTypeFilter === 'mcq') {
+    if (validatedQuestionType === 'mcq') {
       questionTypeInstruction = "Generate Multiple Choice Questions (MCQs). Each question must have an 'options' array with 4 strings, and an 'answer' field with the correct option string.";
       jsonFormatExample = `
       "question": "Which of the following is NOT a condition for deadlock?",
@@ -118,7 +139,7 @@ const handler: Handler = async (event) => {
       "difficulty": "easy",
       "mastery_context": "Tests recall of deadlock conditions.",
       "question_type": "mcq"`;
-    } else if (questionTypeFilter === 'open') {
+    } else if (validatedQuestionType === 'open') {
       questionTypeInstruction = "Generate open-ended questions that require detailed explanation, comparison, or synthesis of multiple concepts.";
     }
 
@@ -135,9 +156,6 @@ const handler: Handler = async (event) => {
     }
 
     // Construct a clear, high-quality prompt for the AI
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-
     const prompt = `
       You are an expert tutor generating exactly 5 practice questions based on a student's notes and their specific learning profile for those notes.
 
@@ -149,8 +167,8 @@ const handler: Handler = async (event) => {
       ---
 
       STUDENT'S PROFILE FOR THIS NOTE:
-      - Concepts & Current Mastery: ${JSON.stringify(conceptsForPrompt, null, 2)}
-      - Identified Knowledge Gaps: ${JSON.stringify(noteGaps || [], null, 2)}
+      - Concepts & Current Mastery: ${JSON.stringify(conceptsWithMastery, null, 2)}
+      - Identified Knowledge Gaps: ${JSON.stringify([])}
 
       YOUR TASK & RULES:
       1.  **Question Type:** ${questionTypeInstruction}
@@ -159,7 +177,7 @@ const handler: Handler = async (event) => {
       4.  FORMAT: Return ONLY a valid JSON array of question objects, no markdown. Each object MUST include a 'difficulty' field with one of these exact string values: "easy", "medium", or "hard".
       5.  HINTS: Provide a useful hint for each question.
       6.  CONNECTIONS: The 'connects' array should list the key concepts tested.
-      7.  QUESTION TYPE: Add a "question_type" field to each question with the value "${questionTypeFilter || 'short'}"
+      7.  QUESTION TYPE: Add a "question_type" field to each question with the value "${validatedQuestionType}"
 
       EXAMPLE JSON OBJECT FORMAT:
       {
@@ -168,8 +186,28 @@ const handler: Handler = async (event) => {
     `;
 
     // Generate, parse, and save the questions
-    const result = await model.generateContent(prompt);
-    const rawText = extractJSONFromMarkdown(result.response.text());
+    console.log(`Calling OpenRouter API with model: ${modelName}`);
+    const completion = await openai.chat.completions.create({
+      model: modelName,
+      messages: [
+        {
+          role: 'system',
+          content: 'You are an expert educational content creator specializing in creating effective practice questions for learning.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: 0.7,
+    });
+
+    const responseContent = completion.choices[0].message.content;
+    if (!responseContent) {
+      throw new Error('Empty response from OpenRouter');
+    }
+
+    const rawText = extractJSONFromMarkdown(responseContent);
     const generatedQuestions: Question[] = JSON.parse(rawText);
 
     const questionsToInsert = generatedQuestions.map(q => ({
@@ -181,7 +219,7 @@ const handler: Handler = async (event) => {
       connects: q.connects,
       difficulty: q.difficulty,
       mastery_context: q.mastery_context,
-      question_type: questionTypeFilter || 'short',
+      question_type: validatedQuestionType,
       options: q.options || null,
       answer: q.answer || null,
       is_default: !difficultyFilter && !questionTypeFilter,

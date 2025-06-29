@@ -21,6 +21,7 @@
     "docx": "^8.5.0",
     "lucide-react": "^0.323.0",
     "mammoth": "^1.6.0",
+    "openai": "^4.28.0",
     "pdfjs-dist": "^5.3.31",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
