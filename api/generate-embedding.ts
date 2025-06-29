@@ -1,5 +1,5 @@
-import OpenAI from 'openai';
 import type { Handler } from '@netlify/functions';
+import { pipeline } from '@xenova/transformers';
 
 export const handler: Handler = async (event, context) => {
   const headers = {
@@ -26,24 +26,7 @@ export const handler: Handler = async (event, context) => {
   }
 
   try {
-    // Check for required environment variables
-    const openrouterApiKey = process.env.OPENROUTER_API_KEY;
-    const modelName = process.env.EMBEDDING_MODEL_NAME || 'openai/text-embedding-3-large';
-    const siteUrl = process.env.SITE_URL || 'https://studymindai.me';
-    const siteName = process.env.SITE_NAME || 'StudyMind AI';
-    
-    if (!openrouterApiKey) {
-      console.error("SERVERLESS: CRITICAL - OPENROUTER_API_KEY is NOT SET in environment variables.");
-      return {
-        statusCode: 500,
-        body: JSON.stringify({
-          error: "Server configuration error: OPENROUTER_API_KEY is not configured."
-        })
-      };
-    }
-
     const requestBody = JSON.parse(event.body || '{}');
-
     const { text, title } = requestBody;
 
     // Input validation with more specific checks
@@ -83,50 +66,36 @@ export const handler: Handler = async (event, context) => {
 
     console.log(`SERVERLESS: Successfully parsed 'text' (length: ${text.length}) and 'title' (length: ${title.length}) from body.`);
 
-    // Initialize OpenAI client for OpenRouter
-    const openai = new OpenAI({
-      baseURL: 'https://openrouter.ai/api/v1',
-      apiKey: openrouterApiKey,
-      defaultHeaders: {
-        'HTTP-Referer': siteUrl,
-        'X-Title': siteName,
-      },
-    });
-
-    console.log(`SERVERLESS: Calling OpenRouter API with model: ${modelName}`);
+    // Use a smaller, faster model for embeddings
+    // This model produces 384-dimensional embeddings, which we'll resize to match our DB schema
+    console.log("SERVERLESS: Loading local embedding model...");
+    const embeddingPipeline = await pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
     
-    // Get embeddings using OpenRouter
-    const embeddingResponse = await openai.embeddings.create({
-      model: modelName,
-      input: text.trim(),
-      dimensions: 768, // Specify dimensions for compatibility with existing database
+    console.log("SERVERLESS: Generating embeddings...");
+    // Generate embeddings for the text
+    const result = await embeddingPipeline(text.trim(), {
+      pooling: 'mean',
+      normalize: true
     });
     
-    if (!embeddingResponse || !embeddingResponse.data || embeddingResponse.data.length === 0) {
-      console.error('SERVERLESS: Embedding response is empty or invalid');
-      console.error('SERVERLESS: Full API result object:', JSON.stringify(embeddingResponse, null, 2));
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ 
-          error: 'Failed to generate valid embedding values from API' 
-        })
-      };
-    }
-
-    const embedding = embeddingResponse.data[0].embedding;
+    // Extract the embedding from the result
+    const embedding = Array.from(result.data);
     
-    if (!embedding || embedding.length === 0) {
-      console.error('SERVERLESS: Embedding values array is empty or undefined');
-      console.error('SERVERLESS: Full API result object:', JSON.stringify(embeddingResponse, null, 2));
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ 
-          error: 'Failed to generate valid embedding values from API' 
-        })
-      };
+    // Resize to 768 dimensions to match the database schema
+    // We'll use a simple approach: repeat the vector and then truncate
+    let resizedEmbedding;
+    if (embedding.length < 768) {
+      // Repeat the vector until we have enough dimensions
+      const repetitions = Math.ceil(768 / embedding.length);
+      resizedEmbedding = Array(repetitions).fill(embedding).flat().slice(0, 768);
+    } else if (embedding.length > 768) {
+      // Truncate to 768 dimensions
+      resizedEmbedding = embedding.slice(0, 768);
+    } else {
+      resizedEmbedding = embedding;
     }
 
-    console.log(`SERVERLESS: Successfully generated embedding with ${embedding.length} dimensions. Responding with 200 OK.`);
+    console.log(`SERVERLESS: Successfully generated embedding with ${resizedEmbedding.length} dimensions. Responding with 200 OK.`);
 
     return {
       statusCode: 200,
@@ -135,8 +104,8 @@ export const handler: Handler = async (event, context) => {
         'Cache-Control': 'no-cache'
       },
       body: JSON.stringify({ 
-        embedding: embedding,
-        dimensions: embedding.length,
+        embedding: resizedEmbedding,
+        dimensions: resizedEmbedding.length,
         title: title.trim(),
         textLength: text.length
       })
@@ -157,10 +126,6 @@ export const handler: Handler = async (event, context) => {
       console.error('SERVERLESS Error Cause:', error.cause);
     }
     
-    if (error.response?.data) {
-      console.error('SERVERLESS External API Error Data:', JSON.stringify(error.response.data, null, 2));
-    }
-    
     console.error("-------------------- SERVERLESS ERROR END ----------------------");
 
     let errorMessage = "An unexpected error occurred while generating the embedding.";
@@ -168,21 +133,10 @@ export const handler: Handler = async (event, context) => {
 
     // Handle specific error types
     if (error.message) {
-      if (error.message.includes('API key')) {
-        errorMessage = "Invalid API key configuration.";
-        statusCode = 500; // Don't expose API key issues to client
-      } else if (error.message.includes('quota') || error.message.includes('limit')) {
-        errorMessage = "Service temporarily unavailable due to rate limits.";
-        statusCode = 429;
-      } else if (error.status === 400) {
-        errorMessage = "Invalid request format for embedding service.";
-        statusCode = 400;
+      if (error.message.includes('model') || error.message.includes('pipeline')) {
+        errorMessage = "Error loading embedding model.";
       } else {
         errorMessage = error.message;
-        if (error.status) {
-          statusCode = error.status;
-          errorMessage = `[${error.status} ${error.statusText || ''}] ${error.message}`;
-        }
       }
     }
 
