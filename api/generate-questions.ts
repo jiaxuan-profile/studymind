@@ -110,6 +110,16 @@ const handler: Handler = async (event) => {
       mastery_level: masteryMap.get(concept.id) ?? 0.5
     }));
 
+    // Validate questionTypeFilter to ensure it matches the database constraint
+    let validatedQuestionType = 'short'; // Default value
+    if (questionTypeFilter) {
+      if (['short', 'mcq', 'open'].includes(questionTypeFilter)) {
+        validatedQuestionType = questionTypeFilter;
+      } else {
+        console.warn(`Invalid question type: ${questionTypeFilter}, defaulting to 'short'`);
+      }
+    }
+
     let questionTypeInstruction = "Generate short-answer questions that require a 1-3 sentence response.";
     let jsonFormatExample = `
       "question": "Based on the note, explain the primary function of a Mutex.",
@@ -118,7 +128,7 @@ const handler: Handler = async (event) => {
       "difficulty": "medium",
       "mastery_context": "Tests understanding of a core synchronization primitive."`;
 
-    if (questionTypeFilter === 'mcq') {
+    if (validatedQuestionType === 'mcq') {
       questionTypeInstruction = "Generate Multiple Choice Questions (MCQs). Each question must have an 'options' array with 4 strings, and an 'answer' field with the correct option string.";
       jsonFormatExample = `
       "question": "Which of the following is NOT a condition for deadlock?",
@@ -129,7 +139,7 @@ const handler: Handler = async (event) => {
       "difficulty": "easy",
       "mastery_context": "Tests recall of deadlock conditions.",
       "question_type": "mcq"`;
-    } else if (questionTypeFilter === 'open') {
+    } else if (validatedQuestionType === 'open') {
       questionTypeInstruction = "Generate open-ended questions that require detailed explanation, comparison, or synthesis of multiple concepts.";
     }
 
@@ -167,7 +177,7 @@ const handler: Handler = async (event) => {
       4.  FORMAT: Return ONLY a valid JSON array of question objects, no markdown. Each object MUST include a 'difficulty' field with one of these exact string values: "easy", "medium", or "hard".
       5.  HINTS: Provide a useful hint for each question.
       6.  CONNECTIONS: The 'connects' array should list the key concepts tested.
-      7.  QUESTION TYPE: Add a "question_type" field to each question with the value "${questionTypeFilter || 'short'}"
+      7.  QUESTION TYPE: Add a "question_type" field to each question with the value "${validatedQuestionType}"
 
       EXAMPLE JSON OBJECT FORMAT:
       {
@@ -209,7 +219,7 @@ const handler: Handler = async (event) => {
       connects: q.connects,
       difficulty: q.difficulty,
       mastery_context: q.mastery_context,
-      question_type: questionTypeFilter || 'short',
+      question_type: validatedQuestionType,
       options: q.options || null,
       answer: q.answer || null,
       is_default: !difficultyFilter && !questionTypeFilter,
