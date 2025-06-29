@@ -56,6 +56,8 @@ export const handler: Handler = async (event, context) => {
     // Check for required environment variables
     const openrouterApiKey = process.env.OPENROUTER_API_KEY;
     const modelName = process.env.FLASHCARD_MODEL_NAME || 'openai/gpt-4o';
+    const siteUrl = process.env.SITE_URL || 'https://studymindai.me';
+    const siteName = process.env.SITE_NAME || 'StudyMind AI';
     
     if (!openrouterApiKey) {
       console.error('OPENROUTER_API_KEY is not set in environment variables');
@@ -80,8 +82,8 @@ export const handler: Handler = async (event, context) => {
       baseURL: 'https://openrouter.ai/api/v1',
       apiKey: openrouterApiKey,
       defaultHeaders: {
-        'HTTP-Referer': 'https://studymindai.me',
-        'X-Title': 'StudyMind AI',
+        'HTTP-Referer': siteUrl,
+        'X-Title': siteName,
       },
     });
 
