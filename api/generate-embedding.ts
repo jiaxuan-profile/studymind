@@ -1,7 +1,17 @@
-import { GoogleGenerativeAI, TaskType, Content } from "@google/generative-ai";
+import OpenAI from 'openai';
 import type { Handler } from '@netlify/functions';
 
 export const handler: Handler = async (event, context) => {
+  const headers = {
+    'Access-Control-Allow-Origin': 'https://*.studymindai.me',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Content-Type': 'application/json'
+  };
+
+  // For local development, allow localhost
+  if (process.env.NODE_ENV === 'development') {
+    headers['Access-Control-Allow-Origin'] = '*';
+  }
 
   if (event.httpMethod !== 'POST') {
     console.warn("SERVERLESS: Method not allowed. Responding with 405.");
@@ -16,14 +26,18 @@ export const handler: Handler = async (event, context) => {
   }
 
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      console.error("SERVERLESS: CRITICAL - GEMINI_API_KEY is NOT SET in environment variables.");
+    // Check for required environment variables
+    const openrouterApiKey = process.env.OPENROUTER_API_KEY;
+    const modelName = process.env.EMBEDDING_MODEL_NAME || 'openai/text-embedding-3-large';
+    const siteUrl = process.env.SITE_URL || 'https://studymindai.me';
+    const siteName = process.env.SITE_NAME || 'StudyMind AI';
+    
+    if (!openrouterApiKey) {
+      console.error("SERVERLESS: CRITICAL - OPENROUTER_API_KEY is NOT SET in environment variables.");
       return {
         statusCode: 500,
         body: JSON.stringify({
-          error: "Server configuration error: GEMINI_API_KEY is not configured."
+          error: "Server configuration error: OPENROUTER_API_KEY is not configured."
         })
       };
     }
@@ -69,23 +83,28 @@ export const handler: Handler = async (event, context) => {
 
     console.log(`SERVERLESS: Successfully parsed 'text' (length: ${text.length}) and 'title' (length: ${title.length}) from body.`);
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const embeddingModel = "models/embedding-001";
+    // Initialize OpenAI client for OpenRouter
+    const openai = new OpenAI({
+      baseURL: 'https://openrouter.ai/api/v1',
+      apiKey: openrouterApiKey,
+      defaultHeaders: {
+        'HTTP-Referer': siteUrl,
+        'X-Title': siteName,
+      },
+    });
 
-    const contentRequest: Content = {
-      parts: [{ text: text.trim() }], // Trim whitespace
-      role: "user"
-    };
+    console.log(`SERVERLESS: Calling OpenRouter API with model: ${modelName}`);
     
-    const result = await genAI.getGenerativeModel({ model: embeddingModel }).embedContent({
-      content: contentRequest,
-      taskType: TaskType.RETRIEVAL_DOCUMENT,
-      title: title.trim()
+    // Get embeddings using OpenRouter
+    const embeddingResponse = await openai.embeddings.create({
+      model: modelName,
+      input: text.trim(),
+      dimensions: 768, // Specify dimensions for compatibility with existing database
     });
     
-    if (!result || !result.embedding || !result.embedding.values || result.embedding.values.length === 0) {
-      console.error('SERVERLESS: Embedding, embedding.values, or values array is undefined or empty in the API result.');
-      console.error('SERVERLESS: Full API result object:', JSON.stringify(result, null, 2));
+    if (!embeddingResponse || !embeddingResponse.data || embeddingResponse.data.length === 0) {
+      console.error('SERVERLESS: Embedding response is empty or invalid');
+      console.error('SERVERLESS: Full API result object:', JSON.stringify(embeddingResponse, null, 2));
       return {
         statusCode: 500,
         body: JSON.stringify({ 
@@ -94,7 +113,20 @@ export const handler: Handler = async (event, context) => {
       };
     }
 
-    console.log(`SERVERLESS: Successfully generated embedding with ${result.embedding.values.length} dimensions. Responding with 200 OK.`);
+    const embedding = embeddingResponse.data[0].embedding;
+    
+    if (!embedding || embedding.length === 0) {
+      console.error('SERVERLESS: Embedding values array is empty or undefined');
+      console.error('SERVERLESS: Full API result object:', JSON.stringify(embeddingResponse, null, 2));
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Failed to generate valid embedding values from API' 
+        })
+      };
+    }
+
+    console.log(`SERVERLESS: Successfully generated embedding with ${embedding.length} dimensions. Responding with 200 OK.`);
 
     return {
       statusCode: 200,
@@ -103,8 +135,8 @@ export const handler: Handler = async (event, context) => {
         'Cache-Control': 'no-cache'
       },
       body: JSON.stringify({ 
-        embedding: result.embedding.values,
-        dimensions: result.embedding.values.length,
+        embedding: embedding,
+        dimensions: embedding.length,
         title: title.trim(),
         textLength: text.length
       })
